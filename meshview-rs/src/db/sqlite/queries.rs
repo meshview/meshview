@@ -6,8 +6,8 @@
 //! tiebreak, one is added, so that the answer does not depend on the query plan.
 
 use crate::db::{
-    DailySnapshot, JobRun, PacketFilter, PacketSeen, Period, PeriodCount, SightingsOf, TopNode,
-    TopQuery,
+    DailySnapshot, Facet, JobRun, Node, NodeFacet, NodeFilter, NodeQuery, PacketFilter, PacketSeen,
+    Period, PeriodCount, SightingsOf, TopNode, TopQuery,
 };
 use anyhow::{Context, Result};
 use sqlx::SqlitePool;
@@ -235,4 +235,167 @@ pub async fn top_nodes(pool: &SqlitePool, top: &TopQuery) -> Result<(i64, Vec<To
         .context("counting the top nodes")?;
 
     Ok((total, nodes))
+}
+
+/// `text` with LIKE's wildcards, and the escape itself, escaped with `/`: what
+/// is searched for is the text, not a pattern.
+fn like_literal(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        if matches!(c, '/' | '%' | '_') {
+            out.push('/');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// A node filter's conditions, after a WHERE already written.
+fn push_node_filter(query: &mut QueryBuilder<Sqlite>, filter: &NodeFilter) {
+    query.push(" node.last_seen_us IS NOT NULL");
+    match filter.node_id {
+        None => {}
+        Some(Some(node_id)) => {
+            query.push(" AND node.node_id = ").push_bind(node_id);
+        }
+        // Asked for by something that is not a node number: no node is that.
+        Some(None) => {
+            query.push(" AND 0");
+        }
+    }
+    if let Some(role) = &filter.role {
+        query
+            .push(" AND node.role = ")
+            .push_bind(role.to_uppercase());
+    }
+    for (column, value) in [
+        ("channel", &filter.channel),
+        ("hw_model", &filter.hw_model),
+        ("firmware", &filter.firmware),
+    ] {
+        if let Some(value) = value {
+            query
+                .push(format!(" AND node.{column} = "))
+                .push_bind(value.clone());
+        }
+    }
+    if let Some(since) = filter.seen_since_us {
+        query.push(" AND node.last_seen_us > ").push_bind(since);
+    }
+    if let Some(ids) = &filter.ids {
+        if ids.is_empty() {
+            query.push(" AND 0");
+        } else {
+            query.push(" AND node.node_id IN (");
+            let mut separated = query.separated(", ");
+            for id in ids {
+                separated.push_bind(*id);
+            }
+            query.push(")");
+        }
+    }
+    match filter.is_mqtt_gateway {
+        None => {}
+        Some(true) => {
+            query.push(" AND node.is_mqtt_gateway IS 1");
+        }
+        Some(false) => {
+            query.push(" AND (node.is_mqtt_gateway IS 0 OR node.is_mqtt_gateway IS NULL)");
+        }
+    }
+    if let Some(has_position) = filter.has_position {
+        query
+            .push(if has_position { " AND " } else { " AND NOT " })
+            .push(
+                "(node.last_lat IS NOT NULL AND node.last_long IS NOT NULL \
+              AND node.last_lat != 0 AND node.last_long != 0)",
+            );
+    }
+    if let Some(search) = &filter.search {
+        let term = like_literal(&search.to_lowercase());
+        query.push(" AND (");
+        for (i, column) in [
+            "lower(node.long_name)",
+            "lower(node.short_name)",
+            "lower(node.id)",
+            "CAST(node.node_id AS VARCHAR)",
+        ]
+        .iter()
+        .enumerate()
+        {
+            if i > 0 {
+                query.push(" OR ");
+            }
+            query
+                .push(format!("{column} LIKE '%' || "))
+                .push_bind(term.clone())
+                .push(" || '%' ESCAPE '/'");
+        }
+        query.push(")");
+    }
+}
+
+pub async fn nodes(pool: &SqlitePool, node_query: &NodeQuery) -> Result<Vec<Node>> {
+    let mut query = QueryBuilder::new(
+        "SELECT id, node_id, long_name, short_name, hw_model, firmware, role, last_lat, \
+         last_long, last_altitude, channel, is_mqtt_gateway, first_seen_us, last_seen_us \
+         FROM node WHERE",
+    );
+    push_node_filter(&mut query, &node_query.filter);
+    match node_query.sort {
+        // As it always was: by short name, exactly, those without one first.
+        None => query.push(" ORDER BY node.short_name ASC"),
+        Some((sort, descending)) => {
+            let column = if sort.is_text() {
+                format!("lower(node.{})", sort.column())
+            } else {
+                format!("node.{}", sort.column())
+            };
+            let direction = if descending { "DESC" } else { "ASC" };
+            query.push(format!(" ORDER BY {column} {direction} NULLS LAST"))
+        }
+    };
+    query.push(", node.node_id ASC");
+    if node_query.limit.is_some() || node_query.offset != 0 {
+        query
+            .push(" LIMIT ")
+            .push_bind(node_query.limit.unwrap_or(-1))
+            .push(" OFFSET ")
+            .push_bind(node_query.offset);
+    }
+    query
+        .build_query_as()
+        .fetch_all(pool)
+        .await
+        .context("listing nodes")
+}
+
+pub async fn count_nodes(pool: &SqlitePool, filter: &NodeFilter) -> Result<i64> {
+    let mut query = QueryBuilder::new("SELECT count(*) FROM node WHERE");
+    push_node_filter(&mut query, filter);
+    query
+        .build_query_scalar()
+        .fetch_one(pool)
+        .await
+        .context("counting nodes")
+}
+
+pub async fn node_facet(
+    pool: &SqlitePool,
+    field: NodeFacet,
+    filter: &NodeFilter,
+) -> Result<Vec<Facet>> {
+    let column = field.column();
+    let mut query = QueryBuilder::new(format!(
+        "SELECT node.{column} AS value, count(*) AS count FROM node WHERE"
+    ));
+    push_node_filter(&mut query, filter);
+    query.push(format!(
+        " GROUP BY node.{column} ORDER BY count(*) DESC, node.{column}"
+    ));
+    query
+        .build_query_as()
+        .fetch_all(pool)
+        .await
+        .with_context(|| format!("counting nodes by {column}"))
 }
