@@ -80,10 +80,6 @@ pub async fn run_until(
         return Ok(());
     }
 
-    if !config.server.tls_cert.trim().is_empty() {
-        warn!("[server] tls_cert is not supported yet and is ignored: terminate TLS in front");
-    }
-
     // Read before anything starts, so that a mistake in [mqtt] stops the process
     // at once rather than after it has reported itself alive.
     let mqtt = if role.ingests() {

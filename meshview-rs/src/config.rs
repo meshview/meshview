@@ -57,8 +57,10 @@ pub struct Server {
     /// The address to listen on. `*` means every interface.
     pub bind: String,
     pub port: u16,
-    /// A PEM file with the certificate and key for HTTPS. Not supported yet.
-    pub tls_cert: String,
+    /// Deprecated, and ignored: HTTPS is a reverse proxy's to serve. Kept for
+    /// one version so that a converted Python configuration still starts, with
+    /// a warning; see [`Config::deprecations`].
+    pub tls_cert: Option<String>,
 }
 
 impl Default for Server {
@@ -67,7 +69,7 @@ impl Default for Server {
             bind: "*".into(),
             // The Python version's, so that nothing in front of it has to change.
             port: 8081,
-            tls_cert: String::new(),
+            tls_cert: None,
         }
     }
 }
@@ -297,6 +299,15 @@ impl Config {
     /// version: a key that is accepted for ever is one nobody ever removes.
     pub fn deprecations(&self) -> Vec<String> {
         let mut warnings = Vec::new();
+
+        if self.server.tls_cert.is_some() {
+            warnings.push(
+                "[server] tls_cert is deprecated and ignored, and will be removed in the next \
+                 version: serve HTTPS from a reverse proxy in front, such as nginx, Caddy or a \
+                 Kubernetes ingress."
+                    .to_string(),
+            );
+        }
 
         let backup = [
             ("backup_enabled", self.cleanup.backup_enabled.is_some()),
@@ -576,19 +587,21 @@ mod tests {
         assert!(Config::default().deprecations().is_empty());
 
         let config = Config::parse(
-            "[cleanup]\nbackup_enabled = true\nbackup_dir = \"/b\"\n\
+            "[server]\ntls_cert = \"\"\n\
+             [cleanup]\nbackup_enabled = true\nbackup_dir = \"/b\"\n\
              [logging]\ndb_cleanup_logfile = \"x.log\"\n",
         )
         .unwrap();
         let warnings = config.deprecations();
 
-        assert_eq!(warnings.len(), 3);
+        assert_eq!(warnings.len(), 4);
         assert!(
             warnings
                 .iter()
                 .all(|w| w.contains("removed in the next version"))
         );
-        assert!(warnings[0].contains("meshview-rs backup"));
+        assert!(warnings[0].contains("reverse proxy"));
+        assert!(warnings[1].contains("meshview-rs backup"));
     }
 
     #[test]
@@ -603,6 +616,7 @@ mod tests {
     fn every_key() -> BTreeMap<String, Vec<String>> {
         let mut config = Config::default();
         config.mqtt.port = Some(1883);
+        config.server.tls_cert = Some(String::new());
         config.cleanup.backup_enabled = Some(false);
         config.cleanup.backup_dir = Some("./backups".into());
         config.cleanup.backup_hour = Some(2);

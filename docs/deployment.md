@@ -37,6 +37,44 @@ filesystem is not, and will end up corrupted: never NFS, CephFS, SMB or any
 `ReadWriteMany` volume. Web servers spread over several machines will need
 PostgreSQL, which is planned but not supported yet.
 
+## HTTPS
+
+meshview-rs serves plain HTTP: HTTPS is for a reverse proxy in front of it to
+serve, as nginx, Caddy, Traefik or a Kubernetes ingress do, getting and renewing
+the certificates themselves. The Python version's `[server] tls_cert` is
+deprecated: it is accepted with a warning and ignored, and will be removed in
+the next version.
+
+With a proxy on the same machine, bind meshview-rs to the loopback interface
+only (`[server] bind = "127.0.0.1"`), so that it is reached through the proxy
+alone. Caddy, which gets its certificate by itself:
+
+```caddyfile
+mesh.example.org {
+    reverse_proxy 127.0.0.1:8081
+}
+```
+
+nginx, with the certificate from elsewhere (certbot, for one):
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name mesh.example.org;
+    ssl_certificate     /etc/letsencrypt/live/mesh.example.org/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/mesh.example.org/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+meshview-rs compresses what is worth compressing itself, so the proxy need not.
+
 ## Probes
 
 Every role listens on `[server] port` and answers two probes, outside the API:
