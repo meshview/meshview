@@ -15,9 +15,9 @@ everything it serves inside it.
 
 Early days. It reads its configuration, takes a Python meshview database over or
 creates one, ingests from MQTT (plain or over TLS), runs the daily cleanup and
-snapshot, makes consistent backups, and answers the probes and the API
-reference. The API itself and the web pages are being ported next,
-against the behaviour of the Python meshview 4.0.
+snapshot, makes consistent backups, and serves part of the API. The rest of the
+API and the web pages are being ported next, against the behaviour of the Python
+meshview 4.0.
 
 Ingestion stores what the Python version stores, byte for byte: run side by side
 on the same broker, both write identical databases.
@@ -54,7 +54,8 @@ copies the database, consistently, for a scheduler to run.
 - [Coming from the Python meshview](docs/migrating-from-python.md): taking a
   database over and converting `config.ini`.
 - [Ingestion](docs/ingestion.md): what is read from MQTT and what is stored.
-- [API](docs/api.md): versioning, the reference and the redirects.
+- [API](docs/api.md): where the reference is, and what changed from the Python
+  version.
 - [Development](docs/development.md): building, testing, protobufs, CI and
   releases.
 

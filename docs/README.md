@@ -6,7 +6,7 @@
 | [Deployment](deployment.md) | The four roles, probes, stopping, the binary, the container image and Kubernetes. |
 | [Coming from the Python meshview](migrating-from-python.md) | Taking a database over, converting `config.ini`, and what is different. |
 | [Ingestion](ingestion.md) | How messages are read from MQTT, decrypted, and what each one stores. |
-| [API](api.md) | Versioning, the reference at `/api/docs`, and the redirects from the unversioned API. |
+| [API](api.md) | Where the reference is, and what changed from the Python version: versions, redirects and differences. |
 | [Development](development.md) | Layout, tests, protobufs, comparing against the Python version, CI and releases. |
 
 ## What is ported so far
@@ -24,7 +24,8 @@ each checked against the Python version's behaviour before it is called done.
 | Clean shutdown | Done |
 | Daily cleanup and snapshot | Done, identical databases side by side with Python |
 | Consistent backups (`meshview-rs backup`) | Done (new in meshview-rs); the Python version's scheduled backups are deprecated |
-| API endpoints | In progress: see [API](api.md#versions) for each one |
+| API: `/version`, `/health`, `config`, `lang`, `channels`, `snapshots/daily`, `packets_seen` | Done |
+| API: `nodes`, `nodes/facets`, `packets`, `stats`, `stats/count`, `stats/top`, `edges`, `traceroute`, `node/{id}/qr` | Not yet |
 | Web pages | Not yet |
 | Coverage prediction | Later |
 | PostgreSQL | Later |
