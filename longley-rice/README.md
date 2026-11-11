@@ -161,6 +161,9 @@ in `tests/fixtures`:
   them (six frequencies, two pairs of heights, 50% and 90% reliability, 1 to
   200 km every 250 m), all bit-identical to pyitm.
 
+  As with NTIA's, the pyitm tests accept up to 1e-10 dB, for other platforms'
+  maths libraries, and report how many results are bit-identical.
+
 Bit-identical results come from doing what the references do: the same
 operations in the same order, every `pow` (squares included) a call to libm's
 `pow` as in the compiled C++ and in Python's `math.pow`, glibc's complex square

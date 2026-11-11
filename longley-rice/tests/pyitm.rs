@@ -1,13 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Óscar García Amor <ogarcia@connectical.com>
 
-//! The pyitm reproduction against pyitm 0.3 itself, bit for bit.
+//! The pyitm reproduction against pyitm 0.3 itself.
 //!
 //! The fixtures hold what pyitm's `area()` returned, as `repr()` of the
 //! float, which parses back to the very same `f64`. The README says how they
-//! were made.
+//! were made. With the maths library they were made with (glibc on x86_64)
+//! every loss is the same to the bit; another one, or another version of it,
+//! rounds an `exp` or a `pow` a last bit differently now and then, so what is
+//! required is the same to within [`TOLERANCE_DB`], and how many are
+//! identical is reported.
 
 use longley_rice::pyitm::{self, Error};
+
+/// How far a loss may be from pyitm's, in dB: a few last bits of an `f64`.
+const TOLERANCE_DB: f64 = 1e-10;
 
 fn expected_error(name: &str) -> Error {
     match name {
@@ -20,7 +27,8 @@ fn expected_error(name: &str) -> Error {
 
 #[test]
 fn matches_pyitm_on_the_grid() {
-    let (mut losses, mut errors) = (0, 0);
+    let (mut losses, mut errors, mut identical) = (0, 0, 0);
+    let mut max_diff: f64 = 0.0;
     for (i, line) in include_str!("fixtures/pyitm.csv").lines().enumerate() {
         if line.starts_with('#') || line.starts_with("mod_var") {
             continue;
@@ -64,18 +72,21 @@ fn matches_pyitm_on_the_grid() {
             loss => {
                 let (db, errnum) = got.unwrap_or_else(|e| panic!("line {}: {e:?}", i + 1));
                 let expected = loss.parse::<f64>().unwrap();
-                assert_eq!(
-                    db.to_bits(),
-                    expected.to_bits(),
-                    "line {}: {db} vs {expected}",
-                    i + 1
-                );
+                let diff = (db - expected).abs();
+                assert!(diff <= TOLERANCE_DB, "line {}: {db} vs {expected}", i + 1);
+                max_diff = max_diff.max(diff);
+                if db.to_bits() == expected.to_bits() {
+                    identical += 1;
+                }
                 assert_eq!(errnum, n(17), "line {}", i + 1);
                 losses += 1;
             }
         }
     }
-    println!("{losses} losses bit-identical to pyitm, {errors} exceptions matched");
+    println!(
+        "{losses} losses ({identical} bit-identical to pyitm, max |diff| {max_diff:e} dB), \
+         {errors} exceptions matched"
+    );
     assert!(losses > 4000);
 }
 
@@ -86,7 +97,8 @@ fn matches_pyitm_as_meshview_calls_it() {
     let mut expected = include_str!("fixtures/pyitm_meshview.csv")
         .lines()
         .filter(|line| !line.starts_with('#'));
-    let mut count = 0;
+    let (mut count, mut identical) = (0, 0);
+    let mut max_diff: f64 = 0.0;
     for frq in [433.0, 868.0, 869.525, 907.0, 915.0, 2400.0] {
         for (tht, rht) in [(5.0, 1.5), (10.0, 2.0)] {
             for rel in [0.5, 0.9] {
@@ -99,11 +111,15 @@ fn matches_pyitm_as_meshview_calls_it() {
                     let line = expected.next().expect("fixture too short");
                     let (loss, code) = line.split_once(',').unwrap();
                     let loss = loss.parse::<f64>().unwrap();
-                    assert_eq!(
-                        db.to_bits(),
-                        loss.to_bits(),
+                    let diff = (db - loss).abs();
+                    assert!(
+                        diff <= TOLERANCE_DB,
                         "f {frq} h {tht}/{rht} rel {rel} d {d}: {db} vs {loss}"
                     );
+                    max_diff = max_diff.max(diff);
+                    if db.to_bits() == loss.to_bits() {
+                        identical += 1;
+                    }
                     assert_eq!(errnum, code.parse::<i32>().unwrap());
                     count += 1;
                 }
@@ -111,5 +127,7 @@ fn matches_pyitm_as_meshview_calls_it() {
         }
     }
     assert!(expected.next().is_none(), "fixture too long");
-    println!("{count} meshview calls bit-identical to pyitm");
+    println!(
+        "{count} meshview calls ({identical} bit-identical to pyitm, max |diff| {max_diff:e} dB)"
+    );
 }
