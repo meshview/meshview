@@ -88,12 +88,13 @@ COPY --from=binary --chmod=0755 /out/meshview /usr/local/bin/meshview
 # Never root. 10001 rather than 1000, which is the first user of most systems,
 # so that the files it writes on a mounted volume belong to nobody in particular;
 # and the same as the Python version's image, so that its volumes carry over as
-# they are. /data is where the database lives, and the working directory, so a
-# config.toml mounted there is found without saying where it is. It only needs
-# to be readable: nothing is ever written to it.
+# they are. /data is where the database lives, and the working directory; the
+# configuration goes in /etc/meshview, read only and apart from the data, where
+# Meshview looks for config.toml when none is named. Owned by root: nothing is
+# ever written there.
 RUN addgroup -g 10001 meshview \
  && adduser -D -H -G meshview -u 10001 meshview \
- && mkdir -p /data \
+ && mkdir -p /data /etc/meshview \
  && chown meshview:meshview /data
 
 # The database is the default one, packets.db in the working directory: /data.

@@ -4,14 +4,10 @@
 use anyhow::{Result, bail};
 use clap::{Parser, Subcommand};
 use meshview::app::{self, Role};
-use meshview::config::Config;
+use meshview::config::{self, Config};
 use std::path::{Path, PathBuf};
 use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
-
-/// The configuration file read when none is named. Optional: without it the
-/// defaults and the environment are the whole configuration.
-const DEFAULT_CONFIG: &str = "config.toml";
 
 /// The Python version's configuration file, which this does not read.
 const PYTHON_CONFIG: &str = "config.ini";
@@ -21,7 +17,8 @@ const PYTHON_CONFIG: &str = "config.ini";
 #[command(version, about)]
 struct Cli {
     /// The configuration file. Named here or in MESHVIEW_CONFIG it has to exist;
-    /// otherwise ./config.toml is read if it is there.
+    /// otherwise ./config.toml or /etc/meshview/config.toml is read, the first
+    /// that is there.
     #[arg(long, short, env = "MESHVIEW_CONFIG", global = true)]
     config: Option<PathBuf>,
 
@@ -65,17 +62,19 @@ async fn main() -> Result<()> {
     let config = match &cli.config {
         Some(path) => Config::load(path, true)?,
         None => {
+            let searched = config::SEARCHED.map(Path::new);
+            let found = config::first_existing(&searched);
             // A config.ini left from the Python version and no config.toml is
             // somebody who has not converted it yet. Starting on the defaults
             // instead would quietly create a new, empty database somewhere else.
-            if Path::new(PYTHON_CONFIG).exists() && !Path::new(DEFAULT_CONFIG).exists() {
+            if Path::new(PYTHON_CONFIG).exists() && found.is_none() {
                 bail!(
-                    "found {PYTHON_CONFIG} but no {DEFAULT_CONFIG}: Meshview reads TOML, with \
-                     the same sections and keys. Convert it (see sample.config.toml) or name a \
-                     file with --config."
+                    "found {PYTHON_CONFIG} but no config.toml: Meshview reads TOML, with the \
+                     same sections and keys. Convert it with scripts/convert-config.py, or name \
+                     a file with --config."
                 );
             }
-            Config::load(DEFAULT_CONFIG.as_ref(), false)?
+            Config::load(found.unwrap_or(searched[0]), false)?
         }
     };
     match config.source() {
