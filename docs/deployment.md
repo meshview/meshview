@@ -203,7 +203,7 @@ podman run -d --name meshview -p 8081:8081 \
 |---|---|
 | Image | `ghcr.io/ogarcia/meshview-rs`: `latest` is the last release, `master` the development branch, and each release has its version as a tag. Both `amd64` and `arm64`. |
 | Command | `run` by default; pass `ingest`, `serve` or `migrate` to choose another role. |
-| User | UID and GID 1000, never root. |
+| User | UID and GID 10001, never root: no user a system already has, and the Python version's image's, so its volumes carry over without a `chown`. |
 | Working directory | `/data`, so a `config.toml` there is found without saying where it is. It only needs to be readable. |
 | Database | `MESHVIEW_DATABASE__CONNECTION_STRING=sqlite:////data/packets.db` is set in the image. |
 | Port | 8081. |
@@ -250,7 +250,7 @@ spec:
       labels: {app: meshview, role: ingest}
     spec:
       terminationGracePeriodSeconds: 15
-      securityContext: {fsGroup: 1000}
+      securityContext: {fsGroup: 10001}
       containers:
         - name: meshview
           image: ghcr.io/ogarcia/meshview-rs:latest
@@ -280,7 +280,7 @@ spec:
       labels: {app: meshview, role: serve}
     spec:
       terminationGracePeriodSeconds: 15
-      securityContext: {fsGroup: 1000}
+      securityContext: {fsGroup: 10001}
       affinity:
         podAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -327,7 +327,7 @@ spec:
       template:
         spec:
           restartPolicy: OnFailure
-          securityContext: {fsGroup: 1000}
+          securityContext: {fsGroup: 10001}
           affinity:
             podAffinity:
               requiredDuringSchedulingIgnoredDuringExecution:
