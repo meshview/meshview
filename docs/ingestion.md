@@ -11,7 +11,7 @@ the databases.
 | | |
 |---|---|
 | Protocol | MQTT 3.1.1, plain or over TLS (`[mqtt] tls`) |
-| Client id | `meshview-rs-<random>`, new on every start, so two ingesters never throw each other off |
+| Client id | `meshview-<random>`, new on every start, so two ingesters never throw each other off |
 | Session | clean: every connection subscribes again |
 | QoS | 0, at most once |
 | Keep-alive | 60 seconds |
@@ -86,7 +86,7 @@ as `unknown(N)` rather than refused.
 A field can arrive encoded as a type other than its own: a `fixed32` as a
 varint, say. That is what garbage looks like, and some real packets carry it.
 Python's protobuf takes such a field for one it does not know and reads the rest
-of the message; prost alone would refuse the whole message. meshview-rs reads
+of the message; prost alone would refuse the whole message. Meshview reads
 messages as Python's protobuf does, so it keeps the packets the Python version
 kept, with the odd field stored where it was, and it accepts what the Python
 version accepted when a wrong key's decryption happens to parse.
@@ -99,7 +99,7 @@ puts them, after the fields it knows, in the order they came, both in the packet
 and inside its decrypted payload. Updating the protobufs is then enough to read
 them in what is already stored.
 
-meshview-rs supports the **official Meshtastic firmware** and its protobufs only.
+Meshview supports the **official Meshtastic firmware** and its protobufs only.
 Some gateways run modified firmware that adds fields of its own (fields 63 and
 64 of `MeshPacket` have been seen, for one); those are kept like any other
 unknown field, but will not be declared or interpreted.

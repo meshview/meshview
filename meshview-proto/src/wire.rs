@@ -2,12 +2,12 @@
 // Copyright (C) 2026 Óscar García Amor <ogarcia@connectical.com>
 
 //! The protobuf wire format, for the two things prost does differently from
-//! Python's protobuf, which the Python meshview was built on.
+//! Python's protobuf, which the Python Meshview was built on.
 //!
 //! **Fields it does not know.** A newer firmware sends fields these protobufs
 //! do not declare yet. prost reads past them and forgets them; Python's protobuf
 //! keeps them and writes them back out, after the fields it knows, in the order
-//! they came. The Python meshview stored packets that way, and so does this: the
+//! they came. The Python Meshview stored packets that way, and so does this: the
 //! database keeps what was sent, and updating the protobufs later is enough to
 //! read what is in it.
 //!

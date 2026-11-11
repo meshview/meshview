@@ -1,6 +1,6 @@
 [package]
 name = "meshview-proto"
-description = "Meshtastic protobuf types for meshview-rs"
+description = "Meshtastic protobuf types for Meshview"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -6,12 +6,12 @@ One binary does everything, and what a process does is its role:
 
 | Command | Ingests from MQTT | Serves the web and API | Migrates the database |
 |---|---|---|---|
-| `meshview-rs run` (the default) | yes | yes | yes |
-| `meshview-rs ingest` | yes | no, probes only | yes |
-| `meshview-rs serve` | no | yes | never |
-| `meshview-rs migrate` | no | no | yes, then exits |
+| `meshview run` (the default) | yes | yes | yes |
+| `meshview ingest` | yes | no, probes only | yes |
+| `meshview serve` | no | yes | never |
+| `meshview migrate` | no | no | yes, then exits |
 
-And `meshview-rs backup <file>`, which is not a role but a tool: it copies the
+And `meshview backup <file>`, which is not a role but a tool: it copies the
 database, consistently, while it is in use, and exits. See [Backups](#backups).
 
 `run` is the simple case: one process, one database. Splitting it into one
@@ -23,7 +23,7 @@ a single ingester writes.
 - `serve` opens the database **read only** and never changes it. Started before
   the ingester has created or migrated the database, it waits, reporting itself
   alive but not ready, and becomes ready by itself once the schema is there.
-  Given a database migrated by a newer meshview-rs than itself, it refuses to
+  Given a database migrated by a newer Meshview than itself, it refuses to
   start rather than misread it.
 - `migrate` brings the schema up to date and exits, for running it as a step of
   its own before anything else starts (a Kubernetes init container or job).
@@ -39,13 +39,13 @@ PostgreSQL, which is planned but not supported yet.
 
 ## HTTPS
 
-meshview-rs serves plain HTTP: HTTPS is for a reverse proxy in front of it to
+Meshview serves plain HTTP: HTTPS is for a reverse proxy in front of it to
 serve, as nginx, Caddy, Traefik or a Kubernetes ingress do, getting and renewing
 the certificates themselves. The Python version's `[server] tls_cert` is
 deprecated: it is accepted with a warning and ignored, and will be removed in
 the next version.
 
-With a proxy on the same machine, bind meshview-rs to the loopback interface
+With a proxy on the same machine, bind Meshview to the loopback interface
 only (`[server] bind = "127.0.0.1"`), so that it is reached through the proxy
 alone. Caddy, which gets its certificate by itself:
 
@@ -73,7 +73,7 @@ server {
 }
 ```
 
-meshview-rs compresses what is worth compressing itself, so the proxy need not.
+Meshview compresses what is worth compressing itself, so the proxy need not.
 
 ## Probes
 
@@ -131,13 +131,13 @@ reading it, even read only. They are as harmless as the ones above.
 
 ## Backups
 
-meshview-rs does not schedule backups: when, where to, how many to keep and how
+Meshview does not schedule backups: when, where to, how many to keep and how
 to get them off the machine are a backup system's job, and there are good ones.
 What it does is the one part such a system cannot do well by itself, which is
 take a **consistent copy of a database that is being written**:
 
 ```sh
-meshview-rs backup /backups/packets-$(date +%Y%m%d-%H%M%S).db
+meshview backup /backups/packets-$(date +%Y%m%d-%H%M%S).db
 ```
 
 It copies the database the configuration names, with SQLite's `VACUUM INTO`: a
@@ -152,16 +152,16 @@ file yet, and a copy taken mid-write may not open at all.
   part, and so is deleting old ones.
 - It has to run on the machine that has the database, like any other process
   using it (see [One machine](#one-machine)).
-- It needs no running meshview-rs: it works as well on a stopped database.
+- It needs no running Meshview: it works as well on a stopped database.
 
-The copy is a plain SQLite database that meshview-rs opens as it is: restoring
-is stopping meshview-rs, putting the copy where the database was, and starting
+The copy is a plain SQLite database that Meshview opens as it is: restoring
+is stopping Meshview, putting the copy where the database was, and starting
 it again. Compressing and encrypting it are the backup system's part too.
 
 With cron, keeping a week:
 
 ```cron
-15 3 * * *  meshview-rs --config /etc/meshview-rs/config.toml backup /var/backups/meshview/packets-$(date +\%u).db.new && mv /var/backups/meshview/packets-$(date +\%u).db.new /var/backups/meshview/packets-$(date +\%u).db
+15 3 * * *  meshview --config /etc/meshview/config.toml backup /var/backups/meshview/packets-$(date +\%u).db.new && mv /var/backups/meshview/packets-$(date +\%u).db.new /var/backups/meshview/packets-$(date +\%u).db
 ```
 
 or as a step before restic, borg or whatever already backs the machine up, so
@@ -169,7 +169,7 @@ that what it picks up is a consistent copy rather than the live file.
 
 Continuous replication, with [Litestream](https://litestream.io) for one, is the
 other way to go, for losing minutes rather than a day. It replicates the
-write-ahead log as it is written, beside meshview-rs. meshview-rs only asks for a
+write-ahead log as it is written, beside Meshview. Meshview only asks for a
 checkpoint of its own when it stops, which should leave Litestream in charge of
 them, but this combination has not been tested yet: check Litestream's
 documentation for what it needs from the applications writing the database.
@@ -184,8 +184,8 @@ Releases have a statically linked binary for Linux on `amd64` and `arm64`: it
 brings its own libc and needs nothing installed beside it.
 
 ```sh
-tar -xzf meshview-rs-<version>-amd64.tar.gz
-./meshview-rs --config /etc/meshview-rs/config.toml run
+tar -xzf meshview-<version>-amd64.tar.gz
+./meshview --config /etc/meshview/config.toml run
 ```
 
 The x86_64 build runs on any x86_64 CPU, including older ones without AVX.
@@ -196,12 +196,12 @@ The x86_64 build runs on any x86_64 CPU, including older ones without AVX.
 podman run -d --name meshview -p 8081:8081 \
   -v meshview-data:/data \
   -v ./config.toml:/data/config.toml:ro \
-  ghcr.io/ogarcia/meshview-rs
+  ghcr.io/meshview/meshview
 ```
 
 | | |
 |---|---|
-| Image | `ghcr.io/ogarcia/meshview-rs`: `latest` is the last release, `master` the development branch, and each release has its version as a tag. Both `amd64` and `arm64`. |
+| Image | `ghcr.io/meshview/meshview`: `latest` is the last release, `master` the development branch, and each release has its version as a tag. Both `amd64` and `arm64`. |
 | Command | `run` by default; pass `ingest`, `serve` or `migrate` to choose another role. |
 | User | UID and GID 10001, never root: no user a system already has, and the Python version's image's, so its volumes carry over without a `chown`. |
 | Working directory | `/data`, so a `config.toml` there is found without saying where it is. It only needs to be readable. |
@@ -217,7 +217,7 @@ The whole configuration can also come from the environment, with no file:
 podman run -d --name meshview -p 8081:8081 -v meshview-data:/data \
   -e MESHVIEW_MQTT__SERVER=mqtt.example.org \
   -e MESHVIEW_MQTT__TOPICS='["msh/EU_868/#"]' \
-  ghcr.io/ogarcia/meshview-rs
+  ghcr.io/meshview/meshview
 ```
 
 ## Kubernetes
@@ -253,7 +253,7 @@ spec:
       securityContext: {fsGroup: 10001}
       containers:
         - name: meshview
-          image: ghcr.io/ogarcia/meshview-rs:latest
+          image: ghcr.io/meshview/meshview:latest
           args: [ingest]
           ports: [{containerPort: 8081}]
           livenessProbe: {httpGet: {path: /livez, port: 8081}}
@@ -289,7 +289,7 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
         - name: meshview
-          image: ghcr.io/ogarcia/meshview-rs:latest
+          image: ghcr.io/meshview/meshview:latest
           args: [serve]
           ports: [{containerPort: 8081}]
           livenessProbe: {httpGet: {path: /livez, port: 8081}}
@@ -311,7 +311,7 @@ nothing in it is secret, and environment variables can replace it altogether.
 
 ### Backing up from Kubernetes
 
-A `CronJob` running `meshview-rs backup`, kept on the ingester's node, writing to
+A `CronJob` running `meshview backup`, kept on the ingester's node, writing to
 a volume of its own for the backup system to collect:
 
 ```yaml
@@ -336,9 +336,9 @@ spec:
                   topologyKey: kubernetes.io/hostname
           containers:
             - name: backup
-              image: ghcr.io/ogarcia/meshview-rs:latest
+              image: ghcr.io/meshview/meshview:latest
               command: [sh, -c]
-              args: ["meshview-rs backup /backups/packets-$(date +%Y%m%d).db"]
+              args: ["meshview backup /backups/packets-$(date +%Y%m%d).db"]
               volumeMounts:
                 - {name: data, mountPath: /data}
                 - {name: config, mountPath: /data/config.toml, subPath: config.toml, readOnly: true}
