@@ -11,8 +11,8 @@
 
 use meshview_proto::meshtastic::mesh_packet::PayloadVariant;
 use meshview_proto::meshtastic::{
-    MapReport, MeshPacket, NeighborInfo, PortNum, Position, RouteDiscovery, Routing, Telemetry,
-    User, routing,
+    MapReport, MeshPacket, NeighborInfo, PortNum, Position, RouteDiscovery, Routing, StatusMessage,
+    StoreAndForward, Telemetry, User, Waypoint, routing, store_and_forward,
 };
 use meshview_proto::{text_format, wire};
 
@@ -90,7 +90,34 @@ fn decode_payload(portnum: i32, bytes: &[u8]) -> Option<Payload> {
         PortNum::RoutingApp => wire::decode::<Routing>("meshtastic.Routing", bytes)
             .map(|routing| Payload::Routing(routing, bytes.to_vec())),
         PortNum::TextMessageApp => String::from_utf8(bytes.to_vec()).ok().map(Payload::Text),
+        // Not decoded by the Python version.
+        PortNum::WaypointApp => message(
+            "meshtastic.Waypoint",
+            wire::decode::<Waypoint>("meshtastic.Waypoint", bytes).is_some(),
+        ),
+        PortNum::NodeStatusApp => message(
+            "meshtastic.StatusMessage",
+            wire::decode::<StatusMessage>("meshtastic.StatusMessage", bytes).is_some(),
+        ),
+        PortNum::StoreForwardApp => message(
+            "meshtastic.StoreAndForward",
+            wire::decode::<StoreAndForward>("meshtastic.StoreAndForward", bytes).is_some(),
+        ),
         _ => None,
+    }
+}
+
+/// Whether a message sent to one node says what only that node should read: a
+/// waypoint, or the store and forward of a message from history, which can be
+/// a direct one. Those are redacted as a direct text message is.
+fn is_private(name: &str, bytes: &[u8]) -> bool {
+    match name {
+        "meshtastic.Waypoint" => true,
+        "meshtastic.StoreAndForward" => {
+            wire::decode::<StoreAndForward>("meshtastic.StoreAndForward", bytes)
+                .is_some_and(|sf| matches!(sf.variant, Some(store_and_forward::Variant::Text(_))))
+        }
+        _ => false,
     }
 }
 
@@ -124,6 +151,7 @@ pub fn show(payload: Option<&[u8]>, portnum: Option<i64>, to_node_id: Option<i64
         Some(PayloadVariant::Decoded(data)) => decode_payload(data.portnum, &data.payload),
         _ => None,
     };
+    let to_everyone = to_node_id == Some(BROADCAST);
 
     let text = match decoded {
         None => DID_NOT_DECODE.to_string(),
@@ -135,6 +163,9 @@ pub fn show(payload: Option<&[u8]>, portnum: Option<i64>, to_node_id: Option<i64
             _ => text_format::decode_to_text("meshtastic.Routing", &bytes)
                 .unwrap_or_else(|| DID_NOT_DECODE.to_string()),
         },
+        Some(Payload::Message(name, bytes)) if !to_everyone && is_private(name, &bytes) => {
+            REDACTED.to_string()
+        }
         Some(Payload::Message(name, bytes)) => {
             text_format::decode_to_text(name, &bytes).unwrap_or_else(|| DID_NOT_DECODE.to_string())
         }
@@ -161,4 +192,78 @@ pub fn python_strip(text: &str) -> &str {
 pub fn is_sequence_only(text: &str) -> bool {
     text.strip_prefix("seq ")
         .is_some_and(|digits| !digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use meshview_proto::meshtastic::Data;
+    use prost::Message;
+
+    fn packet(portnum: PortNum, payload: Vec<u8>) -> Vec<u8> {
+        MeshPacket {
+            payload_variant: Some(PayloadVariant::Decoded(Data {
+                portnum: portnum as i32,
+                payload,
+                ..Default::default()
+            })),
+            ..Default::default()
+        }
+        .encode_to_vec()
+    }
+
+    fn shown(portnum: PortNum, payload: Vec<u8>, to: i64) -> String {
+        show(
+            Some(&packet(portnum, payload)),
+            Some(portnum as i64),
+            Some(to),
+        )
+        .text
+    }
+
+    #[test]
+    fn a_node_status_is_shown() {
+        let status = StatusMessage {
+            status: "On the hill".into(),
+        };
+        assert_eq!(
+            shown(PortNum::NodeStatusApp, status.encode_to_vec(), BROADCAST),
+            "status: \"On the hill\"\n"
+        );
+    }
+
+    #[test]
+    fn a_waypoint_is_shown_to_everyone_and_redacted_to_one() {
+        let waypoint = Waypoint {
+            name: "Summit".into(),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        assert!(shown(PortNum::WaypointApp, waypoint.clone(), BROADCAST).contains("Summit"));
+        assert_eq!(shown(PortNum::WaypointApp, waypoint, 1234), REDACTED);
+    }
+
+    #[test]
+    fn store_and_forward_hides_the_history_it_replays_to_one_node() {
+        let text = StoreAndForward {
+            variant: Some(store_and_forward::Variant::Text(
+                b"a direct message".to_vec(),
+            )),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        assert_eq!(shown(PortNum::StoreForwardApp, text, 1234), REDACTED);
+
+        let heartbeat = StoreAndForward {
+            variant: Some(store_and_forward::Variant::Heartbeat(
+                store_and_forward::Heartbeat {
+                    period: 900,
+                    secondary: 0,
+                },
+            )),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        assert!(shown(PortNum::StoreForwardApp, heartbeat, 1234).contains("period: 900"));
+    }
 }

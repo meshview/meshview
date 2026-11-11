@@ -9,7 +9,7 @@ Real-time data from a Meshtastic mesh network: its nodes, the packets they send 
 - A node is known by its number, `node_id`, the Meshtastic node number; its `id` is the same number as Meshtastic writes it, `!` and eight hex digits.
 - A packet is known by its stored `id`, also answered as `storage_id`, which is what every `packet_id` parameter takes. A packet's `packet_id` field is something else: the id it was sent with over the air, as `reply_id` is. One cannot be used for the other.
 - Numbers are written in decimal. The packets' sender and recipient filters, the node contact and the coverage also take `0x` hex.
-- Text messages sent to everyone are shown as they are; those sent to one node come as `<redacted>`. Text messages are the packets of port 1: `/api/v1/packets?portnum=1`. What a packet says is text from the mesh, never HTML to trust.
+- Text messages sent to everyone are shown as they are; those sent to one node come as `<redacted>`, as do waypoints and messages replayed from history sent to one node. Text messages are the packets of port 1: `/api/v1/packets?portnum=1`. What a packet says is text from the mesh, never HTML to trust.
 
 ## Versions
 

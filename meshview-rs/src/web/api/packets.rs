@@ -59,9 +59,10 @@ pub struct PacketDoc {
     /// not known at all.
     #[schema(example = "Alice")]
     long_name: Option<String>,
-    /// What it says: a text message's text, or `<redacted>` when it was sent
-    /// to one node; for the other ports understood, the decoded message in
-    /// the protobuf text format; `Did not decode` for what cannot be read.
+    /// What it says: a text message's text; for the other ports understood,
+    /// the decoded message in the protobuf text format; `<redacted>` for a
+    /// text message, a waypoint or a message replayed from history sent to
+    /// one node; `Did not decode` for what cannot be read.
     #[schema(example = "Hello, mesh!")]
     payload: String,
     /// The recipient's long name, as `long_name`. Not when asked for by
@@ -94,8 +95,9 @@ pub struct Packets {
 ///
 /// The latest packets, with what each says as the pages show it: decoded and in
 /// the protobuf text format for the ports that are understood, the text of a
-/// text message sent to everyone, `<redacted>` for one sent to someone, and
-/// `Did not decode` for what cannot be read.
+/// text message sent to everyone, `<redacted>` for one sent to someone, as for
+/// a waypoint or a message replayed from history, and `Did not decode` for
+/// what cannot be read.
 ///
 /// With `packet_id`, that one packet, whatever the other filters say. Otherwise
 /// pages of up to `limit`, older ones by passing `next_before` as `before`. Text

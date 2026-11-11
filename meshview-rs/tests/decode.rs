@@ -9,8 +9,16 @@
 //! answered for each: their stored bytes, their own id, and the text shown. One
 //! of them has a field of the wrong wire type, which Python's protobuf takes for
 //! unknown and prost alone would refuse the whole packet for.
+//!
+//! Waypoints, node statuses and store and forward the Python version did not
+//! decode; meshview-rs does, and those are checked to be decoded, or redacted,
+//! instead of to match.
 
-use meshview_rs::decode::{self, python_strip};
+use meshview_rs::decode::{self, DID_NOT_DECODE, REDACTED, python_strip};
+
+/// The ports meshview-rs decodes and the Python version did not: waypoints,
+/// node statuses and store and forward.
+const DECODED_SINCE_PYTHON: [i64; 3] = [8, 36, 65];
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -42,13 +50,24 @@ fn packets_are_shown_as_python_showed_them() {
             sample.portnum,
             sample.to_node_id,
         );
-        assert_eq!(
-            python_strip(&shown.text),
-            sample.text,
-            "packet {} (port {:?})",
-            sample.id,
-            sample.portnum
-        );
+        if sample
+            .portnum
+            .is_some_and(|port| DECODED_SINCE_PYTHON.contains(&port))
+        {
+            assert_eq!(sample.text, DID_NOT_DECODE, "packet {}", sample.id);
+            assert_ne!(shown.text, DID_NOT_DECODE, "packet {}", sample.id);
+            if sample.to_node_id != Some(decode::BROADCAST) && sample.portnum == Some(8) {
+                assert_eq!(shown.text, REDACTED, "packet {}", sample.id);
+            }
+        } else {
+            assert_eq!(
+                python_strip(&shown.text),
+                sample.text,
+                "packet {} (port {:?})",
+                sample.id,
+                sample.portnum
+            );
+        }
         assert_eq!(shown.packet_id(), sample.packet_id, "packet {}", sample.id);
     }
 }
