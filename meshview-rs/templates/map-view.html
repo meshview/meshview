@@ -182,9 +182,15 @@ html.mesh-kiosk, .mesh-kiosk body { width:100%; height:100%; margin:0; overflow:
 .mesh-kiosk .mesh-map-only .mesh-content { width:100%; height:100%; padding:0; max-width:none; }
 .mesh-kiosk .mesh-explorer,.mesh-kiosk .mesh-map-panel { width:100%; height:100%; border:0; border-radius:0; }
 .mesh-kiosk .mesh-map-only .mesh-map-panel #map-wrapper { height:100dvh; min-height:0; }
-.mesh-kiosk .mesh-map-panel #filter-container { position:absolute; bottom:24px; left:10px; z-index:700; max-width:calc(100% - 240px); max-height:25dvh; overflow:auto; padding:8px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:6px; }
+/* In kiosk mode the filters fold behind a button above the map's scale, so they cover neither it nor the map. */
+.map-filter-toggle { display:none; }
+.mesh-kiosk .map-filter-toggle { display:inline-flex; align-items:center; gap:6px; position:absolute; bottom:48px; left:10px; z-index:700; padding:6px 10px; font:inherit; font-size:12px; font-weight:600; color:var(--mesh-text); background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:6px; box-shadow:0 2px 8px #0001; cursor:pointer; }
+.mesh-kiosk .map-filter-toggle[aria-expanded="true"] { color:var(--mesh-primary); background:var(--mesh-soft); }
+.mesh-kiosk .map-filter-toggle:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:2px; }
+.mesh-kiosk .mesh-map-panel #filter-container:not(.is-open) { display:none; }
+.mesh-kiosk .mesh-map-panel #filter-container { position:absolute; bottom:88px; left:10px; z-index:700; max-width:calc(100% - 240px); max-height:25dvh; overflow:auto; padding:8px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:6px; }
 .mesh-kiosk #map-load-status:not(:empty) { position:absolute; top:10px; left:50px; z-index:800; background:var(--mesh-surface); padding:8px; border-radius:5px; }
-@media(max-width:700px) { .mesh-kiosk .mesh-map-panel #filter-container { max-width:calc(100% - 20px); bottom:24px; } .mesh-kiosk #unmapped-packets { display:none; } }
+@media(max-width:700px) { .mesh-kiosk .mesh-map-panel #filter-container { max-width:calc(100% - 20px); bottom:88px; } .mesh-kiosk #unmapped-packets { display:none; } }
 /* Compact live-map node card. */
 .mesh-map-only .mesh-content { max-width:none; }
 /* The node panel opens at the top right over the map controls; close it to use them. */
@@ -393,6 +399,7 @@ a.mesh-inspector-packet:hover { background:var(--mesh-hover); }
 
 </div>
 
+<button id="filter-toggle" class="map-filter-toggle" type="button" aria-controls="filter-container" aria-expanded="false"><span class="ti ti-adjustments-horizontal" aria-hidden="true"></span> <span>{{ "Filters" | tr }}</span></button>
 <div id="filter-container">
     <div class="map-filter-group">
         <label class="map-filter"><input type="checkbox" class="filter-checkbox" id="filter-routers-only"> <span data-translate-lang="show_routers_only">Show Routers Only</span></label>
@@ -405,6 +412,21 @@ a.mesh-inspector-packet:hover { background:var(--mesh-hover); }
     </button>
     {% endif %}
 </div>
+<script>
+// The kiosk's filter button: it opens the filters, and it or Escape folds them again.
+(() => {
+    const toggle = document.getElementById("filter-toggle");
+    const filters = document.getElementById("filter-container");
+    const show = open => {
+        filters.classList.toggle("is-open", open);
+        toggle.setAttribute("aria-expanded", String(open));
+    };
+    toggle.addEventListener("click", () => show(!filters.classList.contains("is-open")));
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && filters.classList.contains("is-open")) show(false);
+    });
+})();
+</script>
 
 
 
