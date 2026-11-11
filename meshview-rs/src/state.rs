@@ -30,13 +30,15 @@ impl Readiness {
         }
     }
 
-    /// Records whether one check passes. A name that is not one of this
-    /// process's checks is a mistake in the program, not something to report.
+    /// Records whether one check passes.
+    ///
+    /// A check this process does not count is ignored rather than refused: the
+    /// ingester reports on its broker whichever role it runs in, and only in the
+    /// one where the broker is all there is does that decide readiness.
     pub fn set(&self, name: &str, passing: bool) {
-        self.checks
-            .get(name)
-            .unwrap_or_else(|| panic!("no readiness check called {name}"))
-            .store(passing, Ordering::Release);
+        if let Some(check) = self.checks.get(name) {
+            check.store(passing, Ordering::Release);
+        }
     }
 
     /// Every check and whether it passes.
@@ -52,6 +54,21 @@ impl Readiness {
         self.checks
             .values()
             .all(|passing| passing.load(Ordering::Acquire))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_check_not_counted_is_ignored() {
+        let readiness = Readiness::new(["database"]);
+        readiness.set("mqtt", true);
+        assert!(!readiness.is_ready());
+        readiness.set("database", true);
+        assert!(readiness.is_ready());
+        assert_eq!(readiness.report().len(), 1);
     }
 }
 

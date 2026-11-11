@@ -23,6 +23,12 @@ use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::watch;
 use tracing::{error, info, warn};
 
+/// How long requests in flight, and messages waiting to be stored, get to finish
+/// once the process has been asked to stop. Comfortably under the ten seconds a
+/// container runtime waits before it stops asking and kills, because being killed
+/// is precisely what leaves the database's side files behind.
+pub const DRAIN_GRACE: Duration = Duration::from_secs(5);
+
 /// How often a web server waiting for the database to be ready looks again.
 const SCHEMA_POLL: Duration = Duration::from_secs(2);
 
@@ -51,11 +57,24 @@ impl Role {
 
 /// Runs a process in this role until it is told to stop.
 pub async fn run(role: Role, config: Config) -> Result<()> {
+    let (stop, stopping) = watch::channel(false);
+    tokio::spawn(wait_for_signal(stop.clone()));
+    run_until(role, config, stop, stopping).await
+}
+
+/// Runs a process in this role until `stop` is sent, from a signal or, in a
+/// test, from the test.
+pub async fn run_until(
+    role: Role,
+    config: Config,
+    stop: watch::Sender<bool>,
+    stopping: watch::Receiver<bool>,
+) -> Result<()> {
     let DatabaseUrl::Sqlite(database) = config.database()?;
 
     if role == Role::Migrate {
         let pool = db::sqlite::open_for_writing(&database).await?;
-        pool.close().await;
+        db::sqlite::close_writer(pool).await;
         info!("{} is up to date", database.display());
         return Ok(());
     }
@@ -84,9 +103,6 @@ pub async fn run(role: Role, config: Config) -> Result<()> {
         reader: Arc::new(OnceLock::new()),
     };
 
-    let (stop, stopping) = watch::channel(false);
-    tokio::spawn(wait_for_signal(stop.clone()));
-
     // Listening comes first, so that the probes answer while the database is
     // migrated or waited for: a process busy migrating is alive, only not ready.
     let addr = config.listen_addr()?;
@@ -96,6 +112,7 @@ pub async fn run(role: Role, config: Config) -> Result<()> {
     info!("listening on http://{addr}");
 
     let app = web::router(role, state.clone());
+    let state_reader = state.reader.clone();
     let mut server_stopping = stopping.clone();
     let server = tokio::spawn(async move {
         axum::serve(listener, app)
@@ -110,6 +127,10 @@ pub async fn run(role: Role, config: Config) -> Result<()> {
         _ = wait_until(stopping.clone()) => Ok(None),
     };
 
+    // Kept here as well as in the store, so that it can be closed properly
+    // however the ingester ends.
+    let writer = prepared.as_ref().ok().cloned().flatten();
+
     let result = match (prepared, mqtt) {
         (Ok(Some(writer)), Some(settings)) => match Store::new(writer).await {
             Ok(store) => ingest::run(settings, store, readiness, stopping.clone()).await,
@@ -122,16 +143,29 @@ pub async fn run(role: Role, config: Config) -> Result<()> {
         (Err(e), _) => Err(e),
     };
 
-    if let Err(e) = result {
+    if let Err(e) = &result {
         error!("{e:#}");
-        let _ = stop.send(true);
-        let _ = server.await;
-        return Err(e);
     }
-
     info!("stopping");
-    server.await.context("the web server task")??;
-    Ok(())
+    let _ = stop.send(true);
+
+    // In order: no more requests, then no more readers, then the writer last,
+    // so that the connection that tidies the log away is the final one.
+    match tokio::time::timeout(DRAIN_GRACE, server).await {
+        Ok(Ok(Ok(()))) => {}
+        Ok(Ok(Err(e))) => warn!("the web server stopped with an error: {e}"),
+        Ok(Err(e)) => warn!("the web server task failed: {e}"),
+        Err(_) => warn!("still serving requests after {DRAIN_GRACE:?}; stopping anyway"),
+    }
+    if let Some(reader) = state_reader.get().cloned() {
+        db::sqlite::close_reader(reader).await;
+    }
+    if let Some(writer) = writer {
+        db::sqlite::close_writer(writer).await;
+    }
+    info!("stopped");
+
+    result
 }
 
 /// Gets the database where this role needs it, and says so through readiness.
