@@ -85,11 +85,14 @@ LABEL org.opencontainers.image.title="meshview-rs" \
 # permissions.
 COPY --from=binary --chmod=0755 /out/meshview-rs /usr/local/bin/meshview-rs
 
-# Never root. /data is where the database lives, and the working directory, so
-# a config.toml mounted there is found without saying where it is. It only needs
+# Never root. 10001 rather than 1000, which is the first user of most systems,
+# so that the files it writes on a mounted volume belong to nobody in particular;
+# and the same as the Python version's image, so that its volumes carry over as
+# they are. /data is where the database lives, and the working directory, so a
+# config.toml mounted there is found without saying where it is. It only needs
 # to be readable: nothing is ever written to it.
-RUN addgroup -g 1000 meshview \
- && adduser -D -H -G meshview -u 1000 meshview \
+RUN addgroup -g 10001 meshview \
+ && adduser -D -H -G meshview -u 10001 meshview \
  && mkdir -p /data \
  && chown meshview:meshview /data
 
@@ -105,7 +108,9 @@ ENV MESHVIEW_DATABASE__CONNECTION_STRING=sqlite:////data/packets.db
 # and what a failure sets in motion belong to whoever runs the container.
 EXPOSE 8081
 
-USER meshview
+# By number: a name cannot be checked to be anything but root, so Kubernetes'
+# runAsNonRoot would refuse to start the container.
+USER 10001:10001
 WORKDIR /data
 ENTRYPOINT ["/usr/local/bin/meshview-rs"]
 CMD ["run"]
