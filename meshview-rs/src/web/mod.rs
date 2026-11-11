@@ -16,16 +16,19 @@
 //! Outside the version: the reference itself, which documents whatever versions
 //! there are, and the probes, whose contract has nothing in it that could change.
 
+pub mod api;
 mod health;
 
 use crate::app::Role;
 use crate::state::AppState;
 use axum::Router;
 use axum::extract::Path;
-use axum::http::header::{HeaderMap, HeaderValue, LINK, LOCATION};
-use axum::http::{StatusCode, Uri};
+use axum::http::header::{CONTENT_TYPE, HeaderMap, HeaderValue, LINK, LOCATION};
+use axum::http::{Extensions, StatusCode, Uri, Version};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
+use tower_http::compression::CompressionLayer;
+use tower_http::compression::predicate::{Predicate, SizeAbove};
 use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -36,6 +39,9 @@ const DOCS_PATH: &str = "/api/docs";
 
 /// Where the document behind it is served, for clients and code generators.
 const OPENAPI_PATH: &str = "/api/openapi.json";
+
+/// The smallest body worth compressing, in bytes.
+const COMPRESS_FROM: u64 = 1024;
 
 /// The version the unversioned addresses stand for.
 const CURRENT_VERSION: &str = "v1";
@@ -72,7 +78,13 @@ const SCALAR_HTML: &str = r#"<!doctype html>
                        they send and the paths those packets take.",
         license(name = "AGPL-3.0-or-later", identifier = "AGPL-3.0-or-later"),
     ),
-    tags((name = "health", description = "Whether the process can serve")),
+    tags(
+        (name = "health", description = "Whether the process can serve"),
+        (name = "meta", description = "What is answering"),
+        (name = "channels", description = "The channels the mesh is heard on"),
+        (name = "packets", description = "The packets, and who heard them"),
+        (name = "stats", description = "Figures about the mesh"),
+    ),
 )]
 struct Reference;
 
@@ -92,11 +104,35 @@ pub fn router(role: Role, state: AppState) -> Router {
                 get(move || async move { axum::Json(document) }),
             )
             .route("/api/{*rest}", get(legacy_api))
+            .layer(compression())
     } else {
         router
     };
 
     router.with_state(state)
+}
+
+/// Gzip for what is worth compressing, as the Python version did: JSON, SVG,
+/// HTML, Markdown and plain text, from a kilobyte up. Unlike it, the client's
+/// `Accept-Encoding` is read properly, quality values included.
+fn compression() -> CompressionLayer<impl Predicate> {
+    const TYPES: &[&str] = &[
+        "application/json",
+        "image/svg+xml",
+        "text/html",
+        "text/markdown",
+        "text/plain",
+    ];
+    let worth_it = |_: StatusCode, _: Version, headers: &HeaderMap, _: &Extensions| {
+        headers
+            .get(CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .map(|value| value.split(';').next().unwrap_or("").trim())
+            .is_some_and(|mime| TYPES.contains(&mime))
+    };
+    CompressionLayer::new()
+        .gzip(true)
+        .compress_when(SizeAbove::new(COMPRESS_FROM).and(worth_it))
 }
 
 /// The routes and the document describing them, built by the same calls.
@@ -105,7 +141,9 @@ pub fn assemble(role: Role) -> (Router<AppState>, utoipa::openapi::OpenApi) {
     let router = router.routes(routes!(health::readyz));
 
     let router = if role.serves() {
-        router.nest(&format!("/api/{CURRENT_VERSION}"), v1())
+        router
+            .merge(api::unversioned())
+            .nest(&format!("/api/{CURRENT_VERSION}"), v1())
     } else {
         router
     };
@@ -115,7 +153,7 @@ pub fn assemble(role: Role) -> (Router<AppState>, utoipa::openapi::OpenApi) {
 
 /// The first version of the API. Paths are relative to it.
 fn v1() -> OpenApiRouter<AppState> {
-    OpenApiRouter::new()
+    api::v1()
 }
 
 /// An unversioned API address, sent on to the current version of itself.
@@ -128,7 +166,7 @@ async fn legacy_api(Path(rest): Path<String>, uri: Uri) -> Response {
     // Anything already under a version that got here matched nothing, and
     // redirecting it would only add another version to the front, for ever.
     if rest == CURRENT_VERSION || rest.starts_with(&format!("{CURRENT_VERSION}/")) {
-        return StatusCode::NOT_FOUND.into_response();
+        return api::error::ApiError::not_found("Not found").into_response();
     }
 
     let mut target = format!("/api/{CURRENT_VERSION}/{rest}");

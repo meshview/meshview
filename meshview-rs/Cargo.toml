@@ -19,6 +19,7 @@ base64 = "0.23"
 bytes = "1"
 clap = { version = "4", features = ["derive", "env"] }
 ctr = "0.10"
+form_urlencoded = "1"
 # Local time for the daily jobs, with the time zone database built in, so that
 # TZ works in an image that has no tzdata.
 jiff = { version = "0.2", features = ["tzdb-bundle-always"] }
@@ -38,6 +39,7 @@ serde_json = "1"
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "tls-none", "sqlite", "macros", "migrate"] }
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 toml = "0.9"
+tower-http = { version = "0.7", default-features = false, features = ["compression-gzip"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 utoipa = "6"

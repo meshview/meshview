@@ -3,7 +3,7 @@
 
 //! What the HTTP handlers share.
 
-use sqlx::SqlitePool;
+use crate::db::Reader;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
@@ -78,7 +78,7 @@ pub struct AppState {
     pub readiness: Arc<Readiness>,
     /// The read pool, there once the database is at a schema this build knows.
     /// Handlers that need the database answer 503 until then.
-    pub reader: Arc<OnceLock<SqlitePool>>,
+    pub reader: Arc<OnceLock<Reader>>,
 }
 
 /// The readiness check for the database being at the expected schema.

@@ -24,7 +24,7 @@ each checked against the Python version's behaviour before it is called done.
 | Clean shutdown | Done |
 | Daily cleanup and snapshot | Done, identical databases side by side with Python |
 | Consistent backups (`meshview-rs backup`) | Done (new in meshview-rs); the Python version's scheduled backups are deprecated |
-| API endpoints | Not yet |
+| API endpoints | In progress: see [API](api.md#versions) for each one |
 | Web pages | Not yet |
 | Coverage prediction | Later |
 | PostgreSQL | Later |

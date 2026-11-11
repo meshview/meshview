@@ -13,11 +13,11 @@ do, and in a crate of their own they are built once and left alone.
 | `meshview-rs/src/db/` | The database. `mod.rs` is what holds for any backend; `sqlite.rs` everything that knows it is SQLite, so that PostgreSQL can be a sibling module. |
 | `meshview-rs/migrations/sqlite/` | The SQLite migrations, compiled into the binary. |
 | `meshview-rs/src/ingest/` | MQTT ingestion: the connection (`mod.rs`), keys and decryption (`keys.rs`), opening a message (`opened.rs`) and storing it (`store.rs`). |
-| `meshview-rs/src/web/` | HTTP: the API router, its reference, the redirects and the probes. |
+| `meshview-rs/src/web/` | HTTP: the API router, its reference, the redirects and the probes. `web/api/` has the API's endpoints, its errors, and its parameter parsing. |
 | `meshview-rs/src/jobs.rs` | The daily cleanup and snapshot, and their schedule. |
 | `meshview-rs/src/app.rs` | The roles, starting and stopping a process, and `backup`. |
 | `meshview-rs/tests/` | Integration tests. |
-| `scripts/` | Updating the protobufs, comparing databases with the Python version, and giving a database back to it. |
+| `scripts/` | Updating the protobufs, comparing databases and API answers with the Python version, and giving a database back to it. |
 
 ## Building and testing
 
@@ -43,6 +43,7 @@ What the integration tests cover:
 | `schema.rs` | Taking a Python database over, at its last revision and refusing others; a new database and an adopted one end up with the same schema. |
 | `ingest.rs` | Envelopes encrypted and serialised by the Python protobufs and `cryptography` are stored exactly as the Python version stores them, unknown fields included. |
 | `http.rs` | Routes per role, probes, the reference, and the redirects. |
+| `api.rs` | The API endpoints, against a small database: what they answer, their errors, and compression. |
 | `shutdown.rs` | Closing the database leaves no `-wal` or `-shm` behind. |
 | `lifecycle.rs` | Whole processes, `run` and `ingest`, started against an unreachable broker and stopped. |
 | `jobs.rs` | The daily cleanup and snapshot, the record of their runs, and `backup` copying a database that is being written. |
@@ -125,6 +126,36 @@ ALL MATCH
 Times of import differ by construction and are not compared. A packet that
 arrives while only one of the two is connected, right at the start or the end,
 shows up as a difference, and is not one.
+
+## Comparing the API
+
+The API is meant to answer what the Python meshview answers. The way to check
+it is to run both web servers on copies of the same database, with nothing
+ingesting into either, and send both the same requests.
+
+1. Make two copies of a Python meshview database: `python.db` stays the
+   Python version's, `rust.db` is taken over with `meshview-rs migrate`.
+2. Start the Python web server on `python.db` (`python main.py --config
+   config.ini`), and `meshview-rs serve` on `rust.db` on another port, both with
+   the same `[site]` settings: the Python `sample.config.ini` and this project's
+   `sample.config.toml` are the same configuration.
+3. Compare:
+
+   ```sh
+   scripts/compare-api.py http://localhost:8081 http://localhost:8082 scripts/api-requests.txt
+   ```
+
+`scripts/api-requests.txt` has the requests, ordinary ones and the edge cases:
+every endpoint ported adds its own. Each is sent to the Python server at its
+unversioned address and to meshview-rs under `/api/v1`, and the status, content
+type and JSON values compared; keys that differ by nature, such as the version,
+are listed after the request as `ignore=`. A request about a particular packet
+or node needs one that is in the database: the file has those of the database
+it was last run against, and they may need changing for another.
+
+The differences that are meant, listed in [API](api.md#differences-from-the-python-version),
+are of values the comparison does not see (the JSON's spacing) or of answers
+the requests do not ask for.
 
 ## CI
 

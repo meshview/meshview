@@ -12,7 +12,72 @@
 
 pub mod sqlite;
 
+use anyhow::Result;
+use sqlx::SqlitePool;
 use std::fmt;
+
+/// Reading the database, for the web server and the API.
+///
+/// Every query the web side makes is a method here, and nothing outside `db`
+/// writes SQL. Today each method hands over to [`sqlite::queries`]; a PostgreSQL
+/// backend makes this an enum over the two, and nothing that calls it changes.
+#[derive(Debug, Clone)]
+pub struct Reader {
+    pool: SqlitePool,
+}
+
+impl Reader {
+    pub fn new(pool: SqlitePool) -> Self {
+        Self { pool }
+    }
+
+    /// The pool, for closing it.
+    pub fn pool(&self) -> &SqlitePool {
+        &self.pool
+    }
+
+    /// The channels of the packets imported since `since_us`, without repeats,
+    /// in byte order.
+    pub async fn channels_since(&self, since_us: i64) -> Result<Vec<String>> {
+        sqlite::queries::channels_since(&self.pool, since_us).await
+    }
+
+    /// The daily snapshots, oldest first: all of them, or only the latest
+    /// `latest` days.
+    pub async fn daily_snapshots(&self, latest: Option<i64>) -> Result<Vec<DailySnapshot>> {
+        sqlite::queries::daily_snapshots(&self.pool, latest).await
+    }
+
+    /// Every sighting of one packet, latest first.
+    pub async fn packet_sightings(&self, packet_id: i64) -> Result<Vec<PacketSeen>> {
+        sqlite::queries::packet_sightings(&self.pool, packet_id).await
+    }
+}
+
+/// A row of `daily_snapshot`.
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct DailySnapshot {
+    pub snapshot_date: String,
+    pub node_count: i64,
+    pub packet_count: i64,
+    pub gateway_count: i64,
+    pub captured_at_us: i64,
+}
+
+/// A row of `packet_seen`: one gateway hearing one packet.
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct PacketSeen {
+    pub packet_id: i64,
+    pub node_id: i64,
+    pub rx_time: i64,
+    pub hop_limit: Option<i64>,
+    pub hop_start: Option<i64>,
+    pub channel: Option<String>,
+    pub rx_snr: Option<f64>,
+    pub rx_rssi: Option<i64>,
+    pub topic: Option<String>,
+    pub import_time_us: Option<i64>,
+}
 
 /// The last Alembic revision of the Python meshview, and the only one this
 /// program agrees to take a database over from. A database at an earlier one

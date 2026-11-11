@@ -175,7 +175,7 @@ pub async fn run_until(
         Err(_) => warn!("still serving requests after {DRAIN_GRACE:?}; stopping anyway"),
     }
     if let Some(reader) = state_reader.get().cloned() {
-        db::sqlite::close_reader(reader).await;
+        db::sqlite::close_reader(reader.pool().clone()).await;
     }
     if let Some(jobs) = jobs {
         // A job in the middle of something is abandoned, which rolls it back.
@@ -214,7 +214,7 @@ async fn prepare(role: Role, database: PathBuf, state: AppState) -> Result<Optio
 
     if role.serves() {
         let reader = wait_for_schema(&database).await?;
-        let _ = state.reader.set(reader);
+        let _ = state.reader.set(db::Reader::new(reader));
     }
 
     state.readiness.set(CHECK_DATABASE, true);
