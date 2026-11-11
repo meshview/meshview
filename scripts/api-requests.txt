@@ -46,3 +46,56 @@
 # Health: times, versions and file sizes differ by nature; backup, snapshot and
 # the status files are what docs/api.md says is different.
 /health ignore=timestamp,version,git_revision,seconds_since_last_message,database_size,database_size_bytes,backup,snapshot,cleanup.status_file,cleanup.last_run
+
+/api/stats
+/api/stats?period_type=day&length=30
+/api/stats?period_type=DAY&length=30
+/api/stats?period_type=hour&length=72
+/api/stats?period_type=day&length=90&channel=NarrowFast
+/api/stats?period_type=day&length=90&channel=narrowfast
+/api/stats?period_type=day&length=30&portnum=1
+/api/stats?period_type=day&length=30&portnum=67&channel=LongFast
+/api/stats?period_type=day&length=30&from_node=1125685839
+/api/stats?period_type=day&length=30&to_node=2925607268
+/api/stats?period_type=day&length=30&channel=
+/api/stats?length=0
+/api/stats?length=x
+/api/stats?portnum=
+/api/stats?portnum=x
+/api/stats?portnum=99999999999
+/api/stats?to_node=x
+/api/stats?node=x
+# The Python version always answers sent and seen as 0: see docs/api.md.
+/api/stats?node=1125685839&period_type=day&length=30 ignore=sent,seen
+# The order of the set in the message changes with every Python start.
+/api/stats?period_type=week ignore=error
+
+/api/stats/count
+/api/stats/count?period_type=day&length=30
+/api/stats/count?period_type=hour&length=72
+/api/stats/count?from_node=1125685839&period_type=day&length=30
+/api/stats/count?to_node=2925607268&period_type=day&length=30
+/api/stats/count?channel=NarrowFast&period_type=day&length=30
+/api/stats/count?channel=narrowfast&period_type=day&length=30
+/api/stats/count?length=30
+/api/stats/count?packet_id=2725269581
+/api/stats/count?packet_id=2725269581&period_type=day&length=30
+/api/stats/count?from_node=0&period_type=day&length=30
+/api/stats/count?packet_id=x
+/api/stats/count?from_node=x
+/api/stats/count?from_node=
+/api/stats/count?length=x
+
+/api/stats/top
+/api/stats/top?length=30
+/api/stats/top?length=30&active=true
+/api/stats/top?length=30&active=1&limit=100
+/api/stats/top?length=30&active=true&limit=20&offset=20
+/api/stats/top?period_type=hour&length=24&active=true
+/api/stats/top?period_type=HOUR&length=2
+/api/stats/top?length=30&channel=NarrowFast&active=true
+/api/stats/top?length=30&channel=narrowfast&active=true
+/api/stats/top?limit=0
+/api/stats/top?limit=1000&offset=-5
+/api/stats/top?active=maybe
+/api/stats/top?limit=x

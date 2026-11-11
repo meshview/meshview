@@ -340,3 +340,152 @@ async fn health_is_503_while_the_database_is_not_ready() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
 }
+
+/// Packets from node 10 to 20 and back, an hour apart, the latest just now.
+async fn traffic(api: &Api) {
+    let now = now_us();
+    for (id, from, to, hours_ago, channel) in [
+        (1, 10, 20, 0, "LongFast"),
+        (2, 10, 20, 1, "LongFast"),
+        (3, 20, 10, 1, "MediumFast"),
+        (4, 10, 30, 50, "LongFast"),
+    ] {
+        sqlx::query(
+            "INSERT INTO packet (id, portnum, from_node_id, to_node_id, import_time_us, channel) \
+             VALUES (?, 1, ?, ?, ?, ?)",
+        )
+        .bind(id)
+        .bind(from)
+        .bind(to)
+        .bind(now - hours_ago * 3_600_000_000_i64)
+        .bind(channel)
+        .execute(&api.pool)
+        .await
+        .unwrap();
+    }
+    for (packet, gateway) in [(1, 20), (1, 21), (2, 20), (3, 21)] {
+        sqlx::query(
+            "INSERT INTO packet_seen (packet_id, node_id, rx_time, import_time_us) \
+             VALUES (?, ?, 0, ?)",
+        )
+        .bind(packet)
+        .bind(gateway)
+        .bind(now)
+        .execute(&api.pool)
+        .await
+        .unwrap();
+    }
+    api.exec(
+        "INSERT INTO node (id, node_id, long_name, short_name, channel) VALUES \
+         ('!0000000a', 10, 'Ten', 'TEN', 'LongFast'), \
+         ('!00000014', 20, 'Twenty', 'TWNT', 'MediumFast'), \
+         ('!0000001e', 30, 'Thirty', 'THRT', 'LongFast')",
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn stats_count_packets_per_period() {
+    let api = api().await;
+    traffic(&api).await;
+
+    let (status, body) = api.get("/api/v1/stats?period_type=day&length=1").await;
+    assert_eq!(status, StatusCode::OK);
+    let total: i64 = body["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|period| period["count"].as_i64().unwrap())
+        .sum();
+    assert_eq!(total, 3, "the packet 50 hours ago is outside the day");
+
+    let (_, on_channel) = api
+        .get("/api/v1/stats?period_type=day&length=1&channel=longfast")
+        .await;
+    assert_eq!(on_channel["data"][0]["count"], 2);
+    assert_eq!(on_channel["channel"], "longfast");
+
+    let (_, node) = api
+        .get("/api/v1/stats?node=10&period_type=day&length=3")
+        .await;
+    assert_eq!(
+        node,
+        json!({"node_id": 10, "period_type": "day", "length": 3, "sent": 3, "seen": 1})
+    );
+
+    assert_eq!(
+        api.get("/api/v1/stats?period_type=week").await,
+        (
+            StatusCode::BAD_REQUEST,
+            json!({"error": "Invalid period_type. Must be one of {'hour', 'day'}"})
+        )
+    );
+    assert_eq!(
+        api.get("/api/v1/stats?portnum=").await.1,
+        json!({"error": "portnum must be an integer"})
+    );
+}
+
+#[tokio::test]
+async fn totals_count_what_is_asked() {
+    let api = api().await;
+    traffic(&api).await;
+
+    assert_eq!(
+        api.get("/api/v1/stats/count").await.1,
+        json!({"total_packets": 4, "total_seen": 4})
+    );
+    // Any filter means the latest day by default.
+    assert_eq!(
+        api.get("/api/v1/stats/count?from_node=10").await.1,
+        json!({"total_packets": 2, "total_seen": 3})
+    );
+    assert_eq!(
+        api.get("/api/v1/stats/count?packet_id=1").await.1,
+        json!({"total_packets": 4, "total_seen": 2})
+    );
+    // An empty filter filters nothing.
+    assert_eq!(
+        api.get("/api/v1/stats/count?channel=").await.1,
+        json!({"total_packets": 4, "total_seen": 4})
+    );
+    assert_eq!(
+        api.get("/api/v1/stats/count?period_type=week").await,
+        (
+            StatusCode::BAD_REQUEST,
+            json!({"error": "period_type must be 'hour' or 'day'"})
+        )
+    );
+}
+
+#[tokio::test]
+async fn the_top_nodes_are_the_most_heard() {
+    let api = api().await;
+    traffic(&api).await;
+
+    let (status, body) = api.get("/api/v1/stats/top?active=true").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["total"], 2);
+    assert_eq!(
+        body["nodes"],
+        json!([
+            {"node_id": 10, "long_name": "Ten", "short_name": "TEN", "channel": "LongFast",
+             "sent": 2, "seen": 3, "avg": 1.5},
+            {"node_id": 20, "long_name": "Twenty", "short_name": "TWNT", "channel": "MediumFast",
+             "sent": 1, "seen": 1, "avg": 1.0},
+        ])
+    );
+
+    // Without `active`, every node, the quiet ones last.
+    let (_, all) = api.get("/api/v1/stats/top").await;
+    assert_eq!(all["total"], 3);
+    assert_eq!(all["nodes"][2]["avg"], 0.0);
+
+    assert_eq!(
+        api.get("/api/v1/stats/top?active=maybe").await,
+        (
+            StatusCode::BAD_REQUEST,
+            json!({"error": "active must be true or false"})
+        )
+    );
+}
