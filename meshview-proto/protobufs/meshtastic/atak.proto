@@ -2147,6 +2147,15 @@ message TAKPacketV2 {
    */
   optional SensorFov sensor_fov = 26;
 
+  /*
+   * Low 14 bits of the event's `start` time, as epoch seconds UTC. 14 bits rather
+   * than a full timestamp, so the field costs 4 bytes on the wire instead of 7.
+   * Order and deduplicates packets from a single sender. Valid only when within an
+   * hour of current wall time. `optional` is deliberate. It costs essentially
+   * nothing and distinguishes "sender did not populate this" from a legitimate zero.
+   */
+  optional uint32 start_epoch_lo14 = 43;
+
   reserved 27, 28, 30;
   // Tags 27, 28 reserved for future top-level annotations. Tag 29 is consumed
   // by `marti` below. Tag 30 was the former `bool pli` oneof arm - dropped
