@@ -14,7 +14,8 @@ do, and in a crate of their own they are built once and left alone.
 | `meshview-rs/src/db/` | The database. `mod.rs` is what holds for any backend; `sqlite.rs` everything that knows it is SQLite, so that PostgreSQL can be a sibling module. |
 | `meshview-rs/migrations/sqlite/` | The SQLite migrations, compiled into the binary. |
 | `meshview-rs/templates/` | The web pages' templates: the Python version's, converted to Tera 2 by `scripts/import-web.py`. Not to be edited by hand. |
-| `meshview-rs/assets/` | What the web side serves and is built into the binary: the pages' files under `static/` and the coverage explanations under `docs/`, both imported with the templates (`IMPORTED_FROM` says from which commit); the translation catalogs under `lang/`, the Python version's; and the API reference's introduction (`api/intro.md`) and translations (`api-lang/`). |
+| `meshview-rs/local/` | What meshview-rs adds to the imported pages, its own: templates under `templates/` (the node page's coverage help) and the translations of their strings under `lang/`. Edited here. |
+| `meshview-rs/assets/` | What the web side serves and is built into the binary: the pages' files under `static/`, imported with the templates (`IMPORTED_FROM` says from which commit); the translation catalogs under `lang/`, the Python version's; and the API reference's introduction (`api/intro.md`) and translations (`api-lang/`). |
 | `meshview-rs/src/ingest/` | MQTT ingestion: the connection (`mod.rs`), keys and decryption (`keys.rs`), opening a message (`opened.rs`) and storing it (`store.rs`). |
 | `meshview-rs/src/traceroute.rs` | Paths out of traceroutes: from the node that started one to the one it traced, and back. |
 | `meshview-rs/src/coverage.rs` | Predicted coverage: where a node is heard, sampled around it with the ITM. |
@@ -225,9 +226,9 @@ written here, but brought over from a checkout of it.
 scripts/import-web.py ~/devel/mesh/meshview
 ```
 
-replaces `meshview-rs/templates/`, `meshview-rs/assets/static/` and
-`meshview-rs/assets/docs/` with what that checkout has, converted, and writes
-which commit it was to `meshview-rs/assets/IMPORTED_FROM`. The conversion:
+replaces `meshview-rs/templates/` and `meshview-rs/assets/static/` with what
+that checkout has, converted, and writes which commit it was to
+`meshview-rs/assets/IMPORTED_FROM`. The conversion:
 
 - Jinja to Tera 2: `{{ tr("…") }}` becomes `{{ "…" | tr }}`, `range(1, 15)`
   becomes `range(start=1, end=15)`, the `chart_tools` macro of the statistics
@@ -237,6 +238,18 @@ which commit it was to `meshview-rs/assets/IMPORTED_FROM`. The conversion:
 - The API's addresses, `/api/…`, become `/api/v1/…`, and the link to the old
   API page, `/api.html`, the reference, `/api/docs`.
 - The old API pages, `api.html` and `api-chat.html`, are left out.
+- The node page's coverage help, which the Python version fetched from its
+  `docs/COVERAGE*.md` and rendered, includes meshview-rs's own
+  `local/templates/coverage-help.html` instead: it can say what is true of
+  meshview-rs (the model is built in), and it is translated as the rest of the
+  page.
+
+What meshview-rs adds of its own lives in `meshview-rs/local/`, which the
+import leaves alone: templates under `templates/`, included by the converted
+ones, and their strings' translations under `lang/`, one catalog a language
+from the English text to its translation. They only fill in what the Python
+version's catalogs do not have. A test fails while a catalog lacks a string of
+those templates, or has one they no longer use.
 
 The script stops at anything in a template it does not know how to convert,
 such as a new macro: that is the time to teach it. A test renders every page in

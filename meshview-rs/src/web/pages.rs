@@ -9,8 +9,11 @@
 //! page is rendered once, at start, and answered from memory after that.
 //!
 //! The templates are the Python version's Jinja ones converted to Tera 2 by
-//! `scripts/import-web.py`, which brings the static files over too. Both are
-//! built into the binary.
+//! `scripts/import-web.py`, which brings the static files over too. What
+//! meshview-rs adds of its own, the node page's coverage help, is under
+//! `local/`: its templates, and the translations of their strings, which fill
+//! in what the Python version's catalogs do not have. All of it is built into
+//! the binary.
 
 use super::api::lang;
 use super::api::site_config;
@@ -39,8 +42,34 @@ struct Templates;
 struct Static;
 
 #[derive(RustEmbed)]
-#[folder = "assets/docs/"]
-struct Docs;
+#[folder = "local/templates/"]
+struct LocalTemplates;
+
+#[derive(RustEmbed)]
+#[folder = "local/lang/"]
+struct LocalCatalogs;
+
+/// meshview-rs's own translations for `code`, English text to translation.
+fn local_catalog(code: &str) -> HashMap<String, String> {
+    LocalCatalogs::get(&format!("{code}.json"))
+        .map(|file| {
+            serde_json::from_slice(&file.data)
+                .unwrap_or_else(|e| panic!("local/lang/{code}.json is not valid: {e}"))
+        })
+        .unwrap_or_default()
+}
+
+/// The templates of an embedded folder, by name.
+fn templates_of<E: RustEmbed>() -> anyhow::Result<Vec<(String, String)>> {
+    E::iter()
+        .map(|name| {
+            let file = E::get(&name).expect("listed");
+            let text = String::from_utf8(file.data.into_owned())
+                .map_err(|_| anyhow!("template {name} is not UTF-8"))?;
+            Ok((name.to_string(), text))
+        })
+        .collect()
+}
 
 /// The pages, by template, and whether each is the dashboard: the map with
 /// the node explorer beside it.
@@ -121,13 +150,15 @@ fn tera(config: &Config) -> anyhow::Result<Tera> {
         .get("ui")
         .cloned()
         .unwrap_or_else(|| json!({}));
-    let translations: Arc<HashMap<String, String>> = Arc::new(
+    // The Python version's strings first; ours only where it has none.
+    let mut translations = local_catalog(code);
+    translations.extend(
         ui.as_object()
             .into_iter()
             .flatten()
-            .filter_map(|(source, text)| Some((source.clone(), text.as_str()?.to_string())))
-            .collect(),
+            .filter_map(|(source, text)| Some((source.clone(), text.as_str()?.to_string()))),
     );
+    let translations = Arc::new(translations);
 
     let site = site_config::build(config).site;
     let map_tiles = json!({
@@ -149,14 +180,8 @@ fn tera(config: &Config) -> anyhow::Result<Tera> {
         tera::Value::safe_string(&to_json(&value))
     });
 
-    let templates = Templates::iter()
-        .map(|name| {
-            let file = Templates::get(&name).expect("listed");
-            let text = String::from_utf8(file.data.into_owned())
-                .map_err(|_| anyhow!("template {name} is not UTF-8"))?;
-            Ok((name.to_string(), text))
-        })
-        .collect::<anyhow::Result<Vec<_>>>()?;
+    let mut templates = templates_of::<Templates>()?;
+    templates.extend(templates_of::<LocalTemplates>()?);
     tera.add_raw_templates(templates)
         .map_err(|e| anyhow!("{e}"))?;
 
@@ -298,21 +323,6 @@ pub fn router<S: Clone + Send + Sync + 'static>(config: &Config) -> anyhow::Resu
 
     let missing = Arc::clone(&rendered.not_found);
     router = router.route(
-        "/docs/{doc}",
-        get(move |Path(doc): Path<String>| async move {
-            match Docs::get(&doc) {
-                Some(file) => (
-                    [(CONTENT_TYPE, "text/markdown; charset=utf-8")],
-                    file.data.into_owned(),
-                )
-                    .into_response(),
-                None => not_found(&missing),
-            }
-        }),
-    );
-
-    let missing = Arc::clone(&rendered.not_found);
-    router = router.route(
         "/static/{*path}",
         get(
             move |Path(path): Path<String>, request: Request| async move {
@@ -365,6 +375,52 @@ mod tests {
             to_json(&value),
             "\"\\u003c/script\\u003e\\u003cb\\u003e\\u0027\\u0026\\u0027\""
         );
+    }
+
+    /// The strings `"…" | tr` translates in a template.
+    fn translated_strings(template: &str) -> Vec<&str> {
+        template
+            .match_indices("\" | tr")
+            .filter_map(|(end, _)| {
+                let start = template[..end].rfind('"')? + 1;
+                Some(&template[start..end])
+            })
+            .collect()
+    }
+
+    /// meshview-rs's own templates are translated whole into every language
+    /// the Python version's catalogs have, and nothing else is.
+    #[test]
+    fn local_catalogs_translate_the_local_templates() {
+        let mut needed = std::collections::BTreeSet::new();
+        for name in LocalTemplates::iter() {
+            let file = LocalTemplates::get(&name).unwrap();
+            let text = std::str::from_utf8(&file.data).unwrap().to_string();
+            needed.extend(translated_strings(&text).into_iter().map(str::to_string));
+        }
+        assert!(!needed.is_empty());
+        for code in ["es", "ru"] {
+            let catalog = local_catalog(code);
+            let missing: Vec<_> = needed
+                .iter()
+                .filter(|s| !catalog.contains_key(*s))
+                .collect();
+            let stale: Vec<_> = catalog.keys().filter(|s| !needed.contains(*s)).collect();
+            assert!(
+                missing.is_empty() && stale.is_empty(),
+                "local/lang/{code}.json: missing {missing:#?}, stale {stale:#?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_coverage_help_is_in_the_node_page_in_its_language() {
+        let mut config = Config::default();
+        config.site.language = "es".into();
+        let rendered = render(&config).unwrap();
+        let node = &rendered.pages["node.html"];
+        assert!(node.contains("<h4>Cómo funciona</h4>"));
+        assert!(!node.contains("/docs/COVERAGE"));
     }
 
     #[test]

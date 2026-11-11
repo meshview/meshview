@@ -129,6 +129,7 @@ with every key, and [Configuration](configuration.md) has them all.
 | Web pages | rendered on every request | the same pages, rendered once at start, and their files built into the binary |
 | Traceroute graph | `/graph/traceroute/{id}`, an SVG drawn by Graphviz | redirects to the traceroute's page, `/traceroute/{id}`, which draws it |
 | Scripts and styles | sent as they are | compressed for browsers that take it |
+| Coverage help | `docs/COVERAGE*.md`, fetched and rendered when it is opened, also served at `/docs/…` | part of the node page, translated with it |
 | Probes | `/health` | `/livez` and `/readyz`, for orchestrators, beside `/health` |
 | MQTT over TLS | no | yes |
 | Coverage prediction | pyitm, installed apart | NTIA's model, built in (see [API](api.md#differences-from-the-python-version)) |

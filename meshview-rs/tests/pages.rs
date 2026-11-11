@@ -163,16 +163,16 @@ async fn what_is_not_there_is_a_page_saying_so() {
 }
 
 #[tokio::test]
-async fn the_coverage_explanation_is_served_in_each_language() {
-    let app = app(Config::default());
-    for doc in ["COVERAGE.md", "COVERAGE.es.md", "COVERAGE.ru.md"] {
-        let response = get(&app, &format!("/docs/{doc}"), &[]).await;
-        assert_eq!(response.status(), StatusCode::OK, "{doc}");
-        assert!(
-            response.headers()[header::CONTENT_TYPE]
-                .to_str()
-                .unwrap()
-                .starts_with("text/markdown")
-        );
-    }
+async fn the_coverage_help_comes_with_the_node_page() {
+    let mut config = Config::default();
+    config.site.language = "ru".into();
+    let app = app(config);
+
+    let page = text(get(&app, "/node/1234", &[]).await).await;
+    assert!(page.contains("<h4>Как это работает</h4>"));
+    // It was fetched from these, which are not served any more.
+    assert_eq!(
+        get(&app, "/docs/COVERAGE.md", &[]).await.status(),
+        StatusCode::NOT_FOUND
+    );
 }

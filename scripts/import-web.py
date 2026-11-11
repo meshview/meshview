@@ -4,9 +4,9 @@
 
 """Bring the Python meshview's web pages into meshview-rs.
 
-The pages are the Python version's: its Jinja templates, its static files and
-the coverage documents the node page shows. This copies them from a checkout of
-it and turns what has to change into what meshview-rs needs:
+The pages are the Python version's: its Jinja templates and its static files.
+This copies them from a checkout of it and turns what has to change into what
+meshview-rs needs:
 
 - the templates from Jinja to Tera 2: `tr("…")` becomes the filter `"…" | tr`,
   `range()` takes its arguments by name, the one macro becomes a component,
@@ -16,7 +16,10 @@ it and turns what has to change into what meshview-rs needs:
   API page, `/api.html`, to the reference, `/api/docs`;
 - blocks a template defines that none of its parents has, which Jinja ignores
   and Tera refuses, are dropped;
-- the old API pages themselves are left out, as the reference replaces them.
+- the old API pages themselves are left out, as the reference replaces them;
+- the node page's coverage help, which the Python version fetched from its
+  docs/COVERAGE*.md and rendered, is meshview-rs's own template instead,
+  local/templates/coverage-help.html, translated as the rest of the page is.
 
 Anything in a template it does not know how to convert stops it, rather than
 leaving a page that fails to render. What it copied from is written to
@@ -35,7 +38,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent / "meshview-rs"
 TEMPLATES = ROOT / "templates"
 STATIC = ROOT / "assets" / "static"
-DOCS = ROOT / "assets" / "docs"
 SOURCE = ROOT / "assets" / "IMPORTED_FROM"
 
 # Replaced by the reference at /api/docs.
@@ -116,8 +118,34 @@ def drop_unknown_blocks(path, text):
     return text
 
 
+# The node page's coverage help: the dialog's body, and the script that fetched
+# and rendered the Markdown into it when the dialog first opened.
+HELP_BODY = re.compile(
+    r'(<div id="coverage-help-body" class="mesh-dialog-body">).*?(</div>)'
+)
+HELP_FETCH = re.compile(
+    r"\n        if \(loaded\) return;\n        try \{.*?\n        \} catch \(err\) \{.*?\n        \}\n",
+    re.DOTALL,
+)
+
+
+def local_coverage_help(path, text):
+    text, bodies = HELP_BODY.subn(r'\1{% include "coverage-help.html" %}\2', text)
+    text, fetches = HELP_FETCH.subn("\n", text)
+    text = re.sub(
+        r"<!-- Coverage help:[^>]*-->",
+        "<!-- Coverage help: meshview-rs's own, local/templates/coverage-help.html. -->",
+        text,
+    )
+    if (bodies, fetches) != (1, 1) or "COVERAGE" in text:
+        fail(path, "the coverage help is not where it was: teach local_coverage_help")
+    return text
+
+
 def convert_template(path):
     text = drop_unknown_blocks(path, path.read_text(encoding="utf-8"))
+    if path.name == "node.html":
+        text = local_coverage_help(path, text)
 
     top_level = TOP_LEVEL_SETS.get(path.name)
     if top_level:
@@ -182,9 +210,7 @@ def main():
 
     shutil.rmtree(TEMPLATES, ignore_errors=True)
     shutil.rmtree(STATIC, ignore_errors=True)
-    shutil.rmtree(DOCS, ignore_errors=True)
     TEMPLATES.mkdir(parents=True)
-    DOCS.mkdir(parents=True)
 
     for template in sorted((package / "templates").glob("*.html")):
         (TEMPLATES / template.name).write_text(
@@ -205,14 +231,11 @@ def main():
                 rewrite_urls(path.read_text(encoding="utf-8")), encoding="utf-8"
             )
 
-    for doc in sorted((source / "docs").glob("COVERAGE*.md")):
-        shutil.copy2(doc, DOCS / doc.name)
-
     commit = git(source, "rev-parse", "HEAD")
     branch = git(source, "rev-parse", "--abbrev-ref", "HEAD")
     dirty = (
         " (with uncommitted changes)"
-        if git(source, "status", "--porcelain", "meshview", "docs")
+        if git(source, "status", "--porcelain", "meshview")
         else ""
     )
     SOURCE.write_text(f"{commit} {branch}{dirty}\n", encoding="utf-8")
