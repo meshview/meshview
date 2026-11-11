@@ -26,7 +26,7 @@
   "Ask for many nodes by `ids` in several requests rather than one: a longer address can be more than the server or a proxy takes.": "Запрашивайте много узлов по `ids` несколькими запросами, а не одним: более длинный адрес может превысить то, что принимает сервер или прокси.",
   "Backups, which meshview-rs does not make: always `disabled`. Use `meshview-rs backup`, from outside.": "Резервные копии, которые meshview-rs не создаёт: всегда `disabled`. Используйте `meshview-rs backup` извне.",
   "Channels": "Каналы",
-  "Colours for channels on the map, by lowercased channel name: only those configured as `#rrggbb`. Other channels get a colour of their own. The map matches names ignoring case, spaces, hyphens and underscores.": "Цвета каналов на карте по имени канала в нижнем регистре: только заданные как `#rrggbb`. Остальные каналы получают собственный цвет. Карта сравнивает имена без учёта регистра, пробелов, дефисов и подчёркиваний.",
+  "Colours for channels on the map, by lowercased channel name: those of the official presets' channels, and those configured as `#rrggbb`, which take their place. Other channels get a colour of their own. The map matches names ignoring case, spaces, hyphens and underscores.": "Цвета каналов на карте по имени канала в нижнем регистре: цвета каналов официальных пресетов и цвета, заданные в формате `#rrggbb`, которые их заменяют. Остальные каналы получают собственный цвет. Карта сравнивает имена без учёта регистра, пробелов, дефисов и подчёркиваний.",
   "Conventions": "Соглашения",
   "Count the sightings of this packet, by its stored id.": "Число наблюдений этого пакета по его сохранённому ID.",
   "Daily snapshots": "Ежедневные снимки",

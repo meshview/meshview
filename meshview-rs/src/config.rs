@@ -507,7 +507,8 @@ mod tests {
         assert_eq!(config.site.title, "My Mesh");
         assert!(config.site.nodes);
         assert_eq!(config.site.map_top_left_lon, -180.0);
-        assert_eq!(config.map_channel_colors["LongFast"], "#4363d8");
+        // The presets' colours are built in: the sample sets none.
+        assert!(config.map_channel_colors.is_empty());
         assert_eq!(config.mqtt.topics, ["msh/EU_868/#"]);
         assert_eq!(config.mqtt.port, Some(1883));
         assert_eq!(config.cleanup.days_to_keep, 14);

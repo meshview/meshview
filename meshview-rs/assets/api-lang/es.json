@@ -26,7 +26,7 @@
   "Ask for many nodes by `ids` in several requests rather than one: a longer address can be more than the server or a proxy takes.": "Para pedir muchos nodos por `ids`, mejor en varias peticiones que en una: una dirección más larga puede superar lo que admite el servidor o un proxy.",
   "Backups, which meshview-rs does not make: always `disabled`. Use `meshview-rs backup`, from outside.": "Copias de seguridad, que meshview-rs no hace: siempre `disabled`. Para ello está `meshview-rs backup`, desde fuera.",
   "Channels": "Canales",
-  "Colours for channels on the map, by lowercased channel name: only those configured as `#rrggbb`. Other channels get a colour of their own. The map matches names ignoring case, spaces, hyphens and underscores.": "Colores de los canales en el mapa, por nombre de canal en minúsculas: solo los configurados como `#rrggbb`. Los demás canales reciben un color propio. El mapa compara los nombres ignorando mayúsculas, espacios, guiones y guiones bajos.",
+  "Colours for channels on the map, by lowercased channel name: those of the official presets' channels, and those configured as `#rrggbb`, which take their place. Other channels get a colour of their own. The map matches names ignoring case, spaces, hyphens and underscores.": "Colores de los canales en el mapa, por nombre de canal en minúsculas: los de los canales de los presets oficiales y los configurados como `#rrggbb`, que los sustituyen. Los demás canales reciben un color propio. El mapa compara los nombres ignorando mayúsculas, espacios, guiones y guiones bajos.",
   "Conventions": "Convenciones",
   "Count the sightings of this packet, by its stored id.": "Cuenta las observaciones de este paquete, por su id almacenado.",
   "Daily snapshots": "Instantáneas diarias",
