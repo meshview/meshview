@@ -1,0 +1,162 @@
+# meshview-rs configuration.
+#
+# The sections and keys are the Python meshview's: moving a config.ini over is
+# quoting the strings and writing booleans, numbers and lists as such. Every key
+# is optional and shown here with an example or its default. A key or section
+# meshview-rs does not know is an error, so a typo does not go unnoticed.
+#
+# Any value can also come from the environment as MESHVIEW_<SECTION>__<KEY>,
+# which wins over this file, for example MESHVIEW_DATABASE__CONNECTION_STRING or
+# MESHVIEW_MQTT__PASSWORD. Lists are written as here: MESHVIEW_MQTT__TOPICS='["msh/#"]'.
+
+# -------------------------
+# Server Configuration
+# -------------------------
+[server]
+# The address to bind the server to. Use * to listen on all interfaces.
+bind = "*"
+# Port to run the web server on.
+port = 8081
+# PEM file containing the TLS certificate and private key. Not supported yet:
+# terminate TLS in front of meshview-rs.
+tls_cert = ""
+
+# -------------------------
+# Site Appearance & Behavior
+# -------------------------
+[site]
+# Optional domain metadata exposed by /api/config; does not configure binding or TLS.
+domain = ""
+# Select a language catalog: en, es, or ru.
+language = "en"
+# Site title to show in the browser title bar and headers.
+title = "Bay Area Mesh"
+# Short tagline for this installation, shown in the page footer and used as the
+# page description by search engines and link previews. Empty for none.
+message = "Real time data from around the bay area and beyond."
+# Optional announcement shown in a banner at the top of every page, for example
+# planned maintenance. Visitors can dismiss it; it shows again when the text
+# changes. Empty for none.
+announcement = ""
+
+# Show or hide navigation links; page and API routes remain available.
+nodes = true
+chat = true
+everything = true
+graphs = true
+stats = true
+net = true
+map = true
+top = true
+api = true
+meshviewworld = true
+
+# Map boundaries (used for the map view).
+map_top_left_lat = 39.0
+map_top_left_lon = -123.0
+map_bottom_right_lat = 36.0
+map_bottom_right_lon = -121.0
+
+# Base map tiles. Without map_tile_url the maps use OpenStreetMap.
+map_tile_url = ""
+map_tile_attribution = ""
+map_tile_max_zoom = 19
+map_tile_name = ""
+
+# Map and Firehose polling intervals in seconds. Zero or negative values disable
+# automatic polling; initial data still loads.
+map_interval = 3
+firehose_interval = 3
+
+# Weekly net details.
+weekly_net_message = "Weekly Mesh check-in. We will keep it open on every Wednesday from 5:00pm for checkins. The message format should be (LONG NAME) - (CITY YOU ARE IN) #BayMeshNet."
+net_tag = "#BayMeshNet"
+
+# Map channel color overrides, as six digit hex colors; other channels get
+# generated colors. Names ignore case, spaces, hyphens and underscores.
+[map_channel_colors]
+LongFast = "#4363d8"
+LongSlow = "#000075"
+VeryLongSlow = "#808000"
+MediumSlow = "#008080"
+MediumFast = "#e6194b"
+ShortSlow = "#911eb4"
+ShortFast = "#f58231"
+LongModerate = "#46f0f0"
+ShortTurbo = "#f032e6"
+
+# -------------------------
+# MQTT Broker Configuration
+# -------------------------
+[mqtt]
+# MQTT server hostname or IP.
+server = "mqtt.bayme.sh"
+# 1883 by default, or 8883 with tls on.
+port = 1883
+# Topics to subscribe to. /# includes all descendant topics.
+topics = ["msh/US/bayarea/#", "msh/US/CA/mrymesh/#", "msh/US/CA/sacvalley/#"]
+username = "meshdev"
+password = "large4cats"
+# Node ids whose packets are not stored, in decimal or hex: [0xdeadbeef, 305419896].
+skip_node_ids = []
+# Base64 AES keys (16 or 32 bytes) tried after the default one. Meshtastic's one
+# byte PSK shorthand is also understood.
+secondary_keys = []
+# New in meshview-rs: TLS to the broker. The certificate is checked against the
+# public roots built into meshview-rs, or only against those in tls_ca_file when
+# it is set. A client certificate and its key, both PEM, are sent when given.
+tls = false
+tls_ca_file = ""
+tls_client_cert = ""
+tls_client_key = ""
+
+# -------------------------
+# Database Configuration
+# -------------------------
+[database]
+# SQLAlchemy's form, as in the Python version: three slashes and a relative
+# path, or four for an absolute one. A driver suffix such as +aiosqlite is
+# accepted and ignored. PostgreSQL is not supported yet.
+#   sqlite:///packets.db
+#   sqlite:////var/lib/meshview/packets.db
+connection_string = "sqlite:///packets.db"
+
+# -------------------------
+# Database Cleanup Configuration
+# -------------------------
+[cleanup]
+# Daily cleanup.
+enabled = false
+# Number of days to keep records in the database.
+days_to_keep = 14
+# Daily cleanup time in the server's local timezone.
+hour = 2
+minute = 0
+# Run SQLite VACUUM after cleanup.
+vacuum = false
+
+# SQLite database backups (independent of cleanup).
+backup_enabled = false
+# Directory to store backups in (relative or absolute).
+backup_dir = "./backups"
+# Daily backup time in the server's local timezone; the cleanup's when not set.
+# backup_hour = 2
+# backup_minute = 0
+
+# -------------------------
+# Daily Snapshot Configuration
+# -------------------------
+[snapshot]
+# Daily snapshot time in the server's local timezone. Each capture summarizes
+# the previous complete UTC day.
+hour = 1
+minute = 0
+
+# -------------------------
+# Logging Configuration
+# -------------------------
+[logging]
+# HTTP access logs from the web server.
+access_log = false
+# Database cleanup log file.
+db_cleanup_logfile = "dbcleanup.log"

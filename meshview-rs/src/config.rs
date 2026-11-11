@@ -1,59 +1,262 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Óscar García Amor <ogarcia@connectical.com>
 
-//! Configuration: the Python meshview's `config.ini`, read the way Python's
-//! `configparser` reads it, with environment variables on top.
+//! Configuration: a TOML file, with environment variables on top.
 //!
-//! The file format is kept on purpose. Somebody moving from the Python version
-//! brings their `config.ini` and it means the same thing here, so the parser
-//! follows `configparser` rather than any INI crate's idea of the format: keys
-//! are case insensitive, a `#` or `;` starts a comment only at the beginning of a
-//! line (which is what lets `LongFast = #4363d8` be a colour), quotes are part of
-//! the value, and an indented line continues the value above it.
+//! The sections and keys are the Python meshview's, so moving a `config.ini`
+//! over is a matter of syntax rather than of meaning: strings get quotes, and
+//! booleans, numbers and lists become real ones (`topics` is a list, as is
+//! `secondary_keys`, and `skip_node_ids` is a list of numbers, hex allowed).
+//! What it does not have is the INI file's tolerance for keys nobody reads: a key
+//! or a section this program does not know is an error, so a typo is found
+//! rather than quietly ignored.
 //!
 //! Any value can be overridden from the environment as
 //! `MESHVIEW_<SECTION>__<KEY>`, which is how a container or a Kubernetes pod is
-//! configured without a file at all: `MESHVIEW_DATABASE__CONNECTION_STRING`,
-//! `MESHVIEW_MQTT__PASSWORD` and so on. The double underscore separates the
-//! section from the key because both may contain single ones.
+//! configured without a file at all. The value is read as the type the key has:
+//! `MESHVIEW_MQTT__PASSWORD=1234` is a string, `MESHVIEW_MQTT__TLS=true` a
+//! boolean and `MESHVIEW_MQTT__TOPICS='["msh/#"]'` a list.
 
 use anyhow::{Context, Result, bail};
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
+use toml::{Table, Value};
 
 /// The prefix every configuration variable in the environment carries.
 const ENV_PREFIX: &str = "MESHVIEW_";
 
-/// Between the section and the key in an environment variable's name.
+/// Between the section and the key in an environment variable's name. Double,
+/// because both may contain single ones.
 const ENV_SEPARATOR: &str = "__";
 
-/// The Python version's default port, kept so that nothing in front of it has
-/// to change.
-const DEFAULT_PORT: u16 = 8081;
-
-/// Also the Python version's default: a file called packets.db next to where it
-/// was started.
-const DEFAULT_CONNECTION_STRING: &str = "sqlite:///packets.db";
-
-/// Sections, each a map of lowercase keys to values.
-type Sections = BTreeMap<String, BTreeMap<String, String>>;
-
-/// The configuration as read, with the environment already applied.
-#[derive(Debug, Clone, Default)]
+/// The whole configuration. Every section and every key has a default, so an
+/// empty file, or none, is a valid configuration.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct Config {
-    sections: Sections,
+    pub server: Server,
+    pub site: Site,
+    /// Map colours by channel name, as `#rrggbb`.
+    pub map_channel_colors: BTreeMap<String, String>,
+    pub mqtt: Mqtt,
+    pub database: Database,
+    pub cleanup: Cleanup,
+    pub snapshot: Snapshot,
+    pub logging: Logging,
+    /// The file this came from, if any.
+    #[serde(skip)]
     source: Option<PathBuf>,
+}
+
+/// `[server]`: where the web server listens.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Server {
+    /// The address to listen on. `*` means every interface.
+    pub bind: String,
+    pub port: u16,
+    /// A PEM file with the certificate and key for HTTPS. Not supported yet.
+    pub tls_cert: String,
+}
+
+impl Default for Server {
+    fn default() -> Self {
+        Self {
+            bind: "*".into(),
+            // The Python version's, so that nothing in front of it has to change.
+            port: 8081,
+            tls_cert: String::new(),
+        }
+    }
+}
+
+/// `[site]`: what the web pages show and how they behave.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Site {
+    pub domain: String,
+    pub language: String,
+    pub title: String,
+    pub message: String,
+    pub announcement: String,
+    pub nodes: bool,
+    pub chat: bool,
+    pub everything: bool,
+    pub graphs: bool,
+    pub stats: bool,
+    pub net: bool,
+    pub map: bool,
+    pub top: bool,
+    pub api: bool,
+    pub meshviewworld: bool,
+    pub map_top_left_lat: f64,
+    pub map_top_left_lon: f64,
+    pub map_bottom_right_lat: f64,
+    pub map_bottom_right_lon: f64,
+    pub map_interval: i64,
+    pub map_tile_url: String,
+    pub map_tile_attribution: String,
+    pub map_tile_max_zoom: u8,
+    pub map_tile_name: String,
+    pub firehose_interval: i64,
+    pub weekly_net_message: String,
+    pub net_tag: String,
+}
+
+impl Default for Site {
+    /// The Python version's defaults, as its `/api/config` applies them.
+    fn default() -> Self {
+        Self {
+            domain: String::new(),
+            language: "en".into(),
+            title: String::new(),
+            message: String::new(),
+            announcement: String::new(),
+            nodes: true,
+            chat: true,
+            everything: true,
+            graphs: true,
+            stats: true,
+            net: true,
+            map: true,
+            top: true,
+            api: true,
+            meshviewworld: true,
+            map_top_left_lat: 39.0,
+            map_top_left_lon: -123.0,
+            map_bottom_right_lat: 36.0,
+            map_bottom_right_lon: -121.0,
+            map_interval: 3,
+            map_tile_url: String::new(),
+            map_tile_attribution: String::new(),
+            map_tile_max_zoom: 19,
+            map_tile_name: String::new(),
+            firehose_interval: 3,
+            weekly_net_message: "Weekly Mesh check-in message.".into(),
+            net_tag: "#BayMeshNet".into(),
+        }
+    }
+}
+
+/// `[mqtt]`: the broker to read the mesh from.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Mqtt {
+    pub server: String,
+    /// 1883, or 8883 with TLS, when not given.
+    pub port: Option<u16>,
+    pub topics: Vec<String>,
+    pub username: String,
+    pub password: String,
+    /// Nodes whose packets are not stored.
+    pub skip_node_ids: Vec<u32>,
+    /// Base64 keys tried after the default one.
+    pub secondary_keys: Vec<String>,
+    pub tls: bool,
+    pub tls_ca_file: String,
+    pub tls_client_cert: String,
+    pub tls_client_key: String,
+}
+
+/// `[database]`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Database {
+    /// SQLAlchemy's form, as the Python version: `sqlite:///relative.db` or
+    /// `sqlite:////absolute.db`.
+    pub connection_string: String,
+}
+
+impl Default for Database {
+    fn default() -> Self {
+        Self {
+            connection_string: "sqlite:///packets.db".into(),
+        }
+    }
+}
+
+/// `[cleanup]`: pruning old data and backing the database up, daily.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Cleanup {
+    pub enabled: bool,
+    pub days_to_keep: u32,
+    pub hour: u8,
+    pub minute: u8,
+    pub vacuum: bool,
+    pub backup_enabled: bool,
+    pub backup_dir: String,
+    /// The cleanup's hour and minute, when not given.
+    pub backup_hour: Option<u8>,
+    pub backup_minute: Option<u8>,
+}
+
+impl Default for Cleanup {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            days_to_keep: 14,
+            hour: 2,
+            minute: 0,
+            vacuum: false,
+            backup_enabled: false,
+            backup_dir: "./backups".into(),
+            backup_hour: None,
+            backup_minute: None,
+        }
+    }
+}
+
+/// `[snapshot]`: when the previous day's figures are recorded.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Snapshot {
+    pub hour: u8,
+    pub minute: u8,
+}
+
+impl Default for Snapshot {
+    fn default() -> Self {
+        Self { hour: 1, minute: 0 }
+    }
+}
+
+/// `[logging]`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Logging {
+    pub access_log: bool,
+    pub db_cleanup_logfile: String,
+}
+
+impl Default for Logging {
+    fn default() -> Self {
+        Self {
+            access_log: false,
+            db_cleanup_logfile: "dbcleanup.log".into(),
+        }
+    }
 }
 
 impl Config {
     /// Reads the file at `path`, if there is one, and applies the environment.
     ///
     /// A missing file is an error only when `required` is set, which is the case
-    /// when somebody named it on the command line. Otherwise the defaults and the
-    /// environment are a complete configuration, which is what a container
-    /// started with nothing but variables wants.
+    /// when somebody named it. Otherwise the defaults and the environment are a
+    /// complete configuration, which is what a container started with nothing but
+    /// variables wants.
     pub fn load(path: &Path, required: bool) -> Result<Self> {
+        if path.extension().is_some_and(|ext| ext == "ini") {
+            bail!(
+                "{} is an INI file, and meshview-rs reads TOML: the sections and keys are the \
+                 Python meshview's, with strings quoted and lists as lists. See \
+                 sample.config.toml.",
+                path.display()
+            );
+        }
+
         let (text, source) = match std::fs::read_to_string(path) {
             Ok(text) => (text, Some(path.to_path_buf())),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound && !required => {
@@ -62,97 +265,34 @@ impl Config {
             Err(e) => return Err(e).with_context(|| format!("reading {}", path.display())),
         };
 
-        let mut config =
-            Self::parse(&text).with_context(|| format!("parsing {}", path.display()))?;
+        let mut table: Table =
+            toml::from_str(&text).with_context(|| format!("parsing {}", path.display()))?;
+        apply_env(&mut table, std::env::vars())?;
+
+        let mut config: Self = Value::Table(table)
+            .try_into()
+            .with_context(|| match &source {
+                Some(path) => format!("in {} or the environment", path.display()),
+                None => "in the environment".to_string(),
+            })?;
         config.source = source;
-        config.apply_env(std::env::vars());
         Ok(config)
     }
 
-    /// Parses INI text the way `configparser.ConfigParser` would.
+    /// Parses TOML text, without the environment.
     pub fn parse(text: &str) -> Result<Self> {
-        let mut sections = Sections::new();
-        let mut section: Option<String> = None;
-        // The key a following indented line would continue.
-        let mut last_key: Option<String> = None;
-
-        for (number, raw) in text.lines().enumerate() {
-            let number = number + 1;
-            let trimmed = raw.trim();
-
-            if trimmed.is_empty() {
-                last_key = None;
-                continue;
-            }
-            if trimmed.starts_with('#') || trimmed.starts_with(';') {
-                continue;
-            }
-
-            let indented = raw.starts_with([' ', '\t']);
-            if indented && let (Some(section), Some(key)) = (&section, &last_key) {
-                let value = sections
-                    .get_mut(section)
-                    .and_then(|keys| keys.get_mut(key))
-                    .expect("the key being continued was inserted above");
-                value.push('\n');
-                value.push_str(trimmed);
-                continue;
-            }
-
-            if let Some(name) = trimmed.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if sections.contains_key(name) {
-                    bail!("line {number}: section [{name}] appears twice");
-                }
-                sections.insert(name.to_string(), BTreeMap::new());
-                section = Some(name.to_string());
-                last_key = None;
-                continue;
-            }
-
-            let Some(current) = &section else {
-                bail!("line {number}: a value before any [section]");
-            };
-
-            // `=` or `:`, whichever comes first, as configparser has it.
-            let Some(split) = trimmed.find(['=', ':']) else {
-                bail!("line {number}: expected `key = value`");
-            };
-            let key = trimmed[..split].trim().to_lowercase();
-            let value = trimmed[split + 1..].trim().to_string();
-            if key.is_empty() {
-                bail!("line {number}: a value with no key");
-            }
-
-            let keys = sections.get_mut(current).expect("inserted with its header");
-            if keys.insert(key.clone(), value).is_some() {
-                bail!("line {number}: [{current}] {key} appears twice");
-            }
-            last_key = Some(key);
-        }
-
-        Ok(Self {
-            sections,
-            source: None,
-        })
+        Ok(toml::from_str(text)?)
     }
 
-    /// Lays `MESHVIEW_<SECTION>__<KEY>` variables over what the file said.
-    pub fn apply_env(&mut self, vars: impl IntoIterator<Item = (String, String)>) {
-        for (name, value) in vars {
-            let Some(rest) = name.strip_prefix(ENV_PREFIX) else {
-                continue;
-            };
-            let Some((section, key)) = rest.split_once(ENV_SEPARATOR) else {
-                continue;
-            };
-            if section.is_empty() || key.is_empty() {
-                continue;
-            }
-            self.sections
-                .entry(section.to_lowercase())
-                .or_default()
-                .insert(key.to_lowercase(), value);
-        }
+    /// Parses TOML text and lays these variables over it, as [`Config::load`]
+    /// does with the real environment.
+    pub fn parse_with_env(
+        text: &str,
+        vars: impl IntoIterator<Item = (String, String)>,
+    ) -> Result<Self> {
+        let mut table: Table = toml::from_str(text)?;
+        apply_env(&mut table, vars)?;
+        Ok(Value::Table(table).try_into()?)
     }
 
     /// The file this came from, or none when it is defaults and environment only.
@@ -160,62 +300,94 @@ impl Config {
         self.source.as_deref()
     }
 
-    /// One raw value, as a string.
-    pub fn get(&self, section: &str, key: &str) -> Option<&str> {
-        self.sections
-            .get(section)
-            .and_then(|keys| keys.get(key))
-            .map(String::as_str)
-    }
-
-    /// A whole section, for the ones that are maps rather than settings, such as
-    /// `[map_channel_colors]`.
-    pub fn section(&self, section: &str) -> Option<&BTreeMap<String, String>> {
-        self.sections.get(section)
-    }
-
-    /// A value that has to be a boolean, in any of the spellings configparser's
-    /// `getboolean` accepts.
-    pub fn get_bool(&self, section: &str, key: &str, default: bool) -> Result<bool> {
-        match self.get(section, key).map(str::trim) {
-            None | Some("") => Ok(default),
-            Some(value) => match value.to_lowercase().as_str() {
-                "1" | "yes" | "true" | "on" => Ok(true),
-                "0" | "no" | "false" | "off" => Ok(false),
-                _ => bail!("[{section}] {key} is not a boolean: {value}"),
-            },
-        }
-    }
-
     /// Where the web server listens.
     pub fn listen_addr(&self) -> Result<SocketAddr> {
-        let port = match self.get("server", "port").map(str::trim) {
-            None | Some("") => DEFAULT_PORT,
-            Some(value) => value
+        let ip = match self.server.bind.trim() {
+            "" | "*" => IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            bind => bind
                 .parse()
-                .with_context(|| format!("[server] port is not a port number: {value}"))?,
+                .with_context(|| format!("[server] bind is not an IP address: {bind}"))?,
         };
-
-        // `*` is the Python version's way of saying every interface.
-        let ip = match self.get("server", "bind").map(str::trim) {
-            None | Some("") | Some("*") => IpAddr::V4(Ipv4Addr::UNSPECIFIED),
-            Some(value) => value
-                .parse()
-                .with_context(|| format!("[server] bind is not an IP address: {value}"))?,
-        };
-
-        Ok(SocketAddr::new(ip, port))
+        Ok(SocketAddr::new(ip, self.server.port))
     }
 
     /// The database to use.
     pub fn database(&self) -> Result<DatabaseUrl> {
-        let value = self
-            .get("database", "connection_string")
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .unwrap_or(DEFAULT_CONNECTION_STRING);
-        DatabaseUrl::parse(value)
+        DatabaseUrl::parse(self.database.connection_string.trim())
     }
+}
+
+/// Lays `MESHVIEW_<SECTION>__<KEY>` variables over a parsed file.
+///
+/// Each value is read as the type its key has, which the defaults say. A key
+/// that has no default to go by (an optional number) is read as a TOML value if
+/// it is one and as a string otherwise. Unknown sections and keys are put in
+/// anyway, so that reading the result refuses them as it would in the file.
+fn apply_env(table: &mut Table, vars: impl IntoIterator<Item = (String, String)>) -> Result<()> {
+    let defaults = Table::try_from(Config::default()).expect("the defaults serialise");
+    let a_string = Value::String(String::new());
+
+    for (name, raw) in vars {
+        let Some(rest) = name.strip_prefix(ENV_PREFIX) else {
+            continue;
+        };
+        let Some((section, key)) = rest.split_once(ENV_SEPARATOR) else {
+            continue;
+        };
+        if section.is_empty() || key.is_empty() {
+            continue;
+        }
+        let (section, key) = (section.to_lowercase(), key.to_lowercase());
+
+        let expected = defaults.get(&section).and_then(|s| match s {
+            // A section that is a map of strings, such as the channel colours.
+            Value::Table(keys) if keys.is_empty() => Some(&a_string),
+            Value::Table(keys) => keys.get(&key),
+            _ => None,
+        });
+        let value = coerce(&raw, expected).with_context(|| format!("{name}={raw:?}"))?;
+
+        let entry = table
+            .entry(section.clone())
+            .or_insert_with(|| Value::Table(Table::new()));
+        let Value::Table(keys) = entry else {
+            bail!("{name}: [{section}] is not a section");
+        };
+        keys.insert(key, value);
+    }
+    Ok(())
+}
+
+/// Reads a value from the environment as the type of `expected`.
+fn coerce(raw: &str, expected: Option<&Value>) -> Result<Value> {
+    let literal = || {
+        toml::from_str::<Table>(&format!("v = {raw}"))
+            .ok()
+            .and_then(|mut table| table.remove("v"))
+    };
+
+    Ok(match expected {
+        Some(Value::String(_)) => Value::String(raw.to_string()),
+        Some(Value::Boolean(_)) => Value::Boolean(match raw.trim().to_lowercase().as_str() {
+            "1" | "yes" | "true" | "on" => true,
+            "0" | "no" | "false" | "off" => false,
+            _ => bail!("not a boolean"),
+        }),
+        Some(Value::Integer(_)) => match literal() {
+            Some(value @ Value::Integer(_)) => value,
+            _ => bail!("not a whole number"),
+        },
+        Some(Value::Float(_)) => match literal() {
+            Some(Value::Float(f)) => Value::Float(f),
+            Some(Value::Integer(i)) => Value::Float(i as f64),
+            _ => bail!("not a number"),
+        },
+        Some(Value::Array(_)) => match literal() {
+            Some(value @ Value::Array(_)) => value,
+            _ => bail!("not a list, such as [\"a\", \"b\"]"),
+        },
+        _ => literal().unwrap_or_else(|| Value::String(raw.to_string())),
+    })
 }
 
 /// Which database, and where.
@@ -227,7 +399,7 @@ pub enum DatabaseUrl {
 
 impl DatabaseUrl {
     /// Reads a connection string in SQLAlchemy's form, which is what every
-    /// existing `config.ini` has.
+    /// existing configuration has.
     ///
     /// That form is `sqlite:///relative/path` and `sqlite:////absolute/path`,
     /// three slashes and then the path. The driver name after a `+`, such as the
@@ -265,62 +437,113 @@ impl DatabaseUrl {
 mod tests {
     use super::*;
 
+    const SAMPLE: &str = include_str!("../../sample.config.toml");
+
+    fn env(vars: &[(&str, &str)]) -> Vec<(String, String)> {
+        vars.iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
     #[test]
-    fn reads_values_the_way_configparser_does() {
-        let config = Config::parse(
-            "# a comment\n\
-             [site]\n\
-             Title = Bay Area Mesh\n\
-             message: with a colon\n\
-             ; another comment\n\
-             [map_channel_colors]\n\
-             LongFast = #4363d8\n\
-             [mqtt]\n\
-             topics = [\"msh/US/bayarea/#\"]\n\
-             empty =\n\
-             long = first\n\
-             \x20 second\n",
+    fn the_sample_is_a_valid_configuration() {
+        let config = Config::parse(SAMPLE).unwrap();
+
+        assert_eq!(config.site.title, "Bay Area Mesh");
+        assert!(config.site.nodes);
+        assert_eq!(config.site.map_top_left_lon, -123.0);
+        assert_eq!(config.map_channel_colors["LongFast"], "#4363d8");
+        assert_eq!(
+            config.mqtt.topics,
+            [
+                "msh/US/bayarea/#",
+                "msh/US/CA/mrymesh/#",
+                "msh/US/CA/sacvalley/#"
+            ]
+        );
+        assert_eq!(config.mqtt.port, Some(1883));
+        assert_eq!(config.cleanup.days_to_keep, 14);
+        assert_eq!(
+            config.database().unwrap(),
+            DatabaseUrl::Sqlite("packets.db".into())
+        );
+    }
+
+    #[test]
+    fn nothing_at_all_is_the_python_defaults() {
+        let config = Config::parse("").unwrap();
+        assert_eq!(config, Config::default());
+        assert_eq!(
+            config.listen_addr().unwrap(),
+            "0.0.0.0:8081".parse().unwrap()
+        );
+        assert_eq!(
+            config.site.weekly_net_message,
+            "Weekly Mesh check-in message."
+        );
+        assert_eq!(config.snapshot.hour, 1);
+    }
+
+    #[test]
+    fn typos_are_refused() {
+        assert!(Config::parse("[mqtt]\npasword = \"x\"\n").is_err());
+        assert!(Config::parse("[sitte]\ntitle = \"x\"\n").is_err());
+        assert!(Config::parse("[server]\nport = \"8081\"\n").is_err());
+        assert!(Config::parse("[server]\nport = 70000\n").is_err());
+    }
+
+    #[test]
+    fn hex_node_ids_are_numbers() {
+        let config = Config::parse("[mqtt]\nskip_node_ids = [0xdeadbeef, 305419896]\n").unwrap();
+        assert_eq!(config.mqtt.skip_node_ids, [0xdead_beef, 305_419_896]);
+    }
+
+    #[test]
+    fn the_environment_wins_and_keeps_each_key_its_type() {
+        let config = Config::parse_with_env(
+            "[mqtt]\nserver = \"from-file\"\npassword = \"file\"\n",
+            env(&[
+                ("MESHVIEW_MQTT__SERVER", "from-env"),
+                ("MESHVIEW_MQTT__PASSWORD", "1234"),
+                ("MESHVIEW_MQTT__TLS", "True"),
+                ("MESHVIEW_MQTT__PORT", "8884"),
+                (
+                    "MESHVIEW_MQTT__TOPICS",
+                    r#"["msh/EU_868/#", "msh/EU_N_868/#"]"#,
+                ),
+                ("MESHVIEW_SITE__MAP_TOP_LEFT_LAT", "43"),
+                ("MESHVIEW_MAP_CHANNEL_COLORS__LONGFAST", "#4363d8"),
+                ("MESHVIEW_CLEANUP__BACKUP_HOUR", "3"),
+                ("MESHVIEW_CONFIG", "ignored"),
+                ("PATH", "ignored"),
+            ]),
         )
         .unwrap();
 
-        assert_eq!(config.get("site", "title"), Some("Bay Area Mesh"));
-        assert_eq!(config.get("site", "message"), Some("with a colon"));
-        assert_eq!(
-            config.get("map_channel_colors", "longfast"),
-            Some("#4363d8")
-        );
-        assert_eq!(config.get("mqtt", "topics"), Some("[\"msh/US/bayarea/#\"]"));
-        assert_eq!(config.get("mqtt", "empty"), Some(""));
-        assert_eq!(config.get("mqtt", "long"), Some("first\nsecond"));
+        assert_eq!(config.mqtt.server, "from-env");
+        assert_eq!(config.mqtt.password, "1234");
+        assert!(config.mqtt.tls);
+        assert_eq!(config.mqtt.port, Some(8884));
+        assert_eq!(config.mqtt.topics, ["msh/EU_868/#", "msh/EU_N_868/#"]);
+        assert_eq!(config.site.map_top_left_lat, 43.0);
+        assert_eq!(config.map_channel_colors["longfast"], "#4363d8");
+        assert_eq!(config.cleanup.backup_hour, Some(3));
     }
 
     #[test]
-    fn refuses_what_configparser_refuses() {
-        assert!(Config::parse("key = value\n").is_err());
-        assert!(Config::parse("[a]\nkey = 1\nKEY = 2\n").is_err());
-        assert!(Config::parse("[a]\n[a]\n").is_err());
-        assert!(Config::parse("[a]\njust words\n").is_err());
+    fn the_environment_is_checked_as_the_file_is() {
+        let refused =
+            |name: &str, value: &str| Config::parse_with_env("", env(&[(name, value)])).is_err();
+        assert!(refused("MESHVIEW_MQTT__PASWORD", "x"));
+        assert!(refused("MESHVIEW_MQTT__TLS", "maybe"));
+        assert!(refused("MESHVIEW_SERVER__PORT", "http"));
+        assert!(refused("MESHVIEW_MQTT__TOPICS", "msh/#"));
     }
 
     #[test]
-    fn the_environment_wins() {
-        let mut config = Config::parse("[database]\nconnection_string = sqlite:///a.db\n").unwrap();
-        config.apply_env([
-            (
-                "MESHVIEW_DATABASE__CONNECTION_STRING".to_string(),
-                "sqlite:////data/b.db".to_string(),
-            ),
-            ("MESHVIEW_MQTT__PASSWORD".to_string(), "secret".to_string()),
-            ("MESHVIEW_CONFIG".to_string(), "ignored".to_string()),
-            ("PATH".to_string(), "ignored".to_string()),
-        ]);
-
-        assert_eq!(
-            config.database().unwrap(),
-            DatabaseUrl::Sqlite("/data/b.db".into())
-        );
-        assert_eq!(config.get("mqtt", "password"), Some("secret"));
-        assert!(config.section("config").is_none());
+    fn an_ini_file_is_pointed_at_the_new_format() {
+        let error = Config::load(Path::new("config.ini"), false).unwrap_err();
+        assert!(format!("{error:#}").contains("sample.config.toml"));
     }
 
     #[test]
@@ -338,27 +561,5 @@ mod tests {
         assert!(DatabaseUrl::parse("sqlite:///:memory:").is_err());
         assert!(DatabaseUrl::parse("postgresql+asyncpg://u:p@h/db").is_err());
         assert!(DatabaseUrl::parse("packets.db").is_err());
-    }
-
-    #[test]
-    fn defaults_are_the_python_ones() {
-        let config = Config::default();
-        assert_eq!(
-            config.listen_addr().unwrap(),
-            "0.0.0.0:8081".parse().unwrap()
-        );
-        assert_eq!(
-            config.database().unwrap(),
-            DatabaseUrl::Sqlite("packets.db".into())
-        );
-    }
-
-    #[test]
-    fn booleans_in_any_spelling() {
-        let config = Config::parse("[a]\nx = True\ny = off\nz = maybe\n").unwrap();
-        assert!(config.get_bool("a", "x", false).unwrap());
-        assert!(!config.get_bool("a", "y", true).unwrap());
-        assert!(config.get_bool("a", "missing", true).unwrap());
-        assert!(config.get_bool("a", "z", false).is_err());
     }
 }

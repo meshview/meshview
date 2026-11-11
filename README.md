@@ -13,10 +13,16 @@ everything it serves inside it.
 
 ## Status
 
-Early days: this is the skeleton. It reads the configuration, takes over or
-creates the database, and answers the probes and the API reference. Ingesting
-from MQTT, the API itself and the web pages are being ported, in that order,
-against the behaviour of the Python meshview 4.0.
+Early days. It reads the configuration, takes over or creates the database,
+ingests from MQTT, and answers the probes and the API reference. The API itself
+and the web pages are being ported next, against the behaviour of the Python
+meshview 4.0.
+
+Ingestion stores what the Python version stores, byte for byte: run side by side
+on the same broker, both write the same packets, sightings, nodes and
+traceroutes. That includes the fields a firmware newer than the bundled
+protobufs sends, which are kept rather than dropped, so updating the protobufs
+later is enough to read them.
 
 ## Roles
 
@@ -39,23 +45,36 @@ Every role listens on the configured port and answers:
 
 - `GET /livez`: 200 while the process is running.
 - `GET /readyz`: 200 once it can serve, 503 with the list of what it is waiting
-  for until then.
+  for until then. For `ingest` that includes being connected to the broker; for
+  `run` it does not, since the web can still be served while the broker is away.
 
 ## Configuration
 
-meshview-rs reads the Python meshview's `config.ini` unchanged. It looks for
-`./config.ini`, or the file named with `--config` or `MESHVIEW_CONFIG`, and runs
-on its defaults when there is none. [sample.config.ini](sample.config.ini) lists
-what is used so far.
+The configuration is a TOML file. meshview-rs looks for `./config.toml`, or the
+file named with `--config` or `MESHVIEW_CONFIG`, and runs on its defaults when
+there is none. [sample.config.toml](sample.config.toml) has every key, with its
+default or an example.
+
+It only ever reads the file: the configuration can live somewhere meshview-rs
+cannot write to, as it usually should. A key or section it does not know is an
+error rather than something quietly ignored.
 
 Any value can be set from the environment as `MESHVIEW_<SECTION>__<KEY>`, which
-wins over the file:
+wins over the file. Each is read as the type its key has, so a numeric password
+stays a string and a list is written as one:
 
 ```sh
 MESHVIEW_DATABASE__CONNECTION_STRING=sqlite:////var/lib/meshview/packets.db \
-MESHVIEW_SERVER__PORT=8081 \
-meshview-rs serve
+MESHVIEW_MQTT__TOPICS='["msh/EU_868/#"]' \
+MESHVIEW_MQTT__TLS=true \
+meshview-rs ingest
 ```
+
+MQTT can also run over TLS, which the Python version could not: `tls = true` in
+`[mqtt]`, optionally with `tls_ca_file` for a broker with its own CA and
+`tls_client_cert`/`tls_client_key` for one that wants a client certificate. The
+public roots are built into the binary, so the container image needs no CA
+bundle.
 
 Connection strings keep the SQLAlchemy form the Python version used: three
 slashes before a relative path (`sqlite:///packets.db`), four before an absolute
@@ -70,7 +89,23 @@ first, so that it migrates it; meshview-rs will refuse it and say so until then.
 
 1. Stop the Python meshview, both the database writer and the web server.
 2. Back the database up.
-3. Run `meshview-rs migrate` against it (or just start `meshview-rs`).
+3. Convert `config.ini` to `config.toml`. The sections and keys are the same;
+   what changes is the syntax:
+
+   | `config.ini` | `config.toml` |
+   |---|---|
+   | `title = Bay Area Mesh` | `title = "Bay Area Mesh"` |
+   | `nodes = True` | `nodes = true` |
+   | `port = 1883` | `port = 1883` |
+   | `topics = ["msh/US/bayarea/#"]` | `topics = ["msh/US/bayarea/#"]` |
+   | `skip_node_ids = 0xdeadbeef, 305419896` | `skip_node_ids = [0xdeadbeef, 305419896]` |
+   | `secondary_keys = AQ==, 1PG7OiApB1nwvP+rz05pAQ==` | `secondary_keys = ["AQ==", "1PG7OiApB1nwvP+rz05pAQ=="]` |
+   | `LongFast = #4363d8` | `LongFast = "#4363d8"` |
+   | `minute = 00` | `minute = 0` |
+
+   meshview-rs will not start from a directory with a `config.ini` and no
+   `config.toml`, rather than start on its defaults and miss your database.
+4. Run `meshview-rs migrate` against the database (or just start `meshview-rs`).
 
 The takeover is one way. Once meshview-rs has migrated a database, it removes
 the Python version's bookkeeping, and going back means restoring the backup.
@@ -95,7 +130,7 @@ podman run -d --name meshview -p 8081:8081 \
 ```
 
 The database lives in `/data`, which is also the working directory, so a
-`config.ini` mounted there is read without saying where it is. The image runs as
+`config.toml` mounted there is read without saying where it is. The image runs as
 UID 1000.
 
 Building it yourself compiles the binary inside the build:

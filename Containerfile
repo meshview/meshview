@@ -86,14 +86,15 @@ LABEL org.opencontainers.image.title="meshview-rs" \
 COPY --from=binary --chmod=0755 /out/meshview-rs /usr/local/bin/meshview-rs
 
 # Never root. /data is where the database lives, and the working directory, so
-# a config.ini mounted there is found without saying where it is.
+# a config.toml mounted there is found without saying where it is. It only needs
+# to be readable: nothing is ever written to it.
 RUN addgroup -g 1000 meshview \
  && adduser -D -H -G meshview -u 1000 meshview \
  && mkdir -p /data \
  && chown meshview:meshview /data
 
 # Four slashes: SQLAlchemy's way of writing an absolute path, which is the form
-# every existing config.ini uses.
+# every existing configuration uses.
 ENV MESHVIEW_DATABASE__CONNECTION_STRING=sqlite:////data/packets.db
 
 # No VOLUME for /data. It would look like protection for the database while
