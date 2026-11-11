@@ -18,15 +18,20 @@
 
 pub mod api;
 mod health;
+mod reference;
 
 use crate::app::Role;
 use crate::state::AppState;
+use crate::web::api::params::Params;
 use axum::Router;
 use axum::extract::Path;
 use axum::http::header::{CONTENT_TYPE, HeaderMap, HeaderValue, LINK, LOCATION};
 use axum::http::{Extensions, StatusCode, Uri, Version};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
+use bytes::Bytes;
+use std::collections::BTreeMap;
+use std::sync::Arc;
 use tower_http::compression::CompressionLayer;
 use tower_http::compression::predicate::{Predicate, SizeAbove};
 use utoipa::OpenApi;
@@ -50,9 +55,14 @@ const CURRENT_VERSION: &str = "v1";
 /// (RFC 9745), as seconds since the epoch: 2026-11-11T00:00:00Z.
 const LEGACY_DEPRECATED_AT: i64 = 1_794_355_200;
 
-/// Scalar's page with a title of our own, and the sidebar listing paths rather
-/// than summaries: a reference is navigated by URL. Scalar is pinned, so that
-/// the page does not change under us from one day to the next.
+/// The language the reference is written in, and answered in when no other is
+/// asked for or there is no catalog for the one asked for.
+const REFERENCE_LANGUAGE: &str = "en";
+
+/// Scalar's page with a title of our own, the sidebar listing paths rather
+/// than summaries, as a reference is navigated by URL, and Scalar's own words
+/// in the site's language. Scalar is pinned, so that the page does not change
+/// under us from one day to the next.
 const SCALAR_HTML: &str = r#"<!doctype html>
 <html>
   <head>
@@ -64,7 +74,7 @@ const SCALAR_HTML: &str = r#"<!doctype html>
     <script
       id="api-reference"
       type="application/json"
-      data-configuration='{"operationTitleSource":"path"}'
+      data-configuration='{"operationTitleSource":"path","localization":{"locale":"$locale"}}'
     >$spec</script>
     <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.76.4"></script>
   </body>
@@ -97,12 +107,29 @@ pub fn router(role: Role, state: AppState) -> Router {
     let (router, reference) = assemble(role);
 
     let router = if role.serves() {
-        let document = reference.clone();
+        let documents = Arc::new(documents(&reference));
+        let site_language = state.config.site.language.as_str();
+        let language = if documents.contains_key(site_language) {
+            site_language
+        } else {
+            REFERENCE_LANGUAGE
+        };
+        let page: serde_json::Value = serde_json::from_slice(&documents[language])
+            .expect("the reference was just serialized");
+        let html = SCALAR_HTML.replace("$locale", language);
+        let default = language.to_string();
         router
-            .merge(Scalar::with_url(DOCS_PATH, reference).custom_html(SCALAR_HTML))
+            .merge(Scalar::with_url(DOCS_PATH, page).custom_html(html))
             .route(
                 OPENAPI_PATH,
-                get(move || async move { axum::Json(document) }),
+                get(move |params: Params| async move {
+                    let asked = params.get("lang").filter(|code| !code.is_empty());
+                    let body = asked
+                        .map_or(documents.get(&default), |code| documents.get(code))
+                        .unwrap_or(&documents[REFERENCE_LANGUAGE])
+                        .clone();
+                    ([(CONTENT_TYPE, "application/json")], body)
+                }),
             )
             .route("/api/{*rest}", get(legacy_api))
             .layer(compression())
@@ -111,6 +138,24 @@ pub fn router(role: Role, state: AppState) -> Router {
     };
 
     router.with_state(state)
+}
+
+/// The reference serialized in each language there is a catalog for, and in
+/// its own.
+fn documents(reference: &utoipa::openapi::OpenApi) -> BTreeMap<String, Bytes> {
+    let english = serde_json::to_value(reference).expect("the reference serializes");
+    let mut documents: BTreeMap<String, Bytes> = reference::catalogs()
+        .into_iter()
+        .map(|(code, catalog)| {
+            let translated = reference::translate(&english, &catalog);
+            (code, Bytes::from(translated.to_string()))
+        })
+        .collect();
+    documents.insert(
+        REFERENCE_LANGUAGE.to_string(),
+        Bytes::from(english.to_string()),
+    );
+    documents
 }
 
 /// Gzip for what is worth compressing, as the Python version did: JSON, SVG,
