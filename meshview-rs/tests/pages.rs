@@ -86,6 +86,11 @@ async fn pages_speak_the_api_version_and_the_sites_language() {
     assert!(page.contains("/api/v1/nodes"));
     assert!(!page.contains("fetch(`/api/nodes"));
     assert!(page.contains(r#"href="/api/docs""#));
+    // The footer is meshview-rs's, not the Python version's.
+    assert!(page.contains(r#"href="https://github.com/ogarcia/meshview-rs""#));
+    assert!(page.contains("meshview-rs en GitHub"));
+    assert!(page.contains(">Meshview Rust<"));
+    assert!(!page.contains("pablorevilla-meshtastic/meshview\""));
 
     // The dashboard is the map with the node explorer beside it.
     let dashboard = text(get(&app, "/", &[]).await).await;

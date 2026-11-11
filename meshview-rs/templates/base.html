@@ -351,10 +351,7 @@ body { min-height:100dvh; display:flex; flex-direction:column; }
 </main>
 <footer class="mesh-footer">
     <span id="site-tagline" class="mesh-footer-tagline">{{ site_description }}</span>
-    <a class="mesh-footer-project" href="https://github.com/pablorevilla-meshtastic/meshview" target="_blank" rel="noopener" title="{{ "Meshview on GitHub" | tr }}">
-        <span class="ti ti-brand-github" aria-hidden="true"></span>
-        <span id="site-version">Meshview</span><span class="visually-hidden"> · GitHub</span>
-    </a>
+    {% include "footer-project.html" %}
 </footer>
 
 <script>
@@ -511,7 +508,7 @@ async function initializePage() {
 
         // Version
         document.getElementById("site-version").textContent =
-            site.version ? `Meshview ${site.version}` : "Meshview";
+            site.version ? `Meshview Rust ${site.version}` : "Meshview Rust";
 
         // Apply translations
         applyTranslations(dict);

@@ -243,6 +243,10 @@ that checkout has, converted, and writes which commit it was to
   `local/templates/coverage-help.html` instead: it can say what is true of
   meshview-rs (the model is built in), and it is translated as the rest of the
   page.
+- The map's node dots get the border that stands out more from their colour,
+  `local/templates/marker-stroke.js`, rather than always a white one.
+- The footer names and links meshview-rs, `local/templates/footer-project.html`,
+  rather than the Python version.
 
 What meshview-rs adds of its own lives in `meshview-rs/local/`, which the
 import leaves alone: templates under `templates/`, included by the converted
