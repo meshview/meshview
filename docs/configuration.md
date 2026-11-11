@@ -221,5 +221,5 @@ much is logged is controlled with `RUST_LOG`, as in `RUST_LOG=debug` or
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `access_log` | boolean | `false` | Log every HTTP request. **Not acted on yet**: the web server is not ported. |
+| `access_log` | boolean | `false` | Log every HTTP request, with its answer's status and how long it took, under `meshview_rs::access`. |
 | `db_cleanup_logfile` | string | | **Deprecated**, ignored with a warning, and removed in the next version: the cleanup logs where everything else does. |
