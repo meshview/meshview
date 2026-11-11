@@ -95,10 +95,10 @@ jobs:
 
       - name: Check that it brought its own libc
         run: |
-          binary=target/${{ matrix.target }}/release/meshview-rs
+          binary=target/${{ matrix.target }}/release/meshview
           file "$binary"
           if readelf -l "$binary" | grep -q INTERP; then
-            echo "meshview-rs is not statically linked" >&2
+            echo "meshview is not statically linked" >&2
             exit 1
           fi
 
@@ -106,8 +106,8 @@ jobs:
       # what the Containerfile reads.
       - uses: actions/upload-artifact@v7
         with:
-          name: meshview-rs-${{ matrix.arch }}
-          path: target/${{ matrix.target }}/release/meshview-rs
+          name: meshview-${{ matrix.arch }}
+          path: target/${{ matrix.target }}/release/meshview
           if-no-files-found: error
 
   image:
@@ -123,18 +123,18 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          name: meshview-rs-amd64
+          name: meshview-amd64
           path: amd64
       - uses: actions/download-artifact@v8
         with:
-          name: meshview-rs-arm64
+          name: meshview-arm64
           path: arm64
 
       - name: Lay the binaries out where the Containerfile looks
         run: |
           mkdir dist
-          mv amd64/meshview-rs dist/meshview-rs-amd64
-          mv arm64/meshview-rs dist/meshview-rs-arm64
+          mv amd64/meshview dist/meshview-amd64
+          mv arm64/meshview dist/meshview-arm64
 
       # Emulation is only for the arm64 image's handful of shell (its user and
       # its directory). No compiler goes near it.
@@ -162,7 +162,7 @@ jobs:
           docker buildx build \
             --build-arg BINARY_SOURCE=prebuilt \
             --platform linux/amd64 \
-            --load --tag meshview-rs:ci .
+            --load --tag meshview:ci .
 
       # An image that builds and an image that serves are different claims. This
       # one starts, creates and migrates its database, reports itself ready, and
@@ -171,15 +171,15 @@ jobs:
       # not the mesh can be heard.
       - name: Start it and ask it something
         run: |
-          docker run --detach --name meshview-rs --publish 8081:8081 \
+          docker run --detach --name meshview --publish 8081:8081 \
             --env MESHVIEW_MQTT__SERVER=127.0.0.1 \
             --env MESHVIEW_MQTT__TOPICS='["msh/#"]' \
-            meshview-rs:ci
+            meshview:ci
           for _ in $(seq 1 30); do
             curl -sf -o /dev/null http://127.0.0.1:8081/readyz && break
             sleep 1
           done
-          docker logs meshview-rs
+          docker logs meshview
           curl -sf http://127.0.0.1:8081/readyz | tee /dev/stderr | grep -q '"status":"ok"'
           curl -sf http://127.0.0.1:8081/api/openapi.json | grep -q '"/readyz"'
           test "$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' \
@@ -190,9 +190,9 @@ jobs:
       # and nothing else: no write-ahead log, no shared memory index.
       - name: Stop it and look at what it left
         run: |
-          docker stop meshview-rs
-          docker logs meshview-rs 2>&1 | tail -3
-          docker cp meshview-rs:/data left
+          docker stop meshview
+          docker logs meshview 2>&1 | tail -3
+          docker cp meshview:/data left
           ls -A left
           test "$(ls -A left)" = "packets.db"
 
@@ -235,11 +235,11 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          name: meshview-rs-amd64
+          name: meshview-amd64
           path: amd64
       - uses: actions/download-artifact@v8
         with:
-          name: meshview-rs-arm64
+          name: meshview-arm64
           path: arm64
 
       # A tarball rather than the bare binary, because an artifact travels as a
@@ -250,8 +250,8 @@ jobs:
           mkdir dist
 
           for arch in amd64 arm64; do
-            chmod +x "$arch/meshview-rs"
-            tar -czf "dist/meshview-rs-$GITHUB_REF_NAME-$arch.tar.gz" -C "$arch" meshview-rs
+            chmod +x "$arch/meshview"
+            tar -czf "dist/meshview-$GITHUB_REF_NAME-$arch.tar.gz" -C "$arch" meshview
           done
 
           (cd dist && sha256sum ./*.tar.gz > sha256sums.txt)

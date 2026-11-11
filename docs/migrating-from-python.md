@@ -1,15 +1,15 @@
-# Coming from the Python meshview
+# Coming from the Python Meshview
 
-meshview-rs takes over from the Python meshview 4.0: its database, as it is,
+Meshview takes over from the Python Meshview 4.0: its database, as it is,
 and its configuration, rewritten in TOML with the same sections and keys.
 
 ## The database
 
-meshview-rs takes over a database only at the Python version's last schema,
+Meshview takes over a database only at the Python version's last schema,
 **Alembic revision `44612e74a798`**, which is what meshview 4.0 leaves. It does
 not carry the Python version's migrations, so a database at an earlier revision
-has to be brought up to date by the Python meshview 4.0 first: start it once
-against the database and let it migrate. Until then meshview-rs refuses the
+has to be brought up to date by the Python Meshview 4.0 first: start it once
+against the database and let it migrate. Until then Meshview refuses the
 database, names the revision it found, and changes nothing.
 
 To see which revision a database is at:
@@ -20,16 +20,16 @@ sqlite3 packets.db 'SELECT version_num FROM alembic_version'
 
 ### Taking it over
 
-1. Stop the Python meshview, both `startdb.py` and the web server (or
+1. Stop the Python Meshview, both `startdb.py` and the web server (or
    `mvrun.py`). Nothing else must have the database open.
 2. Back the database up, with the side files if there are any:
    `packets.db`, `packets.db-wal`, `packets.db-shm`.
 3. Convert the configuration, as [below](#converting-configini).
-4. Run `meshview-rs migrate`, or start meshview-rs, which does the same first.
+4. Run `meshview migrate`, or start Meshview, which does the same first.
 
 ```text
-INFO meshview_rs::db::sqlite: database is Python meshview at Alembic 44612e74a798, migrating
-INFO meshview_rs::db::sqlite: database migrated to meshview-rs at migration 2
+INFO meshview::db::sqlite: database is Python meshview at Alembic 44612e74a798, migrating
+INFO meshview::db::sqlite: database migrated to meshview at migration 2
 ```
 
 The data is not touched: the tables, their columns and their rows stay as they
@@ -40,13 +40,13 @@ are. What changes:
   nothing used.
 - An index the Python models declared but no migration ever created is added:
   `idx_traceroute_packet_id`, for looking traceroutes up by packet.
-- A table of meshview-rs's own is added: `job_run`, the record of what the daily
+- A table of Meshview's own is added: `job_run`, the record of what the daily
   cleanup and snapshot did, which the Python version kept in a JSON file.
-- meshview-rs records its own migrations in `_sqlx_migrations`.
+- Meshview records its own migrations in `_sqlx_migrations`.
 
 ### Going back
 
-Once meshview-rs has taken a database over, the Python meshview cannot open it
+Once Meshview has taken a database over, the Python Meshview cannot open it
 as it is: without `alembic_version` it would try to build its schema from
 scratch over a database that already has one.
 
@@ -60,26 +60,26 @@ scripts/revert-to-python.py --yes packets.db  # gives it back
 ```
 
 It puts the Python version's bookkeeping back exactly as Python creates it, and
-removes what meshview-rs added, in a single transaction: it either all happens
-or none of it does. The data is not touched, so what meshview-rs ingested in the
+removes what Meshview added, in a single transaction: it either all happens
+or none of it does. The data is not touched, so what Meshview ingested in the
 meantime is kept. It needs Python 3 and nothing else.
 
-It only works **as long as meshview-rs has not changed the schema** beyond
+It only works **as long as Meshview has not changed the schema** beyond
 taking the database over. It refuses, and changes nothing, when:
 
-- meshview-rs has applied a migration it does not know how to undo, which means
+- Meshview has applied a migration it does not know how to undo, which means
   the schema has moved on from the Python version's: the way back is then a
-  backup taken before that version of meshview-rs;
-- the database is in use, or meshview-rs was not stopped cleanly (its `-wal`
+  backup taken before that version of Meshview;
+- the database is in use, or Meshview was not stopped cleanly (its `-wal`
   file has data in it): stop every process using it first;
 - the database is already the Python version's, or not meshview's at all.
 
-Every meshview-rs release says in its notes whether it adds a migration, and
+Every Meshview release says in its notes whether it adds a migration, and
 from which version on the script refuses.
 
 ## Converting `config.ini`
 
-meshview-rs reads `config.toml`, not `config.ini`, and never writes either. The
+Meshview reads `config.toml`, not `config.ini`, and never writes either. The
 sections and keys are the same, so converting is a matter of syntax, which
 `scripts/convert-config.py` does:
 
@@ -88,14 +88,14 @@ scripts/convert-config.py config.ini -o config.toml
 ```
 
 It reads the INI file as the Python version reads it and writes every key with
-its type. What meshview-rs has no use for it leaves out, saying why on standard
+its type. What Meshview has no use for it leaves out, saying why on standard
 error: the deprecated keys below, keys the Python version had stopped using
 (`starting`), keys neither knows, with the one they look like (a misspelt
 `firehose_interal`, which the Python version ignored, is left out rather than
 corrected, so the configuration keeps doing what it did), empty values, and the
-Python sample's channel colours, which meshview-rs has its own of.
+Python sample's channel colours, which Meshview has its own of.
 `conversations` is written as `chat`, and `sqlite+aiosqlite://` as `sqlite://`.
-Read its notes, and check the result by starting meshview-rs with it: anything
+Read its notes, and check the result by starting Meshview with it: anything
 it does not take, it refuses.
 
 By hand, the differences are these:
@@ -117,7 +117,7 @@ The Python version's backup settings (`[cleanup] backup_enabled`, `backup_dir`,
 `backup_hour`, `backup_minute`), `[logging] db_cleanup_logfile` and
 `[server] tls_cert` are deprecated: they are accepted with a warning and
 ignored, and will be removed in the next version. Leave them out. Backups are
-made with `meshview-rs backup` from a scheduler (see
+made with `meshview backup` from a scheduler (see
 [Deployment](deployment.md#backups)), the cleanup logs where everything else
 does, and HTTPS is served by a reverse proxy in front (see
 [Deployment](deployment.md#https)).
@@ -125,7 +125,7 @@ does, and HTTPS is served by a reverse proxy in front (see
 Two things that the INI file let pass are errors now:
 
 - **Unknown keys.** The Python version warned about unknown keys in `[site]` and
-  ignored everything else; meshview-rs refuses any key it does not know, in any
+  ignored everything else; Meshview refuses any key it does not know, in any
   section. A setting that was being silently ignored, such as a misspelt
   `firehose_interal`, has to be fixed or removed.
 - **Values of the wrong type**, such as `port = "8081"` in quotes.
@@ -138,7 +138,7 @@ with every key, and [Configuration](configuration.md) has them all.
 
 ## What else is different
 
-| | Python meshview | meshview-rs |
+| | Python version | Meshview |
 |---|---|---|
 | Processes | `startdb.py` writes, `main.py` serves, `mvrun.py` starts both | one binary: `run`, or `ingest` and `serve` apart. See [Deployment](deployment.md). |
 | Configuration | `config.ini` | `config.toml`, plus `MESHVIEW_<SECTION>__<KEY>` environment variables |
@@ -154,7 +154,7 @@ with every key, and [Configuration](configuration.md) has them all.
 | MQTT over TLS | no | yes |
 | Coverage prediction | pyitm, installed apart | NTIA's model, built in (see [API](api.md#differences-from-the-python-version)) |
 | Stopping | the database's side files can be left behind | stops in order and leaves only the database file |
-| Backups | scheduled, copying the live file | `meshview-rs backup`, a consistent copy, for your scheduler to run |
+| Backups | scheduled, copying the live file | `meshview backup`, a consistent copy, for your scheduler to run |
 | Last cleanup | a JSON file beside the cleanup log | the `job_run` table |
 | Cleanup log | a file of its own | standard output, with everything else |
 | Stored packets | — | the same, byte for byte. See [Ingestion](ingestion.md). |

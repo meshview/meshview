@@ -10,19 +10,19 @@ do, and in a crate of their own they are built once and left alone.
 |---|---|
 | `longley-rice/` | The ITS Irregular Terrain Model in area mode, from NTIA's C++, with its own licence and README: a crate meant to be published on its own. |
 | `meshview-proto/` | The Meshtastic protobufs, vendored under `protobufs/` and compiled by prost, and their descriptors. Also `wire`, for what prost reads differently from Python's protobuf (unknown fields, fields of the wrong wire type), and `text_format`, the protobuf text format as Python writes it. |
-| `meshview-rs/src/config.rs` | The configuration: TOML, environment variables, defaults. |
-| `meshview-rs/src/db/` | The database. `mod.rs` is what holds for any backend; `sqlite.rs` everything that knows it is SQLite, so that PostgreSQL can be a sibling module. |
-| `meshview-rs/migrations/sqlite/` | The SQLite migrations, compiled into the binary. |
-| `meshview-rs/templates/` | The web pages' templates, Tera 2. See [The web pages](#the-web-pages). |
-| `meshview-rs/assets/` | What the web side serves and is built into the binary: the pages' files under `static/`, the translation catalogs under `lang/`, and the API reference's introduction (`api/intro.md`) and translations (`api-lang/`). |
-| `meshview-rs/src/ingest/` | MQTT ingestion: the connection (`mod.rs`), keys and decryption (`keys.rs`), opening a message (`opened.rs`) and storing it (`store.rs`). |
-| `meshview-rs/src/traceroute.rs` | Paths out of traceroutes: from the node that started one to the one it traced, and back. |
-| `meshview-rs/src/coverage.rs` | Predicted coverage: where a node is heard, sampled around it with the ITM. |
-| `meshview-rs/src/decode.rs` | What a stored packet says, as the pages show it: decoded, in the protobuf text format, redacted or `Did not decode`. |
-| `meshview-rs/src/web/` | HTTP: the pages (`pages.rs`), the API router, its reference, the redirects and the probes. `web/api/` has the API's endpoints, its errors, and its parameter parsing. |
-| `meshview-rs/src/jobs.rs` | The daily cleanup and snapshot, and their schedule. |
-| `meshview-rs/src/app.rs` | The roles, starting and stopping a process, and `backup`. |
-| `meshview-rs/tests/` | Integration tests. |
+| `meshview/src/config.rs` | The configuration: TOML, environment variables, defaults. |
+| `meshview/src/db/` | The database. `mod.rs` is what holds for any backend; `sqlite.rs` everything that knows it is SQLite, so that PostgreSQL can be a sibling module. |
+| `meshview/migrations/sqlite/` | The SQLite migrations, compiled into the binary. |
+| `meshview/templates/` | The web pages' templates, Tera 2. See [The web pages](#the-web-pages). |
+| `meshview/assets/` | What the web side serves and is built into the binary: the pages' files under `static/`, the translation catalogs under `lang/`, and the API reference's introduction (`api/intro.md`) and translations (`api-lang/`). |
+| `meshview/src/ingest/` | MQTT ingestion: the connection (`mod.rs`), keys and decryption (`keys.rs`), opening a message (`opened.rs`) and storing it (`store.rs`). |
+| `meshview/src/traceroute.rs` | Paths out of traceroutes: from the node that started one to the one it traced, and back. |
+| `meshview/src/coverage.rs` | Predicted coverage: where a node is heard, sampled around it with the ITM. |
+| `meshview/src/decode.rs` | What a stored packet says, as the pages show it: decoded, in the protobuf text format, redacted or `Did not decode`. |
+| `meshview/src/web/` | HTTP: the pages (`pages.rs`), the API router, its reference, the redirects and the probes. `web/api/` has the API's endpoints, its errors, and its parameter parsing. |
+| `meshview/src/jobs.rs` | The daily cleanup and snapshot, and their schedule. |
+| `meshview/src/app.rs` | The roles, starting and stopping a process, and `backup`. |
+| `meshview/tests/` | Integration tests. |
 | `scripts/` | Updating the protobufs, and for those coming from the Python version, converting its configuration and giving a database back to it. |
 
 ## Building and testing
@@ -56,11 +56,11 @@ What the integration tests cover:
 | `decode.rs` | Real packets of every port, shown exactly as the Python version showed them. |
 | `revert.rs` | `scripts/revert-to-python.py` gives a taken over database back exactly as Python left it, and refuses what it cannot. Needs `python3`; skipped without it. |
 
-The fixtures were made with the Python meshview; each test says how.
+The fixtures were made with the Python Meshview; each test says how.
 
 ## Database migrations
 
-Migrations live in `meshview-rs/migrations/sqlite/`, numbered, and are applied
+Migrations live in `meshview/migrations/sqlite/`, numbered, and are applied
 by the writer on start. A migration that has been released is never edited: a
 change is a new migration. They should only add to the schema, so that web
 servers of the previous version keep working while an update rolls out (see
@@ -71,10 +71,10 @@ A new migration also ends the way back to the Python version, unless
 migrations it can undo in `REVERTIBLE`, and a test fails as soon as the
 migrations and that list disagree. Either extend the script, and its test in
 `tests/revert.rs`, or retire it and say from which version on in
-[Coming from the Python meshview](migrating-from-python.md#going-back) and in the
+[Coming from the Python Meshview](migrating-from-python.md#going-back) and in the
 release notes.
 
-`0001_baseline.sql` is the Python meshview's schema at Alembic revision
+`0001_baseline.sql` is the Python Meshview's schema at Alembic revision
 `44612e74a798`, copied from what `alembic upgrade head` produces rather than from
 its models, which disagree about some indexes. Every statement in it is
 `IF NOT EXISTS`, which is what lets it adopt a Python database by changing
@@ -101,7 +101,7 @@ The reference is written where the API is: each endpoint's doc comment is its
 title (the first line) and description, its `#[utoipa::path]` has the
 parameters and answers, and the doc comments of the answers' fields describe
 them. What holds for the whole API, the reference's front page, is
-`meshview-rs/assets/api/intro.md`. All of it is Markdown, for Scalar to render.
+`meshview/assets/api/intro.md`. All of it is Markdown, for Scalar to render.
 
 The reference is translated into the languages of `assets/api-lang/`, one JSON
 catalog each from the English text to its translation, piece by piece: a
@@ -110,7 +110,7 @@ fails while a catalog lacks a piece, or has one there no longer is, so any
 change to the reference's text has to be followed by its catalogs:
 
 ```sh
-cargo test -p meshview-rs --lib reference
+cargo test -p meshview --lib reference
 ```
 
 prints, for each catalog, what is missing as JSON with empty translations, to
@@ -125,9 +125,9 @@ have, they are English.
 
 ## The web pages
 
-The pages are Tera 2 templates under `meshview-rs/templates/`, and the files
+The pages are Tera 2 templates under `meshview/templates/`, and the files
 they use, scripts, styles, icons and the bundled libraries, under
-`meshview-rs/assets/static/`; all of it is built into the binary, and every page
+`meshview/assets/static/`; all of it is built into the binary, and every page
 is rendered once, at start. They began as the Python version's Jinja templates,
 converted, and are developed here now.
 
@@ -137,7 +137,7 @@ coverage help (`coverage-help.html`), the map's dot borders
 (`footer-project.html`).
 
 Templates translate their strings with the `tr` filter, `{{ "Text" | tr }}`,
-from the `ui` section of the catalogs under `meshview-rs/assets/lang/`, keyed by
+from the `ui` section of the catalogs under `meshview/assets/lang/`, keyed by
 the English text; the scripts the pages run use the other sections, by key, through
 `/api/v1/lang`. A test fails while a `tr` string is missing from a catalog's
 `ui`, English included, and another renders every page in every language, so a
@@ -164,9 +164,9 @@ The x86_64 binary is built for the base x86-64 instruction set
 ## The container image
 
 `Containerfile` has two ways to get the binary. By default it compiles it,
-which is what `podman build -t meshview-rs .` does. CI already has the binaries,
+which is what `podman build -t meshview .` does. CI already has the binaries,
 so it passes `--build-arg BINARY_SOURCE=prebuilt` and puts them under `dist/` as
-`meshview-rs-amd64` and `meshview-rs-arm64`, and the build only copies them in.
+`meshview-amd64` and `meshview-arm64`, and the build only copies them in.
 
 ## Releases
 

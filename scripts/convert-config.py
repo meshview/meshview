@@ -2,31 +2,31 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Óscar García Amor <ogarcia@connectical.com>
 
-"""Convert a Python meshview config.ini to a meshview-rs config.toml.
+"""Convert a Python meshview config.ini to a Meshview config.toml.
 
 The INI file is read as the Python version reads it, with Python's own
-configparser, and every key it has is written as meshview-rs expects it: with
+configparser, and every key it has is written as Meshview expects it: with
 its type (quoted strings, lowercase booleans, numbers without leading zeros,
-lists), in its section. What meshview-rs has no use for is left out, with a
+lists), in its section. What Meshview has no use for is left out, with a
 note on standard error saying why:
 
 - the deprecated keys: [server] tls_cert, [cleanup] backup_*, [logging]
-  db_cleanup_logfile, which meshview-rs would accept with a warning and ignore;
+  db_cleanup_logfile, which Meshview would accept with a warning and ignore;
 - keys the Python version no longer used either, such as [site] starting;
 - keys neither knows, with the known one they look like, if any: Python ignored
   them, so leaving them out keeps the configuration doing what it did;
 - empty values, which leave the default in place, as they did;
 - [map_channel_colors] entries that are just the Python sample's colours:
-  meshview-rs has colours of its own for the presets.
+  Meshview has colours of its own for the presets.
 
 [site] conversations, the old name of chat, is written as chat, and a
 connection string's driver, `+aiosqlite` in `sqlite+aiosqlite:///packets.db`,
-which means nothing to meshview-rs, is taken out.
+which means nothing to Meshview, is taken out.
 
     scripts/convert-config.py config.ini > config.toml
     scripts/convert-config.py config.ini -o config.toml
 
-Check the result before using it: read the notes, and start meshview-rs with
+Check the result before using it: read the notes, and start Meshview with
 it, which refuses anything it does not take.
 """
 
@@ -49,7 +49,7 @@ STRING, BOOLEAN, INTEGER, NUMBER, STRINGS, INTEGERS, JSON_STRINGS = (
     "list of strings, as JSON",
 )
 
-# meshview-rs's keys, in its sections, as docs/configuration.md documents them.
+# Meshview's keys, in its sections, as docs/configuration.md documents them.
 SCHEMA = {
     "server": {"bind": STRING, "port": INTEGER},
     "site": {
@@ -120,7 +120,7 @@ LEFT_OUT = {
     (
         "cleanup",
         "backup_enabled",
-    ): "deprecated: run `meshview-rs backup <file>` from a scheduler",
+    ): "deprecated: run `meshview backup <file>` from a scheduler",
     ("cleanup", "backup_dir"): "deprecated, as backup_enabled",
     ("cleanup", "backup_hour"): "deprecated, as backup_enabled",
     ("cleanup", "backup_minute"): "deprecated, as backup_enabled",
@@ -130,7 +130,7 @@ LEFT_OUT = {
     ): "deprecated: the cleanup logs to standard output",
 }
 
-# The Python sample's channel colours, which meshview-rs replaces with its own.
+# The Python sample's channel colours, which Meshview replaces with its own.
 PYTHON_SAMPLE_COLOURS = {
     "longfast": "#4363d8",
     "longslow": "#000075",
@@ -223,7 +223,7 @@ def convert(parser, source_name):
             close = difflib.get_close_matches(section, SCHEMA, n=1, cutoff=0.8)
             hint = f" (did you mean [{close[0]}]?)" if close else ""
             conversion.note(
-                section, "*", f"a section meshview-rs does not know{hint}: left out"
+                section, "*", f"a section Meshview does not know{hint}: left out"
             )
             continue
         out = sections.setdefault(section, {})
@@ -238,7 +238,7 @@ def convert(parser, source_name):
                     conversion.note(
                         section,
                         key,
-                        "the Python sample's colour: left out, meshview-rs has its own",
+                        "the Python sample's colour: left out, Meshview has its own",
                     )
                 else:
                     out[key] = toml_string(colour)
@@ -258,7 +258,7 @@ def convert(parser, source_name):
                 conversion.note(
                     section,
                     key,
-                    f"not a key meshview-rs knows{hint}: left out, as the Python version "
+                    f"not a key Meshview knows{hint}: left out, as the Python version "
                     "ignored it",
                 )
                 continue
@@ -280,7 +280,7 @@ def convert(parser, source_name):
                 conversion.error(section, key, f"{raw!r} is not a {kind} ({e})")
 
     lines = [
-        f"# meshview-rs configuration, converted from {source_name}",
+        f"# Meshview configuration, converted from {source_name}",
         f"# by scripts/convert-config.py on {date.today().isoformat()}.",
         "# See docs/configuration.md for every key.",
     ]
@@ -303,7 +303,7 @@ def convert(parser, source_name):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("config", type=Path, help="the Python meshview's config.ini")
+    parser.add_argument("config", type=Path, help="the Python Meshview's config.ini")
     parser.add_argument(
         "-o", "--output", type=Path, help="where to write it; standard output if not"
     )

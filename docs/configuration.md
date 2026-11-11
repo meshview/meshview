@@ -1,6 +1,6 @@
 # Configuration
 
-meshview-rs is configured with a TOML file, environment variables, or both.
+Meshview is configured with a TOML file, environment variables, or both.
 Every key has a default, so no file at all is a valid configuration as long as
 the environment supplies what the role needs (an ingester needs a broker and
 topics).
@@ -13,25 +13,25 @@ topics).
 | `MESHVIEW_CONFIG=<file>` | that file | error |
 | neither | `./config.toml` | defaults and environment only |
 
-The file is only ever read, never written, so it can live somewhere meshview-rs
+The file is only ever read, never written, so it can live somewhere Meshview
 cannot write to, which is where it usually belongs: on a read-only mount, owned
 by root, while the database directory is the one place the process writes.
 
 When neither `--config` nor `MESHVIEW_CONFIG` is given and the working
-directory has a `config.ini` but no `config.toml`, meshview-rs refuses to start.
+directory has a `config.ini` but no `config.toml`, Meshview refuses to start.
 That is a Python meshview configuration that has not been converted yet, and
 starting on the defaults instead would quietly create a new, empty database
 somewhere else. Naming an `.ini` file explicitly is refused too. See
-[Coming from the Python meshview](migrating-from-python.md#converting-configini)
+[Coming from the Python Meshview](migrating-from-python.md#converting-configini)
 for converting it.
 
 ## The format
 
-The sections and keys are the Python meshview's, written as TOML: strings in
+The sections and keys are the Python Meshview's, written as TOML: strings in
 quotes, booleans as `true`/`false`, numbers bare, lists in brackets.
 [sample.config.toml](../sample.config.toml) has every key.
 
-Anything meshview-rs does not know is an error, whether it is a section or a
+Anything Meshview does not know is an error, whether it is a section or a
 key, and so is a value of the wrong type:
 
 ```text
@@ -197,8 +197,8 @@ The broker the ingester reads the mesh from. Needed by `run` and `ingest`.
 | `password` | string | `""` | Password for that user. |
 | `skip_node_ids` | list of whole numbers | `[]` | Nodes whose packets are not stored, in decimal or hex: `[0xdeadbeef, 305419896]`. |
 | `secondary_keys` | list of strings | `[]` | Base64 AES keys, 16 or 32 bytes, tried after the default one. Meshtastic's one byte PSK shorthand is understood: `"Ag=="` is PSK 2. |
-| `tls` | boolean | `false` | Connect over TLS. New in meshview-rs. |
-| `tls_ca_file` | string | `""` | PEM file of CA certificates to trust instead of the public roots built into meshview-rs, for a broker with its own CA. |
+| `tls` | boolean | `false` | Connect over TLS. New in Meshview. |
+| `tls_ca_file` | string | `""` | PEM file of CA certificates to trust instead of the public roots built into Meshview, for a broker with its own CA. |
 | `tls_client_cert` | string | `""` | PEM client certificate, for a broker that asks for one. Needs `tls_client_key`. |
 | `tls_client_key` | string | `""` | PEM private key of that certificate. Needs `tls_client_cert`. |
 
@@ -220,7 +220,7 @@ The daily cleanup, run by the writer (`run` or `ingest`). See
 | `hour` | whole number | `2` | Hour of the daily cleanup, [local time](#local-time) (0 to 23). |
 | `minute` | whole number | `0` | Minute of the daily cleanup (0 to 59). |
 | `vacuum` | boolean | `false` | Run SQLite's `VACUUM` after cleaning up, giving the space freed back to the filesystem. |
-| `backup_enabled` | boolean | | **Deprecated**, ignored with a warning, and removed in the next version: meshview-rs does not back up by itself. Use [`meshview-rs backup`](deployment.md#backups). |
+| `backup_enabled` | boolean | | **Deprecated**, ignored with a warning, and removed in the next version: Meshview does not back up by itself. Use [`meshview backup`](deployment.md#backups). |
 | `backup_dir` | string | | **Deprecated**, as `backup_enabled`. |
 | `backup_hour` | whole number | | **Deprecated**, as `backup_enabled`. |
 | `backup_minute` | whole number | | **Deprecated**, as `backup_enabled`. |
@@ -241,7 +241,7 @@ The daily jobs run at a time of day in the local time zone, as in the Python
 version. That is the `TZ` environment variable (`TZ=Europe/Madrid`), or the
 system's time zone, or UTC when there is neither, which is the case in the
 container image unless `TZ` is set. The time zone database is built into
-meshview-rs, so `TZ` works even where the system has none installed. Daylight
+Meshview, so `TZ` works even where the system has none installed. Daylight
 saving time is followed: a job set inside the hour a clock skips runs at the
 first time after it, and one inside the hour a clock repeats runs once.
 
@@ -250,9 +250,9 @@ first time after it, and one inside the hour a clock repeats runs once.
 Everything is logged to standard output, for the process's supervisor (systemd,
 the container runtime) to collect; a log file is that supervisor's to keep. How
 much is logged is controlled with `RUST_LOG`, as in `RUST_LOG=debug` or
-`RUST_LOG=meshview_rs::ingest=debug`; the default is `info`.
+`RUST_LOG=meshview::ingest=debug`; the default is `info`.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `access_log` | boolean | `false` | Log every HTTP request, with its answer's status and how long it took, under `meshview_rs::access`. |
+| `access_log` | boolean | `false` | Log every HTTP request, with its answer's status and how long it took, under `meshview::access`. |
 | `db_cleanup_logfile` | string | | **Deprecated**, ignored with a warning, and removed in the next version: the cleanup logs where everything else does. |

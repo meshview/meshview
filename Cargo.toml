@@ -5,16 +5,16 @@
 # once and then left alone, instead of being regenerated and recompiled every
 # time anything in the application moves.
 [workspace]
-members = ["longley-rice", "meshview-proto", "meshview-rs"]
+members = ["longley-rice", "meshview-proto", "meshview"]
 resolver = "3"
 
 [workspace.package]
 version = "0.1.0-dev"
 edition = "2024"
-# The Python meshview this is a port of is AGPL-3.0, and so is this.
+# The Python Meshview this is a port of is AGPL-3.0, and so is this.
 license = "AGPL-3.0-or-later"
 authors = ["Óscar García Amor <ogarcia@connectical.com>"]
-repository = "https://github.com/ogarcia/meshview-rs"
+repository = "https://github.com/meshview/meshview"
 
 # Only what more than one crate needs. Everything else belongs to whichever
 # crate actually uses it.

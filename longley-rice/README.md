@@ -209,5 +209,5 @@ domain in the United States and released worldwide for derivative works; the
 pyitm module reproduces pyitm, under the MIT licence. [NOTICE][notice] has
 both, with the acknowledgment and the statement of changes NTIA asks for.
 
-[license]: https://github.com/ogarcia/meshview-rs/blob/master/longley-rice/LICENSE
-[notice]: https://github.com/ogarcia/meshview-rs/blob/master/longley-rice/NOTICE
+[license]: https://github.com/meshview/meshview/blob/master/longley-rice/LICENSE
+[notice]: https://github.com/meshview/meshview/blob/master/longley-rice/NOTICE

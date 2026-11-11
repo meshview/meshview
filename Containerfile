@@ -5,7 +5,7 @@
 # only place the build itself can read, which is what lets the obvious thing
 # work:
 #
-#   podman build -t meshview-rs .
+#   podman build -t meshview .
 #
 # Both name a minor line rather than a patch, so fixes arrive without a commit.
 ARG ALPINE_VERSION=3.24
@@ -26,7 +26,7 @@ WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
 COPY .cargo ./.cargo
 COPY meshview-proto ./meshview-proto
-COPY meshview-rs ./meshview-rs
+COPY meshview ./meshview
 
 # No target is named: this image's own is a musl one, whichever architecture it
 # runs on, so the same file works on x86_64 and aarch64 alike.
@@ -43,9 +43,9 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/src/target \
     set -eux; \
     cargo build --release --locked; \
-    install -D target/release/meshview-rs /out/meshview-rs; \
-    if readelf -l /out/meshview-rs | grep -q INTERP; then \
-        echo "meshview-rs is not statically linked" >&2; \
+    install -D target/release/meshview /out/meshview; \
+    if readelf -l /out/meshview | grep -q INTERP; then \
+        echo "meshview is not statically linked" >&2; \
         exit 1; \
     fi
 
@@ -55,7 +55,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 # repeating that work inside a container image would be slower and would prove
 # nothing. Point the build at what it already made, under dist/:
 #
-#   podman build --build-arg BINARY_SOURCE=prebuilt -t meshview-rs .
+#   podman build --build-arg BINARY_SOURCE=prebuilt -t meshview .
 #
 # Only the stage that gets used is assembled, so dist/ need not exist for an
 # ordinary build from source. The name carries the architecture in the build's
@@ -63,7 +63,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 # out of the same directory.
 FROM scratch AS prebuilt
 ARG TARGETARCH
-COPY dist/meshview-rs-${TARGETARCH} /out/meshview-rs
+COPY dist/meshview-${TARGETARCH} /out/meshview
 
 # --- whichever of those two it was -------------------------------------------
 
@@ -75,15 +75,15 @@ FROM ${BINARY_SOURCE} AS binary
 
 FROM docker.io/library/alpine:${ALPINE_VERSION}
 
-LABEL org.opencontainers.image.title="meshview-rs" \
+LABEL org.opencontainers.image.title="Meshview" \
       org.opencontainers.image.description="Real-time monitoring and diagnostics for Meshtastic mesh networks" \
-      org.opencontainers.image.source="https://github.com/ogarcia/meshview-rs" \
+      org.opencontainers.image.source="https://github.com/meshview/meshview" \
       org.opencontainers.image.licenses="AGPL-3.0-or-later"
 
 # The mode is set rather than inherited because a binary that has travelled
 # through a CI artifact arrives without its executable bit: zip does not carry
 # permissions.
-COPY --from=binary --chmod=0755 /out/meshview-rs /usr/local/bin/meshview-rs
+COPY --from=binary --chmod=0755 /out/meshview /usr/local/bin/meshview
 
 # Never root. 10001 rather than 1000, which is the first user of most systems,
 # so that the files it writes on a mounted volume belong to nobody in particular;
@@ -112,5 +112,5 @@ EXPOSE 8081
 # runAsNonRoot would refuse to start the container.
 USER 10001:10001
 WORKDIR /data
-ENTRYPOINT ["/usr/local/bin/meshview-rs"]
+ENTRYPOINT ["/usr/local/bin/meshview"]
 CMD ["run"]

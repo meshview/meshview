@@ -1,7 +1,7 @@
-# API: what changed from the Python meshview
+# API: what changed from the Python Meshview
 
 The API documents itself: every endpoint, its parameters and its answers are
-in the reference meshview-rs serves, generated from the code that answers, so it
+in the reference Meshview serves, generated from the code that answers, so it
 cannot disagree with it.
 
 | Address | |
@@ -23,7 +23,7 @@ The API is now served under a version, `/api/v1/...`. A version's addresses and
 the shape of its answers do not change once published; anything that would break
 a client goes into the next version instead, served beside it.
 
-`v1` is the Python meshview 4.0 API, address for address and answer for answer,
+`v1` is the Python Meshview 4.0 API, address for address and answer for answer,
 apart from the [differences](#differences-from-the-python-version) below. Every
 endpoint was checked against the Python version, on a copy of a real database,
 before it was called ported.
@@ -63,7 +63,7 @@ Plain bugs (a crash, a wrong figure, an answer that depends on chance) are fixed
 behaviour a client could rely on is kept even where it is odd, and is a candidate
 for changing in a future version instead.
 
-| | Python meshview | meshview-rs |
+| | Python version | Meshview |
 |---|---|---|
 | JSON | Python's `json.dumps`: spaces after `,` and `:`, everything outside ASCII escaped, and bare `NaN` or `Infinity`, which is not JSON, where a value is not a number | Standard compact JSON in UTF-8; a value that is not a number is `null`. The values are the same. |
 | Errors the handlers did not foresee | Plain text: `404: Not Found`, `500 Internal Server Error` | JSON under `/api/v1`, `{"error": "..."}`, as the errors the handlers do foresee already were. |
@@ -72,10 +72,10 @@ for changing in a future version instead.
 | `/version` `release_date` | The release's date | The date of the commit the build comes from. |
 | `/version` `git_revision` | Asked of git on every request, from the checkout the server runs from | Recorded at build time. |
 | `/api/v1/config` `cleanup` | The values as written in `config.ini`, so `minute = 00` gave `"00"` | The configured numbers, as strings, as before: `"0"`. TOML numbers have no leading zeros. |
-| `/api/v1/config` `site.version` | The Python version's | meshview-rs's |
+| `/api/v1/config` `site.version` | The Python version's | Meshview's |
 | `/api/v1/config` `site.map_channel_colors` | Only the configured colours | The colours built in for the presets' channels too, which the configured ones replace. |
 | `/health` `cleanup` | From the JSON file the cleanup wrote, with its path as `status_file` | From the cleanup's latest run in `job_run`, with no `status_file`; `last_run` has the same keys. |
-| `/health` `backup` | The scheduled backups' settings and last run | `{"enabled": false, "status": "disabled"}`: meshview-rs does not back up by itself (see [Deployment](deployment.md#backups)). |
+| `/health` `backup` | The scheduled backups' settings and last run | `{"enabled": false, "status": "disabled"}`: Meshview does not back up by itself (see [Deployment](deployment.md#backups)). |
 | `/health` `snapshot` | Not reported | The daily snapshot's schedule, status and latest run, as `cleanup`'s. |
 | Empty filters (`?channel=`, `?type=`) | Sometimes a filter on the empty string, which matches nothing, sometimes no filter, sometimes a different default | Always no filter: a filter on nothing filters nothing. The one exception is `ids=` in `/api/v1/nodes`, a list of no nodes, which still matches none, as the list of favourites needs when there are none. |
 | `/api/v1/stats?node=` | `sent` and `seen` always 0: it read a key its query does not return | The totals it meant: packets the node sent, and packets sent to it, in the window. |

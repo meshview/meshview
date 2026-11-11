@@ -1,9 +1,9 @@
-# meshview-rs configuration.
+# Meshview configuration.
 #
-# The sections and keys are the Python meshview's: moving a config.ini over is
+# The sections and keys are the Python Meshview's: moving a config.ini over is
 # quoting the strings and writing booleans, numbers and lists as such. Every key
 # is optional and shown here with an example or its default. A key or section
-# meshview-rs does not know is an error, so a typo does not go unnoticed.
+# Meshview does not know is an error, so a typo does not go unnoticed.
 #
 # Any value can also come from the environment as MESHVIEW_<SECTION>__<KEY>,
 # which wins over this file, for example MESHVIEW_DATABASE__CONNECTION_STRING or
@@ -95,8 +95,8 @@ skip_node_ids = []
 # Base64 AES keys (16 or 32 bytes) tried after the default one. Meshtastic's one
 # byte PSK shorthand is also understood.
 secondary_keys = []
-# New in meshview-rs: TLS to the broker. The certificate is checked against the
-# public roots built into meshview-rs, or only against those in tls_ca_file when
+# New in Meshview: TLS to the broker. The certificate is checked against the
+# public roots built into Meshview, or only against those in tls_ca_file when
 # it is set. A client certificate and its key, both PEM, are sent when given.
 tls = false
 tls_ca_file = ""
@@ -129,8 +129,8 @@ minute = 0
 vacuum = false
 
 # The Python version's backup_enabled, backup_dir, backup_hour and backup_minute
-# are deprecated: meshview-rs does not back up by itself. They are accepted, with
-# a warning, until the next version. Run `meshview-rs backup <file>` from your
+# are deprecated: Meshview does not back up by itself. They are accepted, with
+# a warning, until the next version. Run `meshview backup <file>` from your
 # own scheduler instead; see docs/deployment.md.
 
 # -------------------------
