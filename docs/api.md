@@ -1,45 +1,32 @@
-# API
+# API: what changed from the Python meshview
 
-## Versions
-
-The API is served under a version: `/api/v1/...`. A version's addresses and the
-shape of their answers do not change once published; anything that would
-break a client goes into the next version instead, served beside it.
-
-`v1` is the Python meshview 4.0 API, address for address and answer for answer,
-so that the web pages and anything else written against the Python version work
-unchanged, apart from the [differences](#differences-from-the-python-version)
-below. Each endpoint is checked against the Python version, answer by answer,
-before it is called ported (see [Development](development.md#comparing-the-api)).
-
-| Endpoint | State |
-|---|---|
-| `/version` | Ported |
-| `/api/v1/channels` | Ported |
-| `/api/v1/snapshots/daily` | Ported |
-| `/api/v1/packets_seen/{packet_id}` | Ported |
-| `/health` | Ported |
-| `/api/v1/config`, `/api/v1/lang` | Ported |
-| `/api/v1/nodes`, `/api/v1/nodes/facets` | Not yet |
-| `/api/v1/packets` | Not yet |
-| `/api/v1/stats`, `/api/v1/stats/count`, `/api/v1/stats/top` | Not yet |
-| `/api/v1/edges` | Not yet |
-| `/api/v1/traceroute/{packet_id}` | Not yet |
-| `/api/v1/node/{node_id}/qr` | Not yet |
-| `/api/v1/coverage/{node_id}` | Later |
-
-## The reference
+The API documents itself: every endpoint, its parameters and its answers are
+in the reference meshview-rs serves, generated from the code that answers, so it
+cannot disagree with it.
 
 | Address | |
 |---|---|
 | `/api/docs` | The reference, as a page to read and try calls from. |
 | `/api/openapi.json` | The OpenAPI document behind it, for clients and code generators. |
 
-Both are generated from the code that registers the routes, so they cannot
-disagree with what is served. They sit outside the version because they
-document all of them.
+This page is only about what is different for someone coming from the Python
+meshview 4.0: where the API moved to, and what it answers differently.
 
-## The unversioned addresses
+## Versions
+
+The API is now served under a version, `/api/v1/...`. A version's addresses and
+the shape of its answers do not change once published; anything that would break
+a client goes into the next version instead, served beside it.
+
+`v1` is the Python meshview 4.0 API, address for address and answer for answer,
+apart from the [differences](#differences-from-the-python-version) below. Each
+endpoint is checked against the Python version before it is called ported (see
+[Development](development.md#comparing-the-api)).
+
+`/health` and `/version` stay where they were, outside any version, as do the
+probes `/livez` and `/readyz` (see [Deployment](deployment.md#probes)).
+
+## The Python addresses
 
 The Python version served the same API without a version: `/api/nodes`,
 `/api/stats/top` and so on. Those addresses keep working for now, as permanent
@@ -84,9 +71,3 @@ for changing in a future version instead.
 | `/health` `cleanup` | From the JSON file the cleanup wrote, with its path as `status_file` | From the cleanup's latest run in `job_run`, with no `status_file`; `last_run` has the same keys. |
 | `/health` `backup` | The scheduled backups' settings and last run | `{"enabled": false, "status": "disabled"}`: meshview-rs does not back up by itself (see [Deployment](deployment.md#backups)). |
 | `/health` `snapshot` | Not reported | The daily snapshot's schedule, status and latest run, as `cleanup`'s. |
-
-## Outside the API
-
-`/version` is not part of the API and has no version, as in the Python
-version. Neither have the probes, `/livez` and `/readyz`, which are described in
-[Deployment](deployment.md#probes).
