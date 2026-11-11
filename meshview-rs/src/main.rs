@@ -6,7 +6,7 @@ use clap::{Parser, Subcommand};
 use meshview_rs::app::{self, Role};
 use meshview_rs::config::Config;
 use std::path::{Path, PathBuf};
-use tracing::info;
+use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
 /// The configuration file read when none is named. Optional: without it the
@@ -29,7 +29,7 @@ struct Cli {
     command: Option<Command>,
 }
 
-#[derive(Debug, Clone, Copy, Subcommand)]
+#[derive(Debug, Subcommand)]
 enum Command {
     /// Ingest from MQTT and serve the web, in one process (the default).
     Run,
@@ -39,17 +39,12 @@ enum Command {
     Serve,
     /// Bring the database's schema up to date, and exit.
     Migrate,
-}
-
-impl From<Command> for Role {
-    fn from(command: Command) -> Self {
-        match command {
-            Command::Run => Self::Run,
-            Command::Ingest => Self::Ingest,
-            Command::Serve => Self::Serve,
-            Command::Migrate => Self::Migrate,
-        }
-    }
+    /// Copy the database to a file, consistently, even while it is in use. For a
+    /// scheduler to run; the file must not exist yet.
+    Backup {
+        /// Where the copy goes.
+        output: PathBuf,
+    },
 }
 
 #[tokio::main]
@@ -59,7 +54,7 @@ async fn main() -> Result<()> {
         .init();
 
     let cli = Cli::parse();
-    let role = Role::from(cli.command.unwrap_or(Command::Run));
+    let command = cli.command.unwrap_or(Command::Run);
 
     info!(
         "{} {} — free software under the AGPL, version 3 or later",
@@ -87,6 +82,15 @@ async fn main() -> Result<()> {
         Some(path) => info!("configuration read from {}", path.display()),
         None => info!("no configuration file; using the defaults and the environment"),
     }
+    for warning in config.deprecations() {
+        warn!("{warning}");
+    }
 
-    app::run(role, config).await
+    match command {
+        Command::Run => app::run(Role::Run, config).await,
+        Command::Ingest => app::run(Role::Ingest, config).await,
+        Command::Serve => app::run(Role::Serve, config).await,
+        Command::Migrate => app::run(Role::Migrate, config).await,
+        Command::Backup { output } => app::backup(&config, &output).await,
+    }
 }

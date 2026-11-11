@@ -19,6 +19,11 @@ base64 = "0.23"
 bytes = "1"
 clap = { version = "4", features = ["derive", "env"] }
 ctr = "0.10"
+# Local time for the daily jobs, with the time zone database built in, so that
+# TZ works in an image that has no tzdata.
+jiff = { version = "0.2", features = ["tzdb-bundle-always"] }
+# Only for the level sqlx logs slow statements at.
+log = "0.4"
 meshview-proto = { path = "../meshview-proto" }
 prost.workspace = true
 # TLS through rustls, but with no crypto provider chosen here: its default is

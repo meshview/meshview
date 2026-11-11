@@ -114,8 +114,34 @@ a decision rather than an accident:
 - **Map reports go to node 1**: their recipient is stored as 1, standing for the
   broker.
 
-## Not ported yet
+## Daily jobs
 
-The Python ingester also runs the daily cleanup, backups and snapshot. Those are
-not ported yet; their settings, in `[cleanup]` and `[snapshot]`, are accepted
-and not acted on.
+The writer, `run` or `ingest`, also runs two jobs once a day, at a
+[local time](configuration.md#local-time) of day each. They are the Python
+version's, and do the same: run side by side with it on the same data, both
+leave identical databases.
+
+| Job | When | What |
+|---|---|---|
+| Cleanup | `[cleanup] hour`/`minute`, if `[cleanup] enabled` | Deletes the packets, sightings and traceroutes imported more than `days_to_keep` days ago, and the nodes not seen since, all in one transaction; then, with `vacuum`, runs `VACUUM`. Each table goes by its own time: a sighting today of an old packet stays. Nodes never seen at all are kept. |
+| Snapshot | `[snapshot] hour`/`minute`, always | Records the previous complete UTC day in `daily_snapshot`: the nodes active that day (they sent a packet, or an older packet of theirs was heard again), the packets imported, and the gateways that relayed anything. Running it again for the same day replaces what was recorded. |
+
+The snapshot is what keeps the history the cleanup would otherwise take away:
+with 14 days kept, a month ago's packets are gone, but how many there were each
+day is still there.
+
+Both share the writer's one connection with the ingester, so they never write
+at the same time. While a cleanup deletes, and vacuums, messages keep arriving
+and wait in the ingester's queue, as the Python version paused its ingestion.
+
+Every run is recorded in the `job_run` table, with when it started and finished,
+how it ended (`ok`, `error`, or `interrupted` when the process stopped in the
+middle of it), and what it did: for a cleanup the cutoff and the rows deleted
+from each table, for a snapshot the figures recorded. The last 90 runs of each
+job are kept. The Python version wrote the last cleanup to a JSON file for its
+web server to read; a table is readable by every process that can open the
+database, which is what the web server will report it from.
+
+A job the process is stopped in the middle of is abandoned, which rolls back
+what it had not committed: a cleanup either deletes everything it was going to
+or nothing.

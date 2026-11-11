@@ -13,7 +13,7 @@ use super::{Compatibility, Schema};
 use anyhow::{Context, Result, bail};
 use sqlx::migrate::Migrator;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
-use sqlx::{Row, SqlitePool};
+use sqlx::{ConnectOptions, Row, SqlitePool};
 use std::path::Path;
 use std::time::Duration;
 use tracing::{info, warn};
@@ -25,6 +25,16 @@ pub static MIGRATOR: Migrator = sqlx::migrate!("./migrations/sqlite");
 /// waiting costs nothing when nothing is contended and a failed request costs a
 /// lot, and because the readers may be other processes doing whatever they do.
 const BUSY_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// From how long a write is worth a warning. The writer's statements are the
+/// ingester's inserts, which take milliseconds, and the daily cleanup's deletes,
+/// which on a database cleaned every day take seconds: one that takes longer
+/// than this is contention or a disk in trouble. Readers keep sqlx's own second,
+/// since a slow query from the web is exactly what wants seeing.
+const SLOW_WRITE: Duration = Duration::from_secs(30);
+
+/// How long a write waits for its turn on the writer's connection.
+const WRITER_WAIT: Duration = Duration::from_secs(3600);
 
 /// Read connections per process. Every request holds one only while its queries
 /// run, and SQLite readers do not block each other under WAL.
@@ -59,10 +69,16 @@ pub async fn open_for_writing(path: &Path) -> Result<SqlitePool> {
         // Under WAL this loses nothing on a crash of the process, only possibly
         // the last transactions on a crash of the machine, and saves a sync per
         // commit, which for a stream of small inserts is most of the cost.
-        .synchronous(SqliteSynchronous::Normal);
+        .synchronous(SqliteSynchronous::Normal)
+        .log_slow_statements(log::LevelFilter::Warn, SLOW_WRITE);
 
     let pool = SqlitePoolOptions::new()
         .max_connections(1)
+        // The ingester and the daily jobs take turns on this one connection, and
+        // a cleanup with a VACUUM on a large database can hold it for minutes.
+        // Waiting that long is the point: the ingester's queue holds what arrives
+        // meanwhile, as the Python version paused its ingestion.
+        .acquire_timeout(WRITER_WAIT)
         .connect_with(options)
         .await
         .with_context(|| format!("opening {} for writing", path.display()))?;
@@ -130,6 +146,61 @@ pub async fn close_writer(pool: SqlitePool) {
         warn!("could not fold the write-ahead log back into the database: {e}");
     }
     pool.close().await;
+}
+
+/// Copies the database to `output`, consistently, while it is in use.
+///
+/// `VACUUM INTO` writes a complete copy as of one moment, compacted, without
+/// stopping anything: the ingester can go on writing meanwhile. Copying the file
+/// itself, as `cp` or a volume snapshot would, cannot promise that, and with WAL
+/// the latest writes are not even in it.
+///
+/// The copy is written beside `output` first and moved into place once it is
+/// whole, so `output` is never a copy half written. Neither is overwritten: an
+/// `output` already there is refused, rotating copies is the scheduler's job.
+/// Answers the size of the copy.
+pub async fn backup(database: &Path, output: &Path) -> Result<u64> {
+    if !database.exists() {
+        bail!("{} does not exist", database.display());
+    }
+    if output.exists() {
+        bail!(
+            "{} already exists; meshview-rs does not overwrite backups",
+            output.display()
+        );
+    }
+    let partial = output.with_extension(match output.extension() {
+        Some(ext) => format!("{}.partial", ext.to_string_lossy()),
+        None => "partial".to_string(),
+    });
+    if partial.exists() {
+        bail!(
+            "{} is there, from a backup that did not finish: remove it and try again",
+            partial.display()
+        );
+    }
+
+    // Read and write, so that if this happens to be the last connection to
+    // close it can tidy the write-ahead log away, but never creating anything.
+    let pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        // Copying a whole database takes as long as it takes: that is no
+        // reason for a warning.
+        .connect_with(options(database).log_slow_statements(log::LevelFilter::Off, Duration::MAX))
+        .await
+        .with_context(|| format!("opening {}", database.display()))?;
+
+    let copied = sqlx::query("VACUUM INTO ?")
+        .bind(partial.to_string_lossy().into_owned())
+        .execute(&pool)
+        .await
+        .with_context(|| format!("copying {} to {}", database.display(), partial.display()));
+    pool.close().await;
+    copied?;
+
+    std::fs::rename(&partial, output)
+        .with_context(|| format!("moving {} to {}", partial.display(), output.display()))?;
+    Ok(std::fs::metadata(output)?.len())
 }
 
 /// Closes a read pool, waiting for its connections to be returned and closed.

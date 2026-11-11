@@ -19,8 +19,9 @@ What it does, in one transaction, so that it either all happens or none of it:
 
 - puts back the Python version's bookkeeping (alembic_version at 44612e74a798,
   migration_status, and the unused example table), exactly as Python creates it;
-- removes what meshview-rs added: the idx_traceroute_packet_id index and its
-  own record of migrations, _sqlx_migrations.
+- removes what meshview-rs added: the idx_traceroute_packet_id index, the
+  job_run table (what its scheduled jobs did) and its own record of
+  migrations, _sqlx_migrations.
 
 The data, every row of every table, is not touched. Stop meshview-rs, every
 process using the database, before running it.
@@ -36,7 +37,7 @@ import sys
 # The migrations this knows how to undo, by version and the description sqlx
 # records for them. Adding a migration to meshview-rs makes a test fail until
 # this is taught to undo it, or retired.
-REVERTIBLE = [(1, "baseline"), (2, "retire python bookkeeping")]
+REVERTIBLE = [(1, "baseline"), (2, "take over")]
 
 PYTHON_REVISION = "44612e74a798"
 
@@ -65,6 +66,7 @@ RESTORE = [
             )""",
     "INSERT INTO migration_status (id, in_progress) VALUES (1, 0)",
     "DROP INDEX IF EXISTS idx_traceroute_packet_id",
+    "DROP TABLE IF EXISTS job_run",
     "DROP TABLE _sqlx_migrations",
 ]
 
