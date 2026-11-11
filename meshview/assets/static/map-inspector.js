@@ -48,12 +48,16 @@
             link.textContent = node.short_name || String(id);
             link.href = `/node/${encodeURIComponent(id)}`;
             byId('inspector-name').textContent = node.long_name || node.short_name || MeshI18n.t("Node {id}", {id});
-            byId('inspector-node-meta').textContent = MeshI18n.t("Node {id}", {id});
+            const hex = Number.isInteger(Number(id)) ? ` (!${Number(id).toString(16).padStart(8, '0')})` : '';
+            byId('inspector-node-meta').textContent = MeshI18n.t("Node {id}", {id}) + hex;
             const facts = byId('inspector-facts');
             facts.replaceChildren();
+            // Hardware and firmware only when the node has told us; last seen always closes.
             for (const [label, value] of [
                 [MeshI18n.t("Role"), node.role || MeshI18n.t("Unknown")],
                 [MeshI18n.t("Channel"), node.channel || MeshI18n.t("Unknown")],
+                ...(node.hw_model ? [['Hardware', node.hw_model]] : []),
+                ...(node.firmware ? [[MeshI18n.t("Firmware"), node.firmware]] : []),
                 [MeshI18n.t("Last seen"), node.last_seen_us ? new Date(Number(node.last_seen_us) / 1000).toLocaleString(MeshI18n.language) : MeshI18n.t("Unknown")]
             ]) {
                 const dt = document.createElement('dt'); dt.textContent = label;
