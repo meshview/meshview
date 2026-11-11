@@ -166,10 +166,15 @@ jobs:
 
       # An image that builds and an image that serves are different claims. This
       # one starts, creates and migrates its database, reports itself ready, and
-      # sends the old unversioned API on to v1.
+      # sends the old unversioned API on to v1. The broker it is given refuses
+      # every connection, which is also the point: the web is served whether or
+      # not the mesh can be heard.
       - name: Start it and ask it something
         run: |
-          docker run --detach --name meshview-rs --publish 8081:8081 meshview-rs:ci
+          docker run --detach --name meshview-rs --publish 8081:8081 \
+            --env MESHVIEW_MQTT__SERVER=127.0.0.1 \
+            --env MESHVIEW_MQTT__TOPICS='["msh/#"]' \
+            meshview-rs:ci
           for _ in $(seq 1 30); do
             curl -sf -o /dev/null http://127.0.0.1:8081/readyz && break
             sleep 1
@@ -180,6 +185,16 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' \
             'http://127.0.0.1:8081/api/stats?period_type=hour')" \
             = "308 http://127.0.0.1:8081/api/v1/stats?period_type=hour"
+
+      # Stopped as a container runtime stops it, it has to leave the database
+      # and nothing else: no write-ahead log, no shared memory index.
+      - name: Stop it and look at what it left
+        run: |
+          docker stop meshview-rs
+          docker logs meshview-rs 2>&1 | tail -3
+          docker cp meshview-rs:/data left
+          ls -A left
+          test "$(ls -A left)" = "packets.db"
 
       - uses: docker/login-action@v4
         if: github.event_name == 'push'

@@ -18,7 +18,9 @@ use crate::state::{CHECK_MQTT, Readiness};
 use anyhow::{Context, Result, bail};
 use keys::Keyring;
 use opened::{NotOpened, Opened};
-use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS, TlsConfiguration, Transport};
+use rumqttc::{
+    AsyncClient, Event, MqttOptions, Outgoing, Packet, QoS, TlsConfiguration, Transport,
+};
 use rustls::pki_types::pem::PemObject;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use rustls::{ClientConfig, RootCertStore};
@@ -34,6 +36,9 @@ use tracing::{debug, error, info, warn};
 /// MQTT's own port, and its port over TLS.
 const DEFAULT_PORT: u16 = 1883;
 const DEFAULT_TLS_PORT: u16 = 8883;
+
+/// How long the broker gets to hear that this client is leaving.
+const DISCONNECT_GRACE: Duration = Duration::from_secs(1);
 
 /// How long to wait before connecting again after losing the broker.
 const RECONNECT_DELAY: Duration = Duration::from_secs(1);
@@ -209,7 +214,7 @@ pub async fn run(
 
     let (client, mut events) = AsyncClient::new(settings.options()?, 64);
     let (queue, backlog) = mpsc::channel(BACKLOG);
-    let writer = tokio::spawn(store_messages(
+    let mut writer = tokio::spawn(store_messages(
         backlog,
         keyring,
         settings.skip_node_ids.clone(),
@@ -267,9 +272,34 @@ pub async fn run(
         }
     }
 
-    let _ = client.try_disconnect();
+    // Tell the broker, which takes driving the connection a little longer: a
+    // disconnect that is only queued is never sent.
+    readiness.set(CHECK_MQTT, false);
+    if client.try_disconnect().is_ok() {
+        let _ = tokio::time::timeout(DISCONNECT_GRACE, async {
+            loop {
+                match events.poll().await {
+                    Ok(Event::Outgoing(Outgoing::Disconnect)) | Err(_) => break,
+                    Ok(_) => {}
+                }
+            }
+        })
+        .await;
+    }
+
+    // What has arrived is stored, as long as that does not take longer than a
+    // container runtime would wait.
     drop(queue);
-    writer.await.context("the storing task")?;
+    match tokio::time::timeout(crate::app::DRAIN_GRACE, &mut writer).await {
+        Ok(result) => result.context("the storing task")?,
+        Err(_) => {
+            writer.abort();
+            warn!(
+                "still storing after {:?}; the messages left are lost",
+                crate::app::DRAIN_GRACE
+            );
+        }
+    }
     Ok(())
 }
 

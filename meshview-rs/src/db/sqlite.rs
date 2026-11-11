@@ -16,7 +16,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, S
 use sqlx::{Row, SqlitePool};
 use std::path::Path;
 use std::time::Duration;
-use tracing::info;
+use tracing::{info, warn};
 
 /// The migrations, compiled into the binary.
 pub static MIGRATOR: Migrator = sqlx::migrate!("./migrations/sqlite");
@@ -108,6 +108,33 @@ pub async fn open_for_reading(path: &Path) -> Result<Option<SqlitePool>> {
         .with_context(|| format!("opening {} for reading", path.display()))?;
 
     Ok(Some(pool))
+}
+
+/// Closes the writer so that nothing is left beside the database file.
+///
+/// Under WAL, committed data can still be in the `-wal` file, with the `-shm`
+/// index beside it, and SQLite folds it back in and removes both only when the
+/// last connection closes cleanly. A process that just exits leaves them, which
+/// is harmless to the next start but untidy, and a backup of the bare file then
+/// misses what is in them. So the log is folded back in here first, explicitly,
+/// and the connection closed and waited for.
+///
+/// When another process still has the database open, a web server reading it,
+/// the files stay for that one, which is as it should be: the last to close is
+/// the one that tidies up, and a read only connection cannot.
+pub async fn close_writer(pool: SqlitePool) {
+    if let Err(e) = sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)")
+        .execute(&pool)
+        .await
+    {
+        warn!("could not fold the write-ahead log back into the database: {e}");
+    }
+    pool.close().await;
+}
+
+/// Closes a read pool, waiting for its connections to be returned and closed.
+pub async fn close_reader(pool: SqlitePool) {
+    pool.close().await;
 }
 
 /// What the database holds, read from its catalogue.
