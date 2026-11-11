@@ -2003,6 +2003,13 @@ function closeQrModal() {
     document.getElementById("qrModal").style.display = "none";
 }
 
+// Escape closes whichever dialog is open, the QR code or the expanded chart.
+document.addEventListener("keydown", event => {
+    if (event.key !== "Escape") return;
+    if (document.getElementById("qrModal").style.display === "flex") closeQrModal();
+    else if (document.getElementById("chartModal").style.display === "flex") closeModal();
+});
+
 function copyQrUrl() {
     navigator.clipboard.writeText(currentMeshtasticUrl).then(() => {
         const btn = document.getElementById("copyQrBtn");

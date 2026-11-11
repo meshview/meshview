@@ -1,11 +1,12 @@
 <!doctype html>
 <html lang="en">
 <head>
-    <script src="/static/i18n.js"></script>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Meshview Kiosk</title>
     <script>
+        // Straight on to the map. Nothing is translated here: the link below is
+        // only seen without JavaScript, when no translation could run either.
         const target = new URL('/map', location.origin);
         target.search = location.search;
         target.searchParams.set('kiosk', '1');
