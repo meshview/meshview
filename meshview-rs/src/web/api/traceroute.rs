@@ -17,6 +17,7 @@ const MAX_ROWS: i64 = 200;
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct Traceroute {
+    /// The packet asked for, and who the traceroute is between.
     pub packet: TraceroutePacket,
     /// What each gateway reported, in the order they were heard, leaving out
     /// those that could not be read; `index` counts them all.
@@ -25,6 +26,7 @@ pub struct Traceroute {
     /// whether any of those was a finished traceroute.
     pub unique_forward_paths: Vec<UniquePath>,
     /// Every return route reported, once.
+    #[schema(example = json!([[555, 444]]))]
     pub unique_reverse_paths: Vec<Vec<i64>>,
     /// The whole paths of the finished traceroutes, endpoints included.
     pub winning_paths: WinningPaths,
@@ -32,38 +34,68 @@ pub struct Traceroute {
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct TraceroutePacket {
+    /// Its stored id.
+    #[schema(example = 123)]
     pub id: i64,
+    /// The node that sent this packet: for an answer, the one traced.
+    #[schema(example = 222)]
     pub from: Option<i64>,
+    /// The node it was sent to: for an answer, the one that started it.
+    #[schema(example = 111)]
     pub to: Option<i64>,
     /// The node that started the traceroute.
+    #[schema(example = 111)]
     pub initiator: Option<i64>,
     /// The node it traced.
+    #[schema(example = 222)]
     pub target: Option<i64>,
+    /// The channel it was heard on.
+    #[schema(example = "LongFast")]
     pub channel: Option<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct Report {
+    /// Its place among every report stored, read or not.
+    #[schema(example = 0)]
     pub index: usize,
+    /// The gateway that heard it.
+    #[schema(example = 333)]
     pub gateway_node_id: Option<i64>,
     /// Whether this was the finished traceroute, its answer.
     pub done: Option<bool>,
+    /// The hops on the way to the target, without either end.
+    #[schema(example = json!([444, 555]))]
     pub forward_hops: Vec<i64>,
+    /// The hops on the way back, without either end: as far as the answer
+    /// had come when the gateway heard it.
+    #[schema(example = json!([555, 444]))]
     pub reverse_hops: Vec<i64>,
-    /// Whether the answer was seen back at the node that started it.
+    /// Whether the answer had made it back to the node that started it.
     pub reverse_complete: bool,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct UniquePath {
+    /// The hops, without either end.
+    #[schema(example = json!([444, 555]))]
     pub path: Vec<i64>,
+    /// How many reports had it.
+    #[schema(example = 2)]
     pub count: usize,
+    /// Whether one of them was an answer, which shows the route reached the
+    /// target.
     pub complete: bool,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct WinningPaths {
+    /// From the node that started it to the target, from the answers.
+    #[schema(example = json!([[111, 444, 555, 222]]))]
     pub forward: Vec<Vec<i64>>,
+    /// From the target back, from the answers: to the node that started it
+    /// when the answer was heard there, otherwise as far as it had come.
+    #[schema(example = json!([[222, 555, 444, 111]]))]
     pub reverse: Vec<Vec<i64>>,
 }
 
@@ -72,11 +104,24 @@ pub struct WinningPaths {
 /// A traceroute as the gateways reported it: the hops each saw, the different
 /// routes among them, and the whole paths of the finished traceroutes from the
 /// node that started it to the one it traced and back.
+///
+/// A finished traceroute is heard as its answer, which goes the other way: its
+/// `from` and `to` are the traced node and the one that started it. That is
+/// what `initiator` and `target` sort out. The way there is `initiator`,
+/// `forward_hops`, `target`; the way back, `target`, `reverse_hops`,
+/// `initiator`; the hops never include either end.
+///
+/// A gateway usually hears the answer on its way back, before it gets there,
+/// so `reverse_hops` is often only part of the way: `reverse_complete` says
+/// whether it had arrived. `winning_paths` are built from the answers, because
+/// an answer proves the request reached the target.
+///
+/// A packet with no reports answers them empty.
 #[utoipa::path(
     get,
     path = "/traceroute/{packet_id}",
     tag = "packets",
-    params(("packet_id" = i64, Path, description = "The traceroute packet's stored id.")),
+    params(("packet_id" = i64, Path, description = "The traceroute packet's stored id, in decimal.")),
     responses(
         (status = 200, description = "The traceroute", body = Traceroute),
         (status = 400, description = "`packet_id` is not an integer", body = ErrorBody),

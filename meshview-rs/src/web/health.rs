@@ -14,7 +14,7 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 use utoipa::ToSchema;
 
-/// The answer to either question.
+/// Whether the process is alive, or ready.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct Status {
     /// `ok`, or `unavailable` when the process cannot serve yet.
@@ -48,7 +48,9 @@ pub async fn livez() -> Json<Status> {
 /// Readiness
 ///
 /// Answers 200 once every check this process depends on passes, and 503 with
-/// the list of them until then.
+/// the list of them until then: `database`, once it is open at the schema
+/// this build knows, and for a process that ingests, `mqtt`, while it is
+/// connected to the broker.
 #[utoipa::path(
     get,
     path = "/readyz",

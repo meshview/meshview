@@ -220,7 +220,12 @@ pub struct TopNode {
 /// A link between two nodes, and how it is known.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
 pub struct Edge {
+    /// One end: for a traceroute, the end nearer the node that started it;
+    /// for a neighbour, the neighbour.
+    #[schema(example = 12345678)]
     pub from: i64,
+    /// The other end: for a neighbour, the node that reported it.
+    #[schema(example = 87654321)]
     pub to: i64,
     /// `traceroute` when a traceroute went through it, `neighbor` when a node
     /// reported the other as its neighbour.

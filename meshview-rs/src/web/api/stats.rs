@@ -39,15 +39,26 @@ fn strict_int(
         .ok_or_else(|| ApiError::bad_request(message))
 }
 
-/// The answer with a series.
+/// Packets per period.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct Series {
+    /// The period asked for, in lower case.
     #[schema(example = "hour")]
     pub period_type: String,
+    /// How many periods.
+    #[schema(example = 24)]
     pub length: i64,
+    /// The filters asked for, null when not.
+    #[schema(example = "LongFast")]
     pub channel: Option<String>,
+    /// The port asked for, or null.
+    #[schema(example = 1)]
     pub portnum: Option<i64>,
+    /// The recipient asked for, or null.
+    #[schema(example = json!(null))]
     pub to_node: Option<i64>,
+    /// The sender asked for, or null.
+    #[schema(example = json!(null))]
     pub from_node: Option<i64>,
     /// The periods that had packets, oldest first.
     pub data: Vec<PeriodPoint>,
@@ -58,6 +69,8 @@ pub struct PeriodPoint {
     /// `YYYY-MM-DD HH:00` or `YYYY-MM-DD`, in UTC.
     #[schema(example = "2026-11-11 09:00")]
     pub period: String,
+    /// Packets imported in it.
+    #[schema(example = 10)]
     pub count: i64,
 }
 
@@ -70,11 +83,17 @@ impl From<PeriodCount> for PeriodPoint {
     }
 }
 
-/// The answer for one node.
+/// One node's totals.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct NodeTotals {
+    /// The node asked for.
+    #[schema(example = 12345678)]
     pub node_id: i64,
+    /// The period asked for, in lower case.
+    #[schema(example = "hour")]
     pub period_type: String,
+    /// How many periods.
+    #[schema(example = 24)]
     pub length: i64,
     /// Packets the node sent in the window.
     pub sent: i64,
@@ -82,7 +101,7 @@ pub struct NodeTotals {
     pub seen: i64,
 }
 
-/// The answer is one of the two shapes.
+/// A series, or with `node`, that node's totals.
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(untagged)]
 pub enum Stats {
@@ -96,8 +115,13 @@ pub enum Stats {
 /// first, leaving out the periods with none; optionally only those on a channel,
 /// of a port, or to or from a node.
 ///
+/// Periods are by the time packets were imported, in UTC; those with no packet
+/// are left out rather than answered with 0.
+///
 /// With `node`, instead, how many packets that node sent, and how many were sent
 /// to it, in the whole window. (The Python version answered 0 for both, always.)
+/// For how many times a node's packets were heard, see `/stats/count` with
+/// `from_node`.
 #[utoipa::path(
     get,
     path = "/stats",
@@ -112,8 +136,20 @@ pub enum Stats {
         ("node" = Option<i64>, Query, description = "Totals for this node instead of a series. The other filters do not apply."),
     ),
     responses(
-        (status = 200, description = "The series, or the node's totals", body = Stats),
-        (status = 400, description = "A parameter is not valid", body = ErrorBody),
+        (status = 200, description = "The series, or the node's totals", body = Stats, example = json!({
+            "period_type": "hour",
+            "length": 24,
+            "channel": "LongFast",
+            "portnum": 1,
+            "to_node": null,
+            "from_node": null,
+            "data": [
+                {"period": "2026-11-11 08:00", "count": 10},
+                {"period": "2026-11-11 09:00", "count": 7},
+            ],
+        })),
+        (status = 400, description = "`period_type` is not `hour` or `day`, or `length`, `node`, `portnum`, `from_node` or `to_node` is not an integer", body = ErrorBody),
+        (status = 500, description = "They could not be counted", body = ErrorBody),
     )
 )]
 pub async fn stats(State(state): State<AppState>, params: Params) -> Result<Json<Stats>, ApiError> {
@@ -190,7 +226,11 @@ pub async fn stats(State(state): State<AppState>, params: Params) -> Result<Json
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct Counts {
+    /// Packets.
+    #[schema(example = 12345)]
     pub total_packets: i64,
+    /// Sightings of them: times a gateway heard one, not how many gateways.
+    #[schema(example = 67890)]
     pub total_seen: i64,
 }
 
@@ -200,6 +240,12 @@ pub struct Counts {
 /// packets imported in the latest hours or days (by default the latest day),
 /// optionally only on a channel or to or from a node. With `packet_id`, the
 /// sightings are those of that packet.
+///
+/// Without any filter, the totals are of everything the database keeps. With
+/// any, they are of the packets imported in the window, and the sightings
+/// counted are those of those packets, whenever they happened. `packet_id`
+/// only changes `total_seen`, and the other filters do not apply to it:
+/// `total_packets` stays what it would be without it.
 #[utoipa::path(
     get,
     path = "/stats/count",
@@ -210,11 +256,12 @@ pub struct Counts {
         ("channel" = Option<String>, Query, description = "Only packets on this channel, ignoring case."),
         ("from_node" = Option<i64>, Query, description = "Only packets from this node."),
         ("to_node" = Option<i64>, Query, description = "Only packets to this node."),
-        ("packet_id" = Option<i64>, Query, description = "Count the sightings of this packet."),
+        ("packet_id" = Option<i64>, Query, description = "Count the sightings of this packet, by its stored id."),
     ),
     responses(
         (status = 200, description = "The totals", body = Counts),
-        (status = 400, description = "A parameter is not valid", body = ErrorBody),
+        (status = 400, description = "`period_type` is not `hour` or `day`, or `length`, `packet_id`, `from_node` or `to_node` is not an integer", body = ErrorBody),
+        (status = 500, description = "They could not be counted", body = ErrorBody),
     )
 )]
 pub async fn count(
@@ -274,22 +321,40 @@ pub async fn count(
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct Top {
-    /// How many nodes there are in all, before paging.
+    /// How many nodes there are in all, before paging: those on the channel,
+    /// or with `active`, those of them with traffic.
+    #[schema(example = 250)]
     pub total: i64,
+    /// The page size.
+    #[schema(example = 20)]
     pub limit: i64,
+    /// The nodes skipped.
+    #[schema(example = 0)]
     pub offset: i64,
+    /// The page, the most heard first.
     pub nodes: Vec<TopEntry>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct TopEntry {
+    /// The node number.
+    #[schema(example = 1234)]
     pub node_id: Option<i64>,
+    /// Its long name.
+    #[schema(example = "Alice")]
     pub long_name: Option<String>,
+    /// Its short name.
+    #[schema(example = "A")]
     pub short_name: Option<String>,
+    /// The channel it was last heard on.
+    #[schema(example = "LongFast")]
     pub channel: Option<String>,
     /// Packets it sent in the window.
+    #[schema(example = 100)]
     pub sent: i64,
-    /// Times its packets were heard by a gateway in the window.
+    /// Times its packets were heard by a gateway in the window: sightings,
+    /// not how many gateways.
+    #[schema(example = 240)]
     pub seen: i64,
     /// Sightings per packet sent, to two decimals.
     #[schema(example = 2.4)]
@@ -301,21 +366,28 @@ pub struct TopEntry {
 /// The nodes by how often their packets were heard, then by how many they sent,
 /// in the latest hours or days. The window ends at the latest packet, and the
 /// latest sighting, rather than now, so a mesh gone quiet still has a list.
+///
+/// Without `active`, nodes with no traffic are listed too, after the rest, and
+/// `total` counts every node on the channel; with it, both the list and
+/// `total` hold only nodes with traffic, so paging ends at the last of them.
+/// Nodes as heard as each other come by packets sent, then by `node_id`, so
+/// the pages of a query neither repeat nor skip a node.
 #[utoipa::path(
     get,
     path = "/stats/top",
     tag = "stats",
     params(
         ("period_type" = Option<String>, Query, description = "`hour`, or anything else for days. Default `day`."),
-        ("length" = Option<i64>, Query, description = "How many of them, 1 to 3650. Default 1."),
+        ("length" = Option<i64>, Query, description = "How many of them, 1 to 3650; beyond those, the nearest. Default 1."),
         ("channel" = Option<String>, Query, description = "Only nodes on this channel, exactly."),
-        ("limit" = Option<i64>, Query, description = "Nodes per page, 1 to 100. Default 20."),
-        ("offset" = Option<i64>, Query, description = "Nodes to skip. Default 0."),
+        ("limit" = Option<i64>, Query, description = "Nodes per page, 1 to 100; beyond those, the nearest. Default 20."),
+        ("offset" = Option<i64>, Query, description = "Nodes to skip, 0 or more. Default 0."),
         ("active" = Option<bool>, Query, description = "Only nodes that sent or were heard in the window. Default false."),
     ),
     responses(
         (status = 200, description = "A page of nodes", body = Top),
-        (status = 400, description = "A parameter is not valid", body = ErrorBody),
+        (status = 400, description = "`length`, `limit` or `offset` is not an integer, or `active` is not a boolean", body = ErrorBody),
+        (status = 500, description = "They could not be read", body = ErrorBody),
     )
 )]
 pub async fn top(State(state): State<AppState>, params: Params) -> Result<Json<Top>, ApiError> {

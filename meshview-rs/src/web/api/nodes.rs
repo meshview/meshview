@@ -130,11 +130,62 @@ fn node_fields(node: Node) -> [(&'static str, Value); 14] {
     ]
 }
 
+/// A node: every field, or only `node_id` and those asked for in `fields`.
+// Only for the reference: the answer is built field by field.
+#[derive(ToSchema)]
+#[schema(as = Node)]
+#[allow(dead_code)]
+pub struct NodeDoc {
+    /// The node number as Meshtastic writes it: `!` and eight hex digits.
+    #[schema(example = "!000004d2")]
+    id: String,
+    /// The node number.
+    #[schema(example = 1234)]
+    node_id: i64,
+    /// The name it gives itself.
+    #[schema(example = "Alice")]
+    long_name: Option<String>,
+    /// Its short name, as the map shows it.
+    #[schema(example = "A")]
+    short_name: Option<String>,
+    /// The hardware, as Meshtastic names it.
+    #[schema(example = "HELTEC_V3")]
+    hw_model: Option<String>,
+    /// Its firmware version, when it has reported one.
+    #[schema(example = "2.7.15")]
+    firmware: Option<String>,
+    /// Its role, as Meshtastic names it.
+    #[schema(example = "CLIENT")]
+    role: Option<String>,
+    /// The latitude of its latest position, in degrees times 10 000 000; 0
+    /// when it has none.
+    #[schema(example = 377749000)]
+    last_lat: Option<i64>,
+    /// The longitude of its latest position, in degrees times 10 000 000.
+    #[schema(example = -1224194000)]
+    last_long: Option<i64>,
+    /// Its latest altitude, in metres above sea level. Position packets
+    /// without an altitude, and map reports saying 0, leave it as it was.
+    #[schema(example = 125)]
+    last_altitude: Option<i64>,
+    /// The channel it was last heard on.
+    #[schema(example = "LongFast")]
+    channel: Option<String>,
+    /// Whether it forwards what it hears to MQTT.
+    is_mqtt_gateway: Option<bool>,
+    /// When it was first heard, in microseconds.
+    #[schema(example = 1736283723456789_i64)]
+    first_seen_us: Option<i64>,
+    /// When it was last heard, in microseconds.
+    #[schema(example = 1736370123456789_i64)]
+    last_seen_us: Option<i64>,
+}
+
 /// A page of nodes, or all of them.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct Nodes {
     /// The nodes, with the fields asked for; `node_id` always.
-    #[schema(value_type = Vec<Object>)]
+    #[schema(value_type = Vec<NodeDoc>)]
     pub nodes: Vec<Value>,
     /// With `limit` or `offset`: how many match before paging.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -143,6 +194,7 @@ pub struct Nodes {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<i64>)]
     pub limit: Option<Option<i64>>,
+    /// With `limit` or `offset`: the nodes skipped.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub offset: Option<i64>,
 }
@@ -152,29 +204,49 @@ pub struct Nodes {
 /// The nodes ever seen, filtered, sorted and optionally paged. All filters
 /// combine. Without `limit` or `offset` every matching node is answered; with
 /// either, a page, with how many there are in all.
+///
+/// Without `sort`, nodes come by short name as stored, upper case before lower
+/// case, as they always have. With it, text compares ignoring case and nodes
+/// without the field go last either way. Ties are broken by `node_id`, so the
+/// pages of a query neither repeat nor skip a node.
+///
+/// `role` is compared in upper case; `channel`, `hw_model` and `firmware` must
+/// match exactly. `search` looks for the text as it is, `%` and `_` included,
+/// in the long and short names, the `!` id and the number.
+///
+/// Ask for many nodes by `ids` in several requests rather than one: a longer
+/// address can be more than the server or a proxy takes.
 #[utoipa::path(
     get,
     path = "/nodes",
     tag = "nodes",
     params(
-        ("node_id" = Option<i64>, Query, description = "Only this node."),
+        ("node_id" = Option<i64>, Query, description = "Only this node. Not a number, no node."),
         ("role" = Option<String>, Query, description = "Only nodes with this role, in any case."),
         ("channel" = Option<String>, Query, description = "Only nodes on this channel, exactly."),
         ("hw_model" = Option<String>, Query, description = "Only nodes of this hardware, exactly."),
         ("firmware" = Option<String>, Query, description = "Only nodes with this firmware, exactly."),
-        ("days_active" = Option<i64>, Query, description = "Only nodes seen in the latest this many days. Ignored if not a number."),
+        ("days_active" = Option<i64>, Query, description = "Only nodes seen in the latest this many days. Ignored if not a number. Without it, every node ever seen."),
         ("search" = Option<String>, Query, description = "Only nodes with this text in their names, id or number, ignoring case. At most 100 characters."),
         ("ids" = Option<String>, Query, description = "Only these nodes, comma separated numbers, at most 500. Empty matches no node."),
         ("is_mqtt_gateway" = Option<bool>, Query, description = "Only gateways, or only nodes that are not."),
         ("has_position" = Option<bool>, Query, description = "Only nodes with a position, or only those without."),
-        ("sort" = Option<String>, Query, description = "The field to sort by, `-` in front for descending; text fields ignore case and nodes without the field go last. Default: by short name."),
-        ("limit" = Option<i64>, Query, description = "Page size, 1 to 1000."),
-        ("offset" = Option<i64>, Query, description = "Nodes to skip."),
+        ("sort" = Option<String>, Query, description = "The field to sort by, `-` in front for descending: `short_name`, `long_name`, `hw_model`, `firmware`, `role`, `channel`, `last_lat`, `last_long`, `last_altitude`, `is_mqtt_gateway`, `first_seen_us`, `last_seen_us` or `node_id`. Default: by short name."),
+        ("limit" = Option<i64>, Query, description = "Page size, 1 to 1000; beyond those, the nearest. Default: every node."),
+        ("offset" = Option<i64>, Query, description = "Nodes to skip. Default 0."),
         ("fields" = Option<String>, Query, description = "Only these fields, comma separated; `node_id` always comes."),
     ),
     responses(
-        (status = 200, description = "The nodes", body = Nodes),
-        (status = 400, description = "A parameter is not valid", body = ErrorBody),
+        (status = 200, description = "The nodes", body = Nodes, example = json!({
+            "nodes": [
+                {"node_id": 1234, "short_name": "A", "last_seen_us": 1736370123456789_i64},
+                {"node_id": 5678, "short_name": "B", "last_seen_us": 1736370023456789_i64},
+            ],
+            "total": 596,
+            "limit": 2,
+            "offset": 0,
+        })),
+        (status = 400, description = "`ids`, `search`, `is_mqtt_gateway`, `has_position`, `sort`, `limit`, `offset` or `fields` is not valid", body = ErrorBody),
         (status = 500, description = "They could not be read", body = ErrorBody),
     )
 )]
@@ -263,13 +335,17 @@ pub struct Facets {
     pub total: i64,
     /// For each of `role`, `channel`, `hw_model` and `firmware`, its values
     /// among them, the most common first.
-    #[schema(value_type = Object)]
+    #[schema(value_type = std::collections::HashMap<String, Vec<FacetValue>>)]
     pub facets: BTreeMap<&'static str, Vec<FacetValue>>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct FacetValue {
+    /// The value; null for the nodes without one.
+    #[schema(example = "ROUTER")]
     pub value: Option<String>,
+    /// How many of the nodes have it.
+    #[schema(example = 18)]
     pub count: i64,
 }
 
@@ -277,7 +353,8 @@ pub struct FacetValue {
 ///
 /// How many nodes match the filters of `/nodes`, and how many of them have each
 /// role, channel, hardware and firmware, the most common first: what a list of
-/// nodes needs to offer its filters.
+/// nodes needs to offer its filters, or a chart to sum them up, without
+/// fetching every node. Values as common as each other come by value.
 #[utoipa::path(
     get,
     path = "/nodes/facets",
@@ -295,7 +372,15 @@ pub struct FacetValue {
         ("has_position" = Option<bool>, Query, description = "As in `/nodes`."),
     ),
     responses(
-        (status = 200, description = "The facets", body = Facets),
+        (status = 200, description = "The facets", body = Facets, example = json!({
+            "total": 38,
+            "facets": {
+                "channel": [{"value": "LongFast", "count": 38}],
+                "firmware": [{"value": "2.7.15", "count": 30}, {"value": null, "count": 8}],
+                "hw_model": [{"value": "HELTEC_V3", "count": 25}, {"value": "RAK4631", "count": 13}],
+                "role": [{"value": "CLIENT_BASE", "count": 20}, {"value": "ROUTER", "count": 18}],
+            },
+        })),
         (status = 400, description = "A parameter is not valid", body = ErrorBody),
         (status = 500, description = "They could not be read", body = ErrorBody),
     )

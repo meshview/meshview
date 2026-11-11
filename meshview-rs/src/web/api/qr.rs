@@ -32,17 +32,27 @@ const CONTACT_URL: &str = "https://meshtastic.org/v/#";
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct Contact {
+    /// The node number.
+    #[schema(example = 1234)]
     pub node_id: i64,
+    /// Its long name, as the database knows it.
+    #[schema(example = "Alice")]
     pub long_name: Option<String>,
+    /// Its short name.
+    #[schema(example = "A")]
     pub short_name: Option<String>,
+    /// Its role, as Meshtastic names it.
+    #[schema(example = "CLIENT")]
     pub role: Option<String>,
     /// The public key, in base64, from the node's latest node info.
+    #[schema(example = "MCowBQYDK2VuAyEAlz7Wq8yZK9Z0r8yY2c3k3o4P5Q6R7S8T9U0V1W2X3Y4=")]
     pub public_key: Option<String>,
     /// Whether its node info packets disagree about its key. One of them may
     /// be forged, so then no contact is offered.
     pub public_key_conflict: bool,
     /// The contact, as the link the Meshtastic apps import; none without a key
     /// or with conflicting ones.
+    #[schema(example = "https://meshtastic.org/v/#BASE64URL_CONTACT")]
     pub meshtastic_url: Option<String>,
 }
 
@@ -62,6 +72,11 @@ fn user_id(node_id: i64) -> String {
 /// code of. There is none when the node has sent no public key, which current
 /// apps refuse a contact without and older firmware would erase the key it has
 /// for, nor when its packets disagree about its key.
+///
+/// The answer is JSON, not an image: the QR code is for the client to draw
+/// from `meshtastic_url`. That link holds a `SharedContact` protobuf, in
+/// base64url, made of the node's number and what the database knows of it:
+/// names, hardware, role and key, never marked as verified.
 #[utoipa::path(
     get,
     path = "/node/{node_id}/qr",
