@@ -22,7 +22,8 @@ each checked against the Python version's behaviour before it is called done.
 | MQTT over TLS | Done (new in meshview-rs) |
 | Probes, API reference, redirects from the unversioned API | Done |
 | Clean shutdown | Done |
-| Daily cleanup, backups and snapshots | Not yet: their settings are accepted and not acted on |
+| Daily cleanup and snapshot | Done, identical databases side by side with Python |
+| Consistent backups (`meshview-rs backup`) | Done (new in meshview-rs); the Python version's scheduled backups are deprecated |
 | API endpoints | Not yet |
 | Web pages | Not yet |
 | Coverage prediction | Later |

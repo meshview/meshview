@@ -182,35 +182,49 @@ The broker the ingester reads the mesh from. Needed by `run` and `ingest`.
 
 ### `[cleanup]`
 
-**Not acted on yet**: the daily cleanup and backups are not ported.
+The daily cleanup, run by the writer (`run` or `ingest`). See
+[Ingestion](ingestion.md#daily-jobs).
 
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `enabled` | boolean | `false` | Delete old data daily. |
 | `days_to_keep` | whole number | `14` | How many days of data to keep. |
-| `hour` | whole number | `2` | Hour of the daily cleanup, local time (0 to 23). |
+| `hour` | whole number | `2` | Hour of the daily cleanup, [local time](#local-time) (0 to 23). |
 | `minute` | whole number | `0` | Minute of the daily cleanup (0 to 59). |
-| `vacuum` | boolean | `false` | Run SQLite's `VACUUM` after cleaning up. |
-| `backup_enabled` | boolean | `false` | Back the database up daily, whether or not cleanup is on. |
-| `backup_dir` | string | `"./backups"` | Where backups go. |
-| `backup_hour` | whole number | `hour` | Hour of the daily backup, local time. |
-| `backup_minute` | whole number | `minute` | Minute of the daily backup. |
+| `vacuum` | boolean | `false` | Run SQLite's `VACUUM` after cleaning up, giving the space freed back to the filesystem. |
+| `backup_enabled` | boolean | | **Deprecated**, ignored with a warning, and removed in the next version: meshview-rs does not back up by itself. Use [`meshview-rs backup`](deployment.md#backups). |
+| `backup_dir` | string | | **Deprecated**, as `backup_enabled`. |
+| `backup_hour` | whole number | | **Deprecated**, as `backup_enabled`. |
+| `backup_minute` | whole number | | **Deprecated**, as `backup_enabled`. |
 
 ### `[snapshot]`
 
-**Not acted on yet**: the daily snapshot is not ported.
+The daily snapshot, run by the writer whether or not cleanup is enabled. See
+[Ingestion](ingestion.md#daily-jobs).
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `hour` | whole number | `1` | Hour, local time, at which the previous complete UTC day's figures are recorded. |
+| `hour` | whole number | `1` | Hour, [local time](#local-time), at which the previous complete UTC day's figures are recorded. |
 | `minute` | whole number | `0` | Minute of it. |
+
+### Local time
+
+The daily jobs run at a time of day in the local time zone, as in the Python
+version. That is the `TZ` environment variable (`TZ=Europe/Madrid`), or the
+system's time zone, or UTC when there is neither, which is the case in the
+container image unless `TZ` is set. The time zone database is built into
+meshview-rs, so `TZ` works even where the system has none installed. Daylight
+saving time is followed: a job set inside the hour a clock skips runs at the
+first time after it, and one inside the hour a clock repeats runs once.
 
 ### `[logging]`
 
-**Not acted on yet.** Logging is controlled with `RUST_LOG` for now, as in
-`RUST_LOG=debug` or `RUST_LOG=meshview_rs::ingest=debug`; the default is `info`.
+Everything is logged to standard output, for the process's supervisor (systemd,
+the container runtime) to collect; a log file is that supervisor's to keep. How
+much is logged is controlled with `RUST_LOG`, as in `RUST_LOG=debug` or
+`RUST_LOG=meshview_rs::ingest=debug`; the default is `info`.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `access_log` | boolean | `false` | Log every HTTP request. |
-| `db_cleanup_logfile` | string | `"dbcleanup.log"` | File the cleanup logs to. |
+| `access_log` | boolean | `false` | Log every HTTP request. **Not acted on yet**: the web server is not ported. |
+| `db_cleanup_logfile` | string | | **Deprecated**, ignored with a warning, and removed in the next version: the cleanup logs where everything else does. |

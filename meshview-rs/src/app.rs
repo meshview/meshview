@@ -11,6 +11,7 @@
 use crate::config::{Config, DatabaseUrl};
 use crate::db::{self, Compatibility};
 use crate::ingest::{self, store::Store};
+use crate::jobs;
 use crate::state::{AppState, CHECK_DATABASE, CHECK_MQTT, Readiness};
 use crate::web;
 use anyhow::{Context, Result, bail};
@@ -90,6 +91,11 @@ pub async fn run_until(
     } else {
         None
     };
+    let jobs = if role.ingests() {
+        Some(jobs::Settings::from_config(&config)?)
+    } else {
+        None
+    };
 
     // The broker counts towards readiness only for a process that does nothing
     // else. One that also serves the web can still serve while the broker is
@@ -131,6 +137,17 @@ pub async fn run_until(
     // however the ingester ends.
     let writer = prepared.as_ref().ok().cloned().flatten();
 
+    // The daily jobs run beside the ingester, on the same writer, which is what
+    // keeps them from writing at the same time as it.
+    let jobs = match (&writer, jobs) {
+        (Some(writer), Some(settings)) => Some(tokio::spawn(jobs::run(
+            settings,
+            writer.clone(),
+            stopping.clone(),
+        ))),
+        _ => None,
+    };
+
     let result = match (prepared, mqtt) {
         (Ok(Some(writer)), Some(settings)) => match Store::new(writer).await {
             Ok(store) => ingest::run(settings, store, readiness, stopping.clone()).await,
@@ -160,12 +177,28 @@ pub async fn run_until(
     if let Some(reader) = state_reader.get().cloned() {
         db::sqlite::close_reader(reader).await;
     }
+    if let Some(jobs) = jobs {
+        // A job in the middle of something is abandoned, which rolls it back.
+        let _ = jobs.await;
+    }
     if let Some(writer) = writer {
         db::sqlite::close_writer(writer).await;
     }
     info!("stopped");
 
     result
+}
+
+/// Copies the database to `output`, for a scheduler outside meshview-rs to keep.
+pub async fn backup(config: &Config, output: &std::path::Path) -> Result<()> {
+    let DatabaseUrl::Sqlite(database) = config.database()?;
+    let size = db::sqlite::backup(&database, output).await?;
+    info!(
+        "{} copied to {} ({size} bytes)",
+        database.display(),
+        output.display()
+    );
+    Ok(())
 }
 
 /// Gets the database where this role needs it, and says so through readiness.

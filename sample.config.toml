@@ -129,26 +129,23 @@ connection_string = "sqlite:///packets.db"
 enabled = false
 # Number of days to keep records in the database.
 days_to_keep = 14
-# Daily cleanup time in the server's local timezone.
+# Daily cleanup time, local time (the TZ environment variable, UTC without it).
 hour = 2
 minute = 0
 # Run SQLite VACUUM after cleanup.
 vacuum = false
 
-# SQLite database backups (independent of cleanup).
-backup_enabled = false
-# Directory to store backups in (relative or absolute).
-backup_dir = "./backups"
-# Daily backup time in the server's local timezone; the cleanup's when not set.
-# backup_hour = 2
-# backup_minute = 0
+# The Python version's backup_enabled, backup_dir, backup_hour and backup_minute
+# are deprecated: meshview-rs does not back up by itself. They are accepted, with
+# a warning, until the next version. Run `meshview-rs backup <file>` from your
+# own scheduler instead; see docs/deployment.md.
 
 # -------------------------
 # Daily Snapshot Configuration
 # -------------------------
 [snapshot]
-# Daily snapshot time in the server's local timezone. Each capture summarizes
-# the previous complete UTC day.
+# Daily snapshot time, local time (the TZ environment variable, UTC without it).
+# Each capture records the previous complete UTC day.
 hour = 1
 minute = 0
 
@@ -158,5 +155,5 @@ minute = 0
 [logging]
 # HTTP access logs from the web server.
 access_log = false
-# Database cleanup log file.
-db_cleanup_logfile = "dbcleanup.log"
+# The Python version's db_cleanup_logfile is deprecated: everything is logged to
+# standard output. It is accepted, with a warning, until the next version.

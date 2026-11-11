@@ -40,6 +40,8 @@ are. What changes:
   nothing used.
 - An index the Python models declared but no migration ever created is added:
   `idx_traceroute_packet_id`, for looking traceroutes up by packet.
+- A table of meshview-rs's own is added: `job_run`, the record of what the daily
+  cleanup and snapshot did, which the Python version kept in a JSON file.
 - meshview-rs records its own migrations in `_sqlx_migrations`.
 
 ### Going back
@@ -93,6 +95,13 @@ sections and keys are the same, so converting is a matter of syntax:
 | Empty values can go | `announcement =` | `announcement = ""`, or nothing |
 | Comments | `# ...` or `; ...` | `# ...` only |
 
+The Python version's backup settings (`[cleanup] backup_enabled`, `backup_dir`,
+`backup_hour`, `backup_minute`) and `[logging] db_cleanup_logfile` are
+deprecated: they are accepted with a warning and ignored, and will be removed in
+the next version. Leave them out. Backups are made with `meshview-rs backup`
+from a scheduler (see [Deployment](deployment.md#backups)), and the cleanup logs
+where everything else does.
+
 Two things that the INI file let pass are errors now:
 
 - **Unknown keys.** The Python version warned about unknown keys in `[site]` and
@@ -118,11 +127,14 @@ with every key, and [Configuration](configuration.md) has them all.
 | Probes | `/health` | `/livez` and `/readyz`, for orchestrators; `/health` comes back with the API |
 | MQTT over TLS | no | yes |
 | Stopping | the database's side files can be left behind | stops in order and leaves only the database file |
+| Backups | scheduled, copying the live file | `meshview-rs backup`, a consistent copy, for your scheduler to run |
+| Last cleanup | a JSON file beside the cleanup log | the `job_run` table |
+| Cleanup log | a file of its own | standard output, with everything else |
 | Stored packets | — | the same, byte for byte. See [Ingestion](ingestion.md). |
 
 The port, 8081, and the database file, `packets.db`, are the same.
 
-Not ported yet, so missing for now: the web pages and the API endpoints, the
-daily cleanup, backups and snapshots, and coverage prediction. Their settings
+Not ported yet, so missing for now: the web pages and the API endpoints, and
+coverage prediction. Their settings
 are already accepted, so the configuration does not need to change when they
 arrive.

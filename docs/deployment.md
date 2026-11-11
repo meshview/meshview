@@ -11,6 +11,9 @@ One binary does everything, and what a process does is its role:
 | `meshview-rs serve` | no | yes | never |
 | `meshview-rs migrate` | no | no | yes, then exits |
 
+And `meshview-rs backup <file>`, which is not a role but a tool: it copies the
+database, consistently, while it is in use, and exits. See [Backups](#backups).
+
 `run` is the simple case: one process, one database. Splitting it into one
 `ingest` and any number of `serve` is what lets several web servers share what
 a single ingester writes.
@@ -82,9 +85,60 @@ them over.
 
 A process that is killed instead (`SIGKILL`, or out of memory) loses at most the
 messages it had not stored yet, and leaves the side files for the next start to
-recover from. Copying a database while it is in use, or with side files beside
-it, copies only part of it: back up a stopped database, or use SQLite's own
-backup.
+recover from.
+
+Anything else that opens the database also makes the side files, and leaves them
+if it is the last to close and cannot remove them: the `sqlite3` shell, a script
+reading it, even read only. They are as harmless as the ones above.
+
+## Backups
+
+meshview-rs does not schedule backups: when, where to, how many to keep and how
+to get them off the machine are a backup system's job, and there are good ones.
+What it does is the one part such a system cannot do well by itself, which is
+take a **consistent copy of a database that is being written**:
+
+```sh
+meshview-rs backup /backups/packets-$(date +%Y%m%d-%H%M%S).db
+```
+
+It copies the database the configuration names, with SQLite's `VACUUM INTO`: a
+complete, compacted copy as of one moment, made while `ingest` goes on writing,
+with nothing stopped. Copying the file itself, with `cp`, `rsync` or a volume
+snapshot, does not give that: with WAL the latest writes may not even be in the
+file yet, and a copy taken mid-write may not open at all.
+
+- The copy is written to `<file>.partial` and moved into place once whole, so a
+  file with the name asked for is always a complete copy.
+- An existing file is never overwritten: naming each copy is the scheduler's
+  part, and so is deleting old ones.
+- It has to run on the machine that has the database, like any other process
+  using it (see [One machine](#one-machine)).
+- It needs no running meshview-rs: it works as well on a stopped database.
+
+The copy is a plain SQLite database that meshview-rs opens as it is: restoring
+is stopping meshview-rs, putting the copy where the database was, and starting
+it again. Compressing and encrypting it are the backup system's part too.
+
+With cron, keeping a week:
+
+```cron
+15 3 * * *  meshview-rs --config /etc/meshview-rs/config.toml backup /var/backups/meshview/packets-$(date +\%u).db.new && mv /var/backups/meshview/packets-$(date +\%u).db.new /var/backups/meshview/packets-$(date +\%u).db
+```
+
+or as a step before restic, borg or whatever already backs the machine up, so
+that what it picks up is a consistent copy rather than the live file.
+
+Continuous replication, with [Litestream](https://litestream.io) for one, is the
+other way to go, for losing minutes rather than a day. It replicates the
+write-ahead log as it is written, beside meshview-rs. meshview-rs only asks for a
+checkpoint of its own when it stops, which should leave Litestream in charge of
+them, but this combination has not been tested yet: check Litestream's
+documentation for what it needs from the applications writing the database.
+
+The Python version's own backups (`[cleanup] backup_enabled` and the keys that go
+with it) are deprecated: they are accepted with a warning, do nothing, and will
+be removed in the next version.
 
 ## The binary
 
@@ -139,6 +193,8 @@ The rules above translate into:
   they are on one node; pod affinity keeps them there.
 - `terminationGracePeriodSeconds` of at least 10, so that the clean stop has
   time to finish.
+- Backups as a `CronJob` on that same node, writing to a volume the backup
+  system takes them from (see [below](#backing-up-from-kubernetes)).
 
 ```yaml
 apiVersion: apps/v1
@@ -214,6 +270,51 @@ The `serve` pods mount the volume read-write even though they only read: SQLite
 readers still need the directory to be writable for the `-shm` file. The
 `meshview-config` secret holds the `config.toml`; a `ConfigMap` does as well if
 nothing in it is secret, and environment variables can replace it altogether.
+
+### Backing up from Kubernetes
+
+A `CronJob` running `meshview-rs backup`, kept on the ingester's node, writing to
+a volume of its own for the backup system to collect:
+
+```yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: meshview-backup
+spec:
+  schedule: "15 3 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          securityContext: {fsGroup: 1000}
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels: {app: meshview, role: ingest}
+                  topologyKey: kubernetes.io/hostname
+          containers:
+            - name: backup
+              image: ghcr.io/ogarcia/meshview-rs:latest
+              command: [sh, -c]
+              args: ["meshview-rs backup /backups/packets-$(date +%Y%m%d).db"]
+              volumeMounts:
+                - {name: data, mountPath: /data}
+                - {name: config, mountPath: /data/config.toml, subPath: config.toml, readOnly: true}
+                - {name: backups, mountPath: /backups}
+          volumes:
+            - name: data
+              persistentVolumeClaim: {claimName: meshview-data}
+            - name: config
+              secret: {secretName: meshview-config}
+            - name: backups
+              persistentVolumeClaim: {claimName: meshview-backups}
+```
+
+### Updating
 
 Updating to a version with a new migration needs no coordination: the new
 `ingest` migrates on start, and `serve` pods of the new version wait, not ready,

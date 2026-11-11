@@ -186,9 +186,11 @@ pub struct Cleanup {
     pub hour: u8,
     pub minute: u8,
     pub vacuum: bool,
-    pub backup_enabled: bool,
-    pub backup_dir: String,
-    /// The cleanup's hour and minute, when not given.
+    /// Deprecated, and ignored: meshview-rs does not back up by itself. Kept
+    /// for one version so that a converted Python configuration still starts,
+    /// with a warning; see [`Config::deprecations`].
+    pub backup_enabled: Option<bool>,
+    pub backup_dir: Option<String>,
     pub backup_hour: Option<u8>,
     pub backup_minute: Option<u8>,
 }
@@ -201,8 +203,8 @@ impl Default for Cleanup {
             hour: 2,
             minute: 0,
             vacuum: false,
-            backup_enabled: false,
-            backup_dir: "./backups".into(),
+            backup_enabled: None,
+            backup_dir: None,
             backup_hour: None,
             backup_minute: None,
         }
@@ -224,20 +226,13 @@ impl Default for Snapshot {
 }
 
 /// `[logging]`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Logging {
     pub access_log: bool,
-    pub db_cleanup_logfile: String,
-}
-
-impl Default for Logging {
-    fn default() -> Self {
-        Self {
-            access_log: false,
-            db_cleanup_logfile: "dbcleanup.log".into(),
-        }
-    }
+    /// Deprecated, and ignored: every log goes to standard output, where the
+    /// process's supervisor collects it. Kept for one version, with a warning.
+    pub db_cleanup_logfile: Option<String>,
 }
 
 impl Config {
@@ -293,6 +288,42 @@ impl Config {
         let mut table: Table = toml::from_str(text)?;
         apply_env(&mut table, vars)?;
         Ok(Value::Table(table).try_into()?)
+    }
+
+    /// What in this configuration is deprecated, as warnings to log at start-up.
+    ///
+    /// Deprecated keys are still accepted so that a configuration converted from
+    /// the Python version starts, but they do nothing, and they go in the next
+    /// version: a key that is accepted for ever is one nobody ever removes.
+    pub fn deprecations(&self) -> Vec<String> {
+        let mut warnings = Vec::new();
+
+        let backup = [
+            ("backup_enabled", self.cleanup.backup_enabled.is_some()),
+            ("backup_dir", self.cleanup.backup_dir.is_some()),
+            ("backup_hour", self.cleanup.backup_hour.is_some()),
+            ("backup_minute", self.cleanup.backup_minute.is_some()),
+        ];
+        for (key, given) in backup {
+            if given {
+                warnings.push(format!(
+                    "[cleanup] {key} is deprecated and ignored, and will be removed in the next \
+                     version: meshview-rs does not back up by itself. Run `meshview-rs backup \
+                     <file>` from your scheduler instead."
+                ));
+            }
+        }
+
+        if self.logging.db_cleanup_logfile.is_some() {
+            warnings.push(
+                "[logging] db_cleanup_logfile is deprecated and ignored, and will be removed in \
+                 the next version: the cleanup logs where everything else does. Collect the \
+                 process's output to keep it in a file."
+                    .to_string(),
+            );
+        }
+
+        warnings
     }
 
     /// The file this came from, or none when it is defaults and environment only.
@@ -541,6 +572,26 @@ mod tests {
     }
 
     #[test]
+    fn deprecated_keys_are_accepted_with_a_warning_only_when_given() {
+        assert!(Config::default().deprecations().is_empty());
+
+        let config = Config::parse(
+            "[cleanup]\nbackup_enabled = true\nbackup_dir = \"/b\"\n\
+             [logging]\ndb_cleanup_logfile = \"x.log\"\n",
+        )
+        .unwrap();
+        let warnings = config.deprecations();
+
+        assert_eq!(warnings.len(), 3);
+        assert!(
+            warnings
+                .iter()
+                .all(|w| w.contains("removed in the next version"))
+        );
+        assert!(warnings[0].contains("meshview-rs backup"));
+    }
+
+    #[test]
     fn an_ini_file_is_pointed_at_the_new_format() {
         let error = Config::load(Path::new("config.ini"), false).unwrap_err();
         assert!(format!("{error:#}").contains("sample.config.toml"));
@@ -552,8 +603,11 @@ mod tests {
     fn every_key() -> BTreeMap<String, Vec<String>> {
         let mut config = Config::default();
         config.mqtt.port = Some(1883);
+        config.cleanup.backup_enabled = Some(false);
+        config.cleanup.backup_dir = Some("./backups".into());
         config.cleanup.backup_hour = Some(2);
         config.cleanup.backup_minute = Some(0);
+        config.logging.db_cleanup_logfile = Some("dbcleanup.log".into());
 
         Table::try_from(config)
             .unwrap()

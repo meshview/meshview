@@ -14,8 +14,9 @@ everything it serves inside it.
 ## Status
 
 Early days. It reads its configuration, takes a Python meshview database over or
-creates one, ingests from MQTT (plain or over TLS), and answers the probes and
-the API reference. The API itself and the web pages are being ported next,
+creates one, ingests from MQTT (plain or over TLS), runs the daily cleanup and
+snapshot, makes consistent backups, and answers the probes and the API
+reference. The API itself and the web pages are being ported next,
 against the behaviour of the Python meshview 4.0.
 
 Ingestion stores what the Python version stores, byte for byte: run side by side
@@ -41,7 +42,8 @@ podman run -d --name meshview -p 8081:8081 -v meshview-data:/data \
 
 One binary, four roles: `run` (the default) ingests and serves; `ingest` and
 `serve` split that, so one ingester can feed several web servers; `migrate`
-brings the database up to date and exits.
+brings the database up to date and exits. And `meshview-rs backup <file>`
+copies the database, consistently, for a scheduler to run.
 
 ## Documentation
 

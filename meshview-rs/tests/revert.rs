@@ -102,7 +102,7 @@ async fn a_schema_changed_since_python_is_refused_untouched() {
     let mut conn = connect(&database, false).await;
     conn.execute(
         "INSERT INTO _sqlx_migrations (version, description, success, checksum, execution_time) \
-         VALUES (3, 'something new', 1, x'00', 0)",
+         VALUES (9999, 'from the future', 1, x'00', 0)",
     )
     .await
     .unwrap();
