@@ -24,9 +24,9 @@ the shape of its answers do not change once published; anything that would break
 a client goes into the next version instead, served beside it.
 
 `v1` is the Python meshview 4.0 API, address for address and answer for answer,
-apart from the [differences](#differences-from-the-python-version) below. Each
-endpoint is checked against the Python version before it is called ported (see
-[Development](development.md#comparing-the-api)).
+apart from the [differences](#differences-from-the-python-version) below. Every
+endpoint was checked against the Python version, on a copy of a real database,
+before it was called ported.
 
 `/health` and `/version` stay where they were, outside any version, as do the
 probes `/livez` and `/readyz` (see [Deployment](deployment.md#probes)).

@@ -3,7 +3,7 @@
 
 use super::error::{ApiError, ErrorBody};
 use super::params::{Params, parse_db_int_any_base};
-use crate::coverage::{self, MODEL, Radio};
+use crate::coverage::{self, Radio};
 use crate::state::AppState;
 use axum::Json;
 use axum::extract::{Path, State};
@@ -202,7 +202,6 @@ pub async fn coverage(
         step_km: python_round(step_km, 3),
         reliability: python_round(reliability, 3),
     };
-    let model = *MODEL;
     let perimeter_mode = params.get("mode").unwrap_or("perimeter") == "perimeter";
 
     // Pure computation, thousands of model runs: off the threads serving
@@ -212,10 +211,10 @@ pub async fn coverage(
             Coverage::Perimeter {
                 mode: "perimeter",
                 threshold_dbm,
-                perimeter: coverage::perimeter(model, &radio, python_round(threshold_dbm, 1)),
+                perimeter: coverage::perimeter(&radio, python_round(threshold_dbm, 1)),
             }
         } else {
-            let points = coverage::heatmap(model, &radio);
+            let points = coverage::heatmap(&radio);
             Coverage::Heatmap {
                 mode: "heatmap",
                 min_dbm: points.iter().map(|p| p.2).fold(DEFAULT_MIN_DBM, f64::min),

@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Óscar García Amor <ogarcia@connectical.com>
 
-//! The API endpoints, against a small database. That they answer what the
-//! Python version answers is checked against it with scripts/compare-api.py;
-//! these keep them answering it.
+//! The API endpoints, against a small database. They were checked to answer
+//! what the Python version answered; these keep them answering it.
 
 use axum::Router;
 use axum::body::Body;

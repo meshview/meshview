@@ -3,8 +3,8 @@
 The ingester (`run` or `ingest`) subscribes to the configured MQTT topics, opens
 each Meshtastic message it receives, and stores it. What it stores is what the
 Python meshview 4.0 stores from the same traffic, row for row and byte for byte:
-that has been checked by running both side by side on a public broker and
-comparing the databases (see [Development](development.md#comparing-with-the-python-version)).
+that was checked by running both side by side on a public broker and comparing
+the databases.
 
 ## The connection
 
