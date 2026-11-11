@@ -96,9 +96,9 @@ RUN addgroup -g 10001 meshview \
  && mkdir -p /data \
  && chown meshview:meshview /data
 
-# Four slashes: SQLAlchemy's way of writing an absolute path, which is the form
-# every existing configuration uses.
-ENV MESHVIEW_DATABASE__CONNECTION_STRING=sqlite:////data/packets.db
+# The database is the default one, packets.db in the working directory: /data.
+# It is not set in the environment, which would win over a connection_string in
+# the configuration file and quietly open another database than the one named.
 
 # No VOLUME for /data. It would look like protection for the database while
 # actually creating an unnamed volume that goes away with the next container;

@@ -148,6 +148,7 @@ with every key, and [Configuration](configuration.md) has them all.
 | Traceroute graph | `/graph/traceroute/{id}`, an SVG drawn by Graphviz | redirects to the traceroute's page, `/traceroute/{id}`, which draws it |
 | Scripts and styles | sent as they are | compressed for browsers that take it |
 | Channel colours on the map | the presets' in `config.ini`'s `[map_channel_colors]`, without the 2.8 ones and with `LongModerate` for the channel the firmware calls `LongMod` | built in for every preset, `[map_channel_colors]` only for what you change: the Python sample's can be left out |
+| Container image | the database in `/var/lib/meshview`, UID 10001 | the database in `/data`, the working directory, as the same UID: mount the Python image's volume at `/data`, or keep it where it is and name it in `connection_string` |
 | Coverage help | `docs/COVERAGE*.md`, fetched and rendered when it is opened, also served at `/docs/…` | part of the node page, translated with it |
 | Probes | `/health` | `/livez` and `/readyz`, for orchestrators, beside `/health` |
 | MQTT over TLS | no | yes |
