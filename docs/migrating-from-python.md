@@ -42,12 +42,38 @@ are. What changes:
   `idx_traceroute_packet_id`, for looking traceroutes up by packet.
 - meshview-rs records its own migrations in `_sqlx_migrations`.
 
-### There is no way back
+### Going back
 
 Once meshview-rs has taken a database over, the Python meshview cannot open it
-again: without `alembic_version` it would try to build its schema from scratch
-over a database that already has one. Going back to the Python version means
-restoring the backup from step 2, and losing what was ingested since.
+as it is: without `alembic_version` it would try to build its schema from
+scratch over a database that already has one.
+
+`scripts/revert-to-python.py` gives it back. It comes **with no warranty, and no
+responsibility is taken for what it does to your data**: whatever it promises,
+back the database up before running it.
+
+```sh
+scripts/revert-to-python.py packets.db        # only checks, changes nothing
+scripts/revert-to-python.py --yes packets.db  # gives it back
+```
+
+It puts the Python version's bookkeeping back exactly as Python creates it, and
+removes what meshview-rs added, in a single transaction: it either all happens
+or none of it does. The data is not touched, so what meshview-rs ingested in the
+meantime is kept. It needs Python 3 and nothing else.
+
+It only works **as long as meshview-rs has not changed the schema** beyond
+taking the database over. It refuses, and changes nothing, when:
+
+- meshview-rs has applied a migration it does not know how to undo, which means
+  the schema has moved on from the Python version's: the way back is then a
+  backup taken before that version of meshview-rs;
+- the database is in use, or meshview-rs was not stopped cleanly (its `-wal`
+  file has data in it): stop every process using it first;
+- the database is already the Python version's, or not meshview's at all.
+
+Every meshview-rs release says in its notes whether it adds a migration, and
+from which version on the script refuses.
 
 ## Converting `config.ini`
 
