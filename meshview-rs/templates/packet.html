@@ -1,0 +1,496 @@
+{% extends "base.html" %}
+{% block theme %}light{% endblock %}
+{% block body_class %}mesh-data-page mesh-packet-page{% endblock %}
+
+
+{% block head %}
+<script src="/static/portmaps.js"></script>
+{% endblock %}
+
+{% block css %}
+{% include "data-page-styles.html" %}
+<style>
+.packet-card { background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; overflow:hidden; color:var(--mesh-text); }
+.packet-card .card-header { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; background:var(--mesh-soft); padding:18px 22px; border-bottom:1px solid var(--mesh-border); color:var(--mesh-primary-dark); font-size:15px; font-weight:600; }
+.packet-card .card-header small { font-size:11px; font-weight:400; }
+.packet-card .card-body { padding:24px; }
+.packet-card dl { display:grid; grid-template-columns:180px minmax(0,1fr); gap:16px 24px; margin:0; font-size:13px; }
+.packet-card dt { color:var(--mesh-muted); font-weight:500; }
+.packet-card dd { margin:0; overflow-wrap:anywhere; }
+.packet-card pre { padding:14px; background:var(--mesh-stripe); border:1px solid var(--mesh-border); border-radius:6px; color:var(--mesh-text); font-size:12px; white-space:pre-wrap; overflow-wrap:anywhere; margin:0; }
+#map { display:none; }
+.source-marker { width:24px; height:24px; background:#f4484866; border:3px solid #e33; border-radius:50%; box-shadow:0 0 6px #f007; }
+#seen-container { background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; overflow:hidden; }
+#seen-container h5 { padding:16px 20px; margin:0!important; color:var(--mesh-text); font-size:15px; }
+.seen-table { margin:0; }
+/* "Seen by" cards: gateway and time / RSSI, SNR, channel and hops; hop groups stay as headings. */
+.seen-table.is-cards { padding:12px; }
+.mesh-data-page .seen-table.card-table.is-cards tbody tr.hop-group { grid-column:1 / -1; display:block; padding:6px 2px 0; border:0; background:none; }
+.mesh-data-page .seen-table.card-table.is-cards tbody tr.hop-group td { padding:0!important; border:0!important; background:none!important; }
+.mesh-data-page .seen-table.card-table.is-cards tr.seen-row { grid-template-columns:auto auto minmax(0,1fr) auto; grid-template-areas:"gw gw gw time" "rssi snr chan hops"; }
+.mesh-data-page .seen-table.card-table.is-cards .c-gw { grid-area:gw; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mesh-data-page .seen-table.card-table.is-cards .c-time { grid-area:time; text-align:right; white-space:nowrap; font-size:12px; color:var(--mesh-muted); }
+.mesh-data-page .seen-table.card-table.is-cards :is(.c-rssi,.c-snr) { font-size:13px; white-space:nowrap; }
+.mesh-data-page .seen-table.card-table.is-cards .c-rssi { grid-area:rssi; }
+.mesh-data-page .seen-table.card-table.is-cards .c-snr { grid-area:snr; }
+.mesh-data-page .seen-table.card-table.is-cards :is(.c-rssi,.c-snr)::before { content:attr(data-label) " "; color:var(--mesh-muted); }
+.mesh-data-page .seen-table.card-table.is-cards .c-channel { grid-area:chan; font-size:12px; color:var(--mesh-muted); }
+.mesh-data-page .seen-table.card-table.is-cards .c-hops { grid-area:hops; justify-self:end; font-size:12px; color:var(--mesh-muted); }
+#loading { color:var(--mesh-muted); padding:24px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; }
+@media(max-width:700px) { .packet-card dl { grid-template-columns:minmax(0,1fr); gap:6px; } .packet-card dd { margin-bottom:14px; } .packet-card .card-body { padding:18px; } }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container packet-container">
+<header class="data-heading is-compact"><div class="data-title"><h1>{{ "Packet details" | tr }}</h1></div><div class="data-actions"><a class="mesh-secondary-button" href="/firehose">{{ "Live packets ↗" | tr }}</a></div></header>
+
+    <div id="loading" class="is-loading" data-translate-lang="loading">Loading packet information...</div>
+    <div id="packet-card" class="packet-card d-none"></div>
+
+    <div id="map"></div>
+
+    <div id="seen-container" class="mt-4 d-none">
+        <h5 >
+            <span class="ti ti-access-point" aria-hidden="true"></span> <span data-translate-lang="seen_by">Seen By</span>
+            <span id="seen-count" style="color:var(--mesh-primary);"></span>
+        </h5>
+
+        <div class="table-responsive">
+            <table class="table table-sm seen-table card-table">
+                <thead>
+                    <tr>
+                        <th data-translate-lang="gateway">Gateway</th>
+                        <th data-translate-lang="rssi">RSSI</th>
+                        <th data-translate-lang="snr">SNR</th>
+                        <th data-translate-lang="hops">Hops</th>
+                        <th data-translate-lang="channel">Channel</th>
+                        <th data-translate-lang="time">Time</th>
+                    </tr>
+                </thead>
+                <tbody id="seen-table-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+
+/* ======================================================
+   PACKET PAGE TRANSLATION
+   ====================================================== */
+let packetTranslations = {};
+
+async function loadTranslationsPacket() {
+    try {
+        const cfg = await window._siteConfigPromise;
+        const lang = cfg?.site?.language || "en";
+        const res = await fetch(`/api/v1/lang?lang=${lang}&section=packet`);
+        packetTranslations = await res.json();
+        applyTranslationsPacket(packetTranslations);
+    } catch (err) {
+        console.error("Packet translations failed:", err);
+    }
+}
+
+function applyTranslationsPacket(dict, root = document) {
+    root.querySelectorAll("[data-translate-lang]").forEach(el => {
+        const key = el.dataset.translateLang;
+        if (dict[key]) el.textContent = dict[key];
+    });
+}
+
+/* ======================================================
+   PACKET PAGE MAIN
+   ====================================================== */
+
+document.addEventListener("DOMContentLoaded", async () => {
+
+    await loadTranslationsPacket();  // <-- IMPORTANT
+
+    const packetCard    = document.getElementById("packet-card");
+    const loading       = document.getElementById("loading");
+    const mapDiv        = document.getElementById("map");
+    const seenContainer = document.getElementById("seen-container");
+    const seenTableBody = document.getElementById("seen-table-body");
+    const seenCountSpan = document.getElementById("seen-count");
+
+    /* ---------------------------------------------
+       Identify packet ID
+    ----------------------------------------------*/
+    const match = window.location.pathname.match(/\/packet\/(\d+)/);
+    if (!match) {
+        loading.textContent = packetTranslations.invalid_url || MeshI18n.t("Invalid packet URL");
+        return;
+    }
+    const packetId = match[1];
+
+    /* PORT LABELS (NOT TRANSLATED) */
+    const PORT_NAMES = window.PORT_LABEL_MAP;
+
+    /* ---------------------------------------------
+       Fetch packet
+    ----------------------------------------------*/
+    const packetRes = await fetch(`/api/v1/packets?packet_id=${packetId}`);
+    const packetData = await packetRes.json();
+    if (!packetData.packets.length) {
+        loading.textContent = packetTranslations.not_found || MeshI18n.t("Packet not found.");
+        return;
+    }
+    const p = packetData.packets[0];
+
+    /* ---------------------------------------------
+       Load the gateways that heard it, then only the nodes involved
+       (sender, destination, gateways) for names & positions
+    ----------------------------------------------*/
+    const seenRes  = await fetch(`/api/v1/packets_seen/${packetId}`);
+    const seenData = await seenRes.json();
+    const seenList = seenData.seen ?? [];
+    const involvedNodes = await meshFetchNodes([p.from_node_id, p.to_node_id, ...seenList.map(s => s.node_id)])
+        .catch(err => { console.error("Failed to load nodes", err); return []; });
+    const nodesData = { nodes: involvedNodes };
+    const nodeLookup = {};
+    (nodesData.nodes || []).forEach(n => nodeLookup[n.node_id] = n);
+
+    const fromNodeObj = nodeLookup[p.from_node_id];
+    const toNodeObj   = nodeLookup[p.to_node_id];
+
+    const fromNodeLabel = escapeHtml(fromNodeObj?.long_name || p.from_node_id);
+
+    const toNodeLabel =
+        p.to_node_id == 4294967295
+            ? (packetTranslations.all_broadcast || MeshI18n.t("All"))
+            : escapeHtml(toNodeObj?.long_name || p.to_node_id);
+
+    /* ---------------------------------------------
+       Parse payload for lat/lon
+    ----------------------------------------------*/
+    let lat = null, lon = null;
+    const parsed = {};
+
+    if (p.payload?.includes(":")) {
+        p.payload.split("\n").forEach(line => {
+            const [k, v] = line.split(":").map(x=>x.trim());
+            if (k && v !== undefined) {
+                parsed[k] = v;
+                if (k === "latitude_i") lat = Number(v) / 1e7;
+                if (k === "longitude_i") lon = Number(v) / 1e7;
+            }
+        });
+    }
+
+    /* ---------------------------------------------
+       Render card
+    ----------------------------------------------*/
+    const time = p.import_time_us
+        ? new Date(p.import_time_us / 1000).toLocaleString(MeshI18n.language)
+        : "—";
+
+    const telemetryExtras = [];
+    if (parsed.PDOP) telemetryExtras.push(`PDOP: ${parsed.PDOP}`);
+    if (parsed.sats_in_view) telemetryExtras.push(`Sats: ${parsed.sats_in_view}`);
+    if (parsed.ground_speed) telemetryExtras.push(`Speed: ${parsed.ground_speed}`);
+    if (parsed.altitude)     telemetryExtras.push(`Altitude: ${parsed.altitude}`);
+
+    packetCard.innerHTML = `
+        <div class="card-header">
+            <span>
+                <span data-translate-lang="packet_id_label">${packetTranslations.packet_id_label || MeshI18n.t("Packet ID:")}</span>
+                <i>${p.id}</i>
+            </span>
+            <small>${time}</small>
+        </div>
+
+        <div class="card-body">
+            <dl>
+                <dt data-translate-lang="from_node">${packetTranslations.from_node || MeshI18n.t("From Node")}:</dt>
+                <dd><a href="/node/${p.from_node_id}">${fromNodeLabel}</a></dd>
+
+                <dt data-translate-lang="to_node">${packetTranslations.to_node || MeshI18n.t("To Node")}:</dt>
+                <dd>${
+                    p.to_node_id === 4294967295
+                        ? `<i data-translate-lang="all_broadcast">${packetTranslations.all_broadcast || MeshI18n.t("All")}</i>`
+                        : p.to_node_id === 1
+                            ? `<i data-translate-lang="direct_to_mqtt">${packetTranslations.direct_to_mqtt || MeshI18n.t("Direct to MQTT")}</i>`
+                            : `<a href="/node/${p.to_node_id}">${toNodeLabel}</a>`
+                }</dd>
+
+                <dt data-translate-lang="channel">${packetTranslations.channel || MeshI18n.t("Channel")}:</dt>
+                <dd>${escapeHtml(p.channel ?? "—")}</dd>
+
+                <dt data-translate-lang="port">${packetTranslations.port || MeshI18n.t("Port")}:</dt>
+                <dd><i>${PORT_NAMES[p.portnum] || MeshI18n.t("UNKNOWN APP")}</i> (${p.portnum})</dd>
+
+                <dt data-translate-lang="raw_payload">${packetTranslations.raw_payload || MeshI18n.t("From Raw Payload")}:</dt>
+                <dd><pre>${escapeHtml(p.payload ?? "—")}</pre></dd>
+
+                ${
+                    telemetryExtras.length
+                    ? `<dt data-translate-lang="decoded_telemetry">${packetTranslations.decoded_telemetry || MeshI18n.t("Decoded Telemetry")}</dt>
+                       <dd><pre>${escapeHtml(telemetryExtras.join("\n"))}</pre></dd>`
+                    : ""
+                }
+
+                ${
+                    lat && lon
+                    ? `<dt data-translate-lang="location">${packetTranslations.location || MeshI18n.t("Location:")}</dt>
+                       <dd>${lat.toFixed(6)}, ${lon.toFixed(6)}</dd>`
+                    : ""
+                }
+            </dl>
+        </div>
+    `;
+
+    loading.classList.add("d-none");
+    packetCard.classList.remove("d-none");
+
+    /* ---------------------------------------------
+       Map setup
+    ----------------------------------------------*/
+    const map = L.map("map");
+    mapDiv.style.display = "block";
+
+    meshTileLayer().addTo(map);
+
+    const allBounds = [];
+
+    /* ---------------------------------------------
+       Determine packet source location
+    ----------------------------------------------*/
+    let srcLat = lat;
+    let srcLon = lon;
+
+    if ((!srcLat || !srcLon) && fromNodeObj?.last_lat && fromNodeObj?.last_long) {
+        srcLat = fromNodeObj.last_lat / 1e7;
+        srcLon = fromNodeObj.last_long / 1e7;
+    }
+
+    if (srcLat && srcLon) {
+        allBounds.push([srcLat, srcLon]);
+
+        const sourceIcon = L.divIcon({
+            html: `<div class="source-marker"></div>`,
+            className: "",
+            iconSize: [26, 26],
+            iconAnchor: [13, 13]
+        });
+
+        const sourceMarker = L.marker([srcLat, srcLon], {
+            icon: sourceIcon,
+            zIndexOffset: 9999
+        }).addTo(map);
+
+        sourceMarker.bindPopup(`
+            <div style="font-size:0.9em">
+                <b data-translate-lang="packet_source">${packetTranslations.packet_source || MeshI18n.t("Packet Source")}</b><br>
+                ${MeshI18n.h("Lat:")} ${srcLat.toFixed(6)}<br>
+                ${MeshI18n.h("Lon:")} ${srcLon.toFixed(6)}<br>
+                <span data-translate-lang="from_node">${packetTranslations.from_node || MeshI18n.t("From Node:")}</span> ${fromNodeLabel}<br>
+                <span data-translate-lang="channel">${packetTranslations.channel || MeshI18n.t("Channel:")}</span> ${escapeHtml(p.channel ?? "—")}<br>
+                <span data-translate-lang="port">${packetTranslations.port || "Port:"}</span> ${PORT_NAMES[p.portnum] || "UNKNOWN"} (${p.portnum})
+            </div>
+        `);
+    } else {
+        map.setView([0,0], 2);
+    }
+
+    /* ---------------------------------------------
+       Colors for hops (warm → cold)
+    ----------------------------------------------*/
+    function hopColor(hopValue){
+        const colors = [
+            "#ff3b30","#ff6b22","#ff9f0c","#ffd60a",
+            "#87d957","#57d9c4","#3db2ff","#1e63ff"
+        ];
+        let h = Number(hopValue);
+        if (isNaN(h)) return "#aaa";
+        return colors[Math.min(Math.max(h, 0), 7)];
+    }
+
+    /* ---------------------------------------------
+       Distance helper
+    ----------------------------------------------*/
+    function haversine(lat1, lon1, lat2, lon2){
+        const R = 6371;
+        const dLat = (lat2-lat1)*Math.PI/180;
+        const dLon = (lon2-lon1)*Math.PI/180;
+        const a = Math.sin(dLat/2)**2 +
+            Math.cos(lat1*Math.PI/180)*
+            Math.cos(lat2*Math.PI/180)*
+            Math.sin(dLon/2)**2;
+        return R * (2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+    }
+
+/* ---------------------------------------------
+   Sort by hop count (highest first)
+----------------------------------------------*/
+const seenSorted = seenList.slice().sort((a,b)=>{
+    const ha = (a.hop_start ?? 0) - (a.hop_limit ?? 0);
+    const hb = (b.hop_start ?? 0) - (b.hop_limit ?? 0);
+    return hb - ha;
+});
+
+if (seenSorted.length){
+    seenContainer.classList.remove("d-none");
+    seenCountSpan.textContent = `(${seenSorted.length})`;
+}
+
+/* ---------------------------------------------
+   GROUP BY HOP COUNT
+----------------------------------------------*/
+const hopGroups = {};
+
+seenSorted.forEach(s => {
+    const hopValue = Math.max(
+        0,
+        (s.hop_start ?? 0) - (s.hop_limit ?? 0)
+    );
+    if (!hopGroups[hopValue]) hopGroups[hopValue] = [];
+    hopGroups[hopValue].push(s);
+});
+
+// Plural-aware hop count label: "1 salto", "2 saltos", "5 переходов".
+function hopCountLabel(count){
+    if (count === 0) return MeshI18n.t("Direct (0 hops)");
+    const keys = {one: "{count} hop", few: "{count} hops (few)", many: "{count} hops (many)"};
+    const category = new Intl.PluralRules(MeshI18n.language).select(count);
+    return MeshI18n.t(keys[category] || "{count} hops", {count});
+}
+
+function formatHopDisplay(hopKey, hopStart){
+    const startVal = hopStart ?? "—";
+    return `${hopKey}/${startVal}`;
+}
+
+/* ---------------------------------------------
+   Render grouped gateway table + map markers
+----------------------------------------------*/
+seenTableBody.innerHTML = Object.keys(hopGroups)
+    .sort((a,b) => Number(a) - Number(b))   // 0 hop first
+    .map(hopKey => {
+
+        const hopLabel = escapeHtml(hopCountLabel(Number(hopKey)));
+
+        const rows = hopGroups[hopKey].map(s => {
+            const node = nodeLookup[s.node_id];
+            const label = escapeHtml(node?.long_name || s.node_id);
+
+            const hopDisplay = formatHopDisplay(hopKey, s.hop_start);
+            const timeStr = s.import_time_us
+                ? new Date(s.import_time_us/1000).toLocaleTimeString(MeshI18n.language)
+                : "—";
+
+            /* ---------------- MAP MARKERS (UNCHANGED) ---------------- */
+            if (node?.last_lat && node.last_long){
+                const rlat = node.last_lat/1e7;
+                const rlon = node.last_long/1e7;
+                allBounds.push([rlat, rlon]);
+                let distanceKm = null;
+                if (srcLat && srcLon) {
+                    distanceKm = haversine(srcLat, srcLon, rlat, rlon);
+                }
+                const distanceMi = distanceKm !== null ? distanceKm * 0.621371 : null;
+                const color = hopColor(hopKey);
+
+                const marker = L.marker([rlat,rlon],{
+                    icon: L.divIcon({
+                        html: `
+                        <div style="
+                            background:${color};
+                            width:24px; height:24px;
+                            border-radius:50%;
+                            display:flex;
+                            align-items:center;
+                            justify-content:center;
+                            color:white;
+                            font-size:11px;
+                            font-weight:700;
+                            border:2px solid rgba(0,0,0,0.35);
+                            box-shadow:0 0 5px rgba(0,0,0,0.45);
+                        ">${hopKey}</div>`,
+                        className: "",
+                        iconSize:[24,24],
+                        iconAnchor:[12,12]
+                    })
+                }).addTo(map);
+
+                marker.bindPopup(`
+                <div style="font-size:0.9em">
+                    <b>${label}</b><br>
+                    <span data-translate-lang="node_id_short">${MeshI18n.h("Node ID")}</span>:
+                    <a href="/node/${s.node_id}">${s.node_id}</a><br>
+                    ${MeshI18n.h("HW:")} ${escapeHtml(node?.hw_model ?? "—")}<br>
+                    <span data-translate-lang="channel">${MeshI18n.h("Channel")}</span>: ${escapeHtml(s.channel ?? "—")}<br>
+                    ${
+                        distanceKm !== null
+                            ? `<span data-translate-lang="distance">${MeshI18n.h("Distance")}</span>:
+                               ${distanceKm.toFixed(1)} km / ${distanceMi.toFixed(1)} mi<br>`
+                            : ""
+                    }
+
+                    <br>
+
+                    <b data-translate-lang="signal">${MeshI18n.h("Signal")}</b><br>
+                    RSSI: ${s.rx_rssi ?? "—"}<br>
+                    SNR: ${s.rx_snr ?? "—"}<br><br>
+
+                    <b data-translate-lang="hops">${MeshI18n.h("Hops")}</b>: ${hopDisplay}
+                </div>
+            `);
+
+            }
+
+            return `
+                <tr class="seen-row">
+                    <td class="c-gw"><a href="/node/${s.node_id}">${label}</a></td>
+                    <td class="c-rssi" data-label="RSSI">${s.rx_rssi ?? "—"}</td>
+                    <td class="c-snr" data-label="SNR">${s.rx_snr ?? "—"}</td>
+                    <td class="c-hops" title="${MeshI18n.h("Hops")}">${hopDisplay}</td>
+                    <td class="c-channel">${escapeHtml(s.channel ?? "—")}</td>
+                    <td class="c-time">${timeStr}</td>
+                </tr>
+            `;
+        }).join("");
+
+        return `
+            <tr class="hop-group">
+                <td colspan="6"
+                    style="
+                        background:var(--mesh-soft);
+                        font-weight:700;
+                        color:var(--mesh-primary-dark);
+                        border-top:1px solid var(--mesh-border);
+                        padding:8px 12px;
+                    ">
+                    <span class="ti ti-repeat" aria-hidden="true"></span> ${hopLabel} (${hopGroups[hopKey].length})
+                </td>
+            </tr>
+            ${rows}
+        `;
+    }).join("");
+
+
+    /* ---------------------------------------------
+       Fit map around all markers
+    ----------------------------------------------*/
+    if (allBounds.length > 0){
+        map.fitBounds(allBounds, { padding:[40,40] });
+    }
+
+    /* ---------------------------------------------
+       Escape HTML helper
+    ----------------------------------------------*/
+    function escapeHtml(unsafe) {
+        return String(unsafe ?? "").replace(/[&<"'>]/g, m => ({
+            "&":"&amp;",
+            "<":"&lt;",
+            ">":"&gt;",
+            "\"":"&quot;",
+            "'":"&#039;"
+        })[m]);
+    }
+
+});
+</script>
+
+{% endblock %}

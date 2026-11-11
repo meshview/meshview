@@ -1,0 +1,1706 @@
+{% extends "base.html" %}
+{% block theme %}light{% endblock %}
+{% block body_class %}{{ "mesh-dashboard" if dashboard else "mesh-map-only" }}{% endblock %}
+
+{% block css %}
+<script>
+if (new URLSearchParams(location.search).get('kiosk') === '1') {
+    document.documentElement.classList.add('mesh-kiosk');
+}
+</script>
+<style>
+    .legend { background:var(--mesh-surface);padding:8px;line-height:1.5;border-radius:5px;box-shadow:0 0 10px rgba(0,0,0,0.3);font-size:14px;color:var(--mesh-text); }
+    .legend i { width:12px;height:12px;display:inline-block;margin-right:6px;border-radius:50%; }
+
+
+
+    .blinking-tooltip {
+        background: var(--mesh-surface);
+        color:var(--mesh-text);
+        border: 1px solid #111;
+        border-radius: 4px;
+        padding: 3px 6px;
+        font-size: 12px;
+        font-weight: 400;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    }
+    .blinking-tooltip.text-packet {
+        animation: textPulse 1.1s ease-in-out 6;
+        border-color: #ff8c00;
+    }
+    .mesh-map-panel { --packet-reach-color:#1f2937; }
+    [data-bs-theme="dark"] .mesh-map-panel { --packet-reach-color:#38bdf8; }
+    .packet-seen-trace { stroke:var(--packet-reach-color); }
+    .packet-seen-trace.packet-seen-outline { stroke:#fff; }
+    .packet-seen-landing {
+        stroke:var(--packet-reach-color);
+        fill:var(--packet-reach-color);
+        filter:drop-shadow(0 0 1px #fff) drop-shadow(0 0 2px var(--packet-reach-color));
+    }
+    .packet-seen-trace {
+        stroke-dasharray: 0.01px var(--packet-trace-gap, 999px);
+        stroke-linecap: round;
+        animation: packetTrace var(--packet-trace-duration, 3.25s) linear 1 forwards;
+    }
+    .packet-seen-landing {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: packetSeenLanding 1.4s ease-out 1 forwards;
+    }
+    @keyframes packetTrace {
+        from { stroke-dashoffset: 0; }
+        to { stroke-dashoffset: calc(-1 * var(--packet-trace-distance, 1000px)); }
+    }
+    @keyframes packetSeenLanding {
+        from {
+            stroke-opacity: 1;
+            fill-opacity: 0.4;
+            transform: scale(0.4);
+        }
+        40% {
+            stroke-opacity: 0.85;
+            fill-opacity: 0.18;
+            transform: scale(1);
+        }
+        to {
+            stroke-opacity: 0;
+            fill-opacity: 0;
+            transform: scale(1.8);
+        }
+    }
+    @keyframes textPulse {
+        0% { box-shadow: 0 2px 8px rgba(0,0,0,0.25); }
+        50% { box-shadow: 0 4px 14px rgba(255,140,0,0.45); }
+        100% { box-shadow: 0 2px 8px rgba(0,0,0,0.25); }
+    }
+
+    #map-wrapper {
+        position: relative;
+        width: 100%;
+        height: calc(100vh - 270px);
+    }
+    #map {
+        width: 100%;
+        height: 100%;
+    }
+    #unmapped-packets {
+        position: absolute;
+        bottom: 30px;
+        right: 15px;
+        z-index: 600;
+        width: 220px;
+        padding: 6px 8px;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 12px;
+        text-align: left;
+        box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        pointer-events: auto;
+    }
+    #unmapped-packets h3 {
+        margin: 0 0 6px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #000;
+    }
+    #unmapped-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        max-height: 120px;
+        overflow-y: auto;
+    }
+    #unmapped-list li {
+        display: flex;
+        gap: 6px;
+        padding: 3px 0;
+        border-bottom: 1px dotted #e0e0e0;
+    }
+    #unmapped-list li:last-child { border-bottom: none; }
+    .map-overlay > summary { display:flex; align-items:center; gap:6px; list-style:none; cursor:pointer; }
+    .map-overlay > summary::-webkit-details-marker { display:none; }
+    .map-overlay > summary::after { content:""; flex-shrink:0; width:12px; height:12px; margin-left:auto; background:currentColor; opacity:.6; -webkit-mask:url(/static/vendor/tabler-icons-3.51.0/icons/outline/chevron-right.svg) center / contain no-repeat; mask:url(/static/vendor/tabler-icons-3.51.0/icons/outline/chevron-right.svg) center / contain no-repeat; transition:transform .15s ease; }
+    .map-overlay[open] > summary::after { transform:rotate(90deg); }
+    #unmapped-packets > summary { margin-bottom:6px; }
+    #unmapped-packets > summary h3 { margin:0; }
+    #map-legend > summary { display:none; }
+    /* Zoom and legend side by side in the top-left corner. */
+    .mesh-map-panel .leaflet-top.leaflet-left { display:flex; align-items:flex-start; }
+    .mesh-map-panel #map-legend { margin-left:8px; font-size:11px; box-shadow:0 2px 8px #0001; border:1px solid var(--mesh-border); }
+    /* Wider screens: as tall as the zoom buttons beside it, its two lines centred. */
+    @media(min-width:701px) { .mesh-map-panel #map-legend { box-sizing:border-box; min-height:64px; padding-top:0; padding-bottom:0; display:flex; flex-direction:column; justify-content:center; } }
+    .map-overlay-count { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--mesh-primary); color:var(--mesh-surface); font-size:11px; font-weight:700; }
+    .map-overlay-count[hidden] { display:none; }
+    @media(max-width:700px) {
+        .mesh-map-panel .map-overlay:not([open]) { width:auto; padding:5px 10px; }
+        .mesh-map-panel .map-overlay:not([open]) > summary { margin:0; }
+        #map-legend > summary { display:flex; font-weight:600; font-size:12px; }
+        #map-legend[open] > summary { margin-bottom:6px; }
+    }
+    .unmapped-node { font-weight: 400; color: #000; }
+    .unmapped-empty { color: #666; font-style: italic; }
+
+/* Give the standalone map more vertical space. */
+/* Map page: the content fills the window under the header and the map takes every pixel the
+   filter row leaves, whatever its height. */
+.mesh-map-only .mesh-content { display:flex; flex-direction:column; height:calc(100dvh - 48px); min-height:480px; box-sizing:border-box; }
+.mesh-map-only .mesh-explorer { display:flex; flex:1; min-height:0; }
+.mesh-map-only .mesh-map-panel { display:flex; flex:1; flex-direction:column; min-width:0; min-height:0; }
+.mesh-map-only .mesh-map-panel #map-wrapper { display:flex; flex:1; flex-direction:column; height:auto; min-height:300px; }
+.mesh-map-only .mesh-map-panel #map { flex:1; height:auto; min-height:0; }
+@media(max-width:700px) { .mesh-map-only .mesh-content { height:calc(100dvh - 52px); } }
+/* Fit and share as a map control, with labels on wider screens. */
+.mesh-map-tools { display:flex; flex-direction:column; overflow:hidden; background:var(--mesh-surface); }
+/* Same frame as the layers control and the legend (thin border, soft shadow), not Leaflet's thick bar border. */
+.mesh-map-panel .mesh-map-tools.leaflet-bar { border:1px solid var(--mesh-border); border-radius:5px; box-shadow:0 2px 8px #0001; background-clip:padding-box; }
+.mesh-map-tools button { display:flex; align-items:center; justify-content:center; width:44px; min-height:38px; padding:0; border:0; border-bottom:1px solid var(--mesh-border); background:var(--mesh-surface); color:var(--mesh-text); font:500 11px/1 inherit; white-space:nowrap; cursor:pointer; }
+.mesh-map-tools button:last-child { border-bottom:0; }
+.mesh-map-tools button:hover { background:var(--mesh-soft); }
+.mesh-map-tools button:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:-2px; }
+.mesh-map-tools .ti { font-size:16px; color:var(--mesh-primary); }
+.mesh-map-tools button.is-copied .ti { color:#198754; }
+/* Icon buttons like the folded layer picker; the label stays for screen readers and the tooltip. */
+.mesh-map-tool-label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+/* Reset sits at the end of the filter row. */
+.map-filter-reset { display:inline-flex; align-items:center; gap:6px; margin-left:auto; padding:6px 10px; border:0; border-radius:6px; background:transparent; color:var(--mesh-primary); font-size:12px; font-weight:500; white-space:nowrap; cursor:pointer; }
+.map-filter-reset:hover { background:var(--mesh-soft); }
+.map-filter-reset:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:2px; }
+/* Let the map determine the desktop row height; scroll longer node panels. */
+@media(min-width:1001px) {
+    .mesh-explorer .mesh-node-panel { contain:size; }
+    .mesh-explorer .mesh-node-browser:not([hidden]) { height:100%; display:flex; flex-direction:column; }
+    .mesh-explorer .mesh-node-browser-body { flex:1; min-height:0; display:flex; flex-direction:column; }
+    .mesh-explorer .mesh-node-list { flex:1; min-height:0; max-height:none; }
+    .mesh-explorer .mesh-node-inspector { max-height:100%; }
+}
+/* Kiosk shares the live map and fills the viewport without dashboard chrome. */
+html.mesh-kiosk, .mesh-kiosk body { width:100%; height:100%; margin:0; overflow:hidden; }
+.mesh-kiosk .mesh-header,.mesh-kiosk .mesh-announcement,.mesh-kiosk .mesh-footer,
+.mesh-kiosk .mesh-page-heading,.mesh-kiosk .mesh-map-panel > .mesh-panel-title,
+.mesh-kiosk .mesh-map-panel > div:has(> #share-button) { display:none; }
+.mesh-kiosk .mesh-map-only .mesh-content { width:100%; height:100%; padding:0; max-width:none; }
+.mesh-kiosk .mesh-explorer,.mesh-kiosk .mesh-map-panel { width:100%; height:100%; border:0; border-radius:0; }
+.mesh-kiosk .mesh-map-only .mesh-map-panel #map-wrapper { height:100dvh; min-height:0; }
+.mesh-kiosk .mesh-map-panel #filter-container { position:absolute; bottom:24px; left:10px; z-index:700; max-width:calc(100% - 240px); max-height:25dvh; overflow:auto; padding:8px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:6px; }
+.mesh-kiosk #map-load-status:not(:empty) { position:absolute; top:10px; left:50px; z-index:800; background:var(--mesh-surface); padding:8px; border-radius:5px; }
+@media(max-width:700px) { .mesh-kiosk .mesh-map-panel #filter-container { max-width:calc(100% - 20px); bottom:24px; } .mesh-kiosk #unmapped-packets { display:none; } }
+/* Compact live-map node card. */
+.mesh-map-only .mesh-content { max-width:none; }
+/* The node panel opens at the top right over the map controls; close it to use them. */
+.mesh-map-only .mesh-node-panel { position:absolute; right:10px; top:10px; width:280px; max-width:calc(100% - 20px); max-height:calc(100% - 20px); overflow:auto; z-index:1001; contain:none; padding:14px; box-shadow:0 4px 20px #0003; }
+.mesh-map-only .mesh-node-panel[hidden] { display:none; }
+.mesh-map-only .mesh-panel-close { float:right; margin-left:8px; }
+.mesh-map-only .mesh-inspector-name { font-size:15px; margin:8px 0 4px; }
+.mesh-map-only .mesh-inspector-meta { margin-bottom:10px; }
+.mesh-map-only .mesh-inspector-facts { grid-template-columns:70px minmax(0,1fr); gap:5px; margin:0; }
+.mesh-map-only .mesh-inspector-short-name { font-size:14px; font-weight:650; }
+/* Map-side inspection and shared live packet stream. */
+.mesh-node-browser[hidden],.mesh-node-inspector[hidden],.mesh-node-browser-body[hidden] { display:none; }
+/* Node list heading: plain title beside the map, a fold toggle once stacked under it. */
+.mesh-panel-toggle { display:inline-flex; align-items:center; gap:6px; padding:0; border:0; background:none; color:inherit; font:inherit; text-align:left; }
+.mesh-panel-toggle .ti { display:none; color:var(--mesh-muted); transition:transform .15s ease; }
+.mesh-panel-toggle:disabled { cursor:default; opacity:1; }
+.mesh-panel-toggle:not(:disabled) { cursor:pointer; }
+.mesh-panel-toggle:not(:disabled) .ti { display:inline-block; }
+.mesh-panel-toggle[aria-expanded="true"] .ti { transform:rotate(90deg); }
+.mesh-panel-toggle:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:3px; border-radius:4px; }
+.mesh-node-panel:has(.mesh-node-browser-body[hidden]) .mesh-panel-title { border-bottom:0; }
+/* Node list search: magnifier and result count inside the field. Beside the map it is the
+   list's heading (same height as the inspector's); stacked, the fold toggle stays above it. */
+.mesh-search-row { position:relative; display:flex; align-items:center; box-sizing:border-box; min-height:64px; padding:12px 16px; border-bottom:1px solid var(--mesh-border); }
+.mesh-search-row .ti-search { position:absolute; left:27px; color:var(--mesh-muted); pointer-events:none; }
+.mesh-search-row .mesh-search { width:100%; margin:0; padding:9px 64px 9px 34px; }
+.mesh-search-row .mesh-count { position:absolute; right:26px; pointer-events:none; }
+@media(min-width:1001px) { .mesh-explorer .mesh-node-browser > .mesh-panel-title { display:none; } }
+@media(max-width:1000px) { .mesh-search-row .mesh-count { display:none; } .mesh-search-row .mesh-search { padding-right:10px; } }
+.mesh-node-inspector { max-height:690px; overflow:auto; }
+/* Inspector heading: stays at the top while the inspector's own scroll moves, hides while
+   scrolling down and comes back on scroll up, like the page header. Phones show the whole
+   inspector in the page, so there it simply scrolls away. */
+#mesh-node-inspector > .mesh-panel-title { position:sticky; top:0; z-index:5; background:var(--mesh-surface); transition:transform .2s ease; }
+#mesh-node-inspector > .mesh-panel-title.is-hidden { transform:translateY(-100%); }
+@media(max-width:700px) { #mesh-node-inspector > .mesh-panel-title { position:static; } }
+.mesh-inspector-back,.mesh-traffic-control { padding:6px 10px; background:var(--mesh-soft); color:var(--mesh-primary); border:1px solid var(--mesh-border); border-radius:5px; font-size:12px; }
+.mesh-inspector-body { padding:16px; }
+.mesh-inspector-name { font-size:17px; font-weight:650; overflow-wrap:anywhere; margin:0 0 5px; }
+/* Node name with the refresh icon on its right. */
+.mesh-inspector-title { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.mesh-inspector-title .mesh-traffic-icon { flex-shrink:0; }
+.mesh-inspector-meta { color:var(--mesh-muted); font-size:11px; margin:0 0 16px; overflow-wrap:anywhere; }
+.mesh-inspector-facts { display:grid; grid-template-columns:90px minmax(0,1fr); gap:8px; font-size:12px; }
+.mesh-inspector-facts dt { color:var(--mesh-muted); font-weight:500; }
+.mesh-inspector-facts dd { margin:0; overflow-wrap:anywhere; }
+.mesh-inspector-section { margin:18px 0 10px; font-size:12px; font-weight:650; padding-top:14px; border-top:1px solid var(--mesh-border); }
+.mesh-inspector-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+.mesh-inspector-actions a { font-size:12px; }
+/* Rows bleed into the body padding so the hover tint does not stop at the letters. */
+.mesh-inspector-packet { display:block; width:auto; margin:0 -8px; text-align:left; padding:10px 8px; border:0; border-bottom:1px solid var(--mesh-border); background:var(--mesh-surface); color:var(--mesh-text); font-size:12px; text-decoration:none; }
+.mesh-inspector-packet:last-child { border-bottom:0; }
+a.mesh-inspector-packet:hover { background:var(--mesh-hover); }
+.mesh-inspector-packet-top { display:flex; align-items:center; gap:8px; min-width:0; }
+.mesh-inspector-packet-peer { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--mesh-muted); }
+.mesh-inspector-packet-time { flex-shrink:0; color:var(--mesh-muted); font-variant-numeric:tabular-nums; }
+.mesh-inspector-packet small { display:block; color:var(--mesh-text); margin-top:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mesh-inspector-note { color:var(--mesh-muted); font-size:12px; margin:8px 0; }
+.mesh-inspector-telemetry { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+/* Values sit at the bottom so a row's numbers line up even when a label wraps. */
+.mesh-inspector-telemetry > div { display:flex; flex-direction:column; justify-content:space-between; padding:10px; background:var(--mesh-soft); border-radius:6px; }
+.mesh-inspector-telemetry strong { display:block; margin-top:2px; font-size:18px; line-height:1.25; color:var(--mesh-primary); }
+/* Icon and label on top, value below, like the home metric cards on phones. */
+.mesh-inspector-telemetry div > span { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--mesh-muted); }
+.mesh-inspector-telemetry .ti { width:14px; height:14px; vertical-align:0; color:var(--mesh-primary); }
+.mesh-traffic { margin-top:20px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; overflow:hidden; }
+.mesh-traffic-tools { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-left:auto; }
+.mesh-traffic-actions { display:flex; gap:8px; align-items:center; }
+.mesh-traffic-icon { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; padding:0; }
+.mesh-traffic-icon .ti { width:16px; height:16px; vertical-align:0; }
+.mesh-traffic-list { max-height:360px; overflow:auto; }
+ .mesh-traffic-table { width:100%; min-width:780px; border-collapse:collapse; font-size:13px; color:var(--mesh-text); }
+/* Same rows as the traffic page: 40px header and rows, plain underlined links, muted italic broadcast. */
+.mesh-traffic-table th { position:sticky; top:0; z-index:1; height:40px; padding:0 14px; background:var(--mesh-brand); color:white; font-weight:600; font-size:12px; white-space:nowrap; text-align:left; vertical-align:middle; }
+.mesh-traffic-table td { padding:6px 14px; border-bottom:1px solid var(--mesh-border); text-align:left; vertical-align:middle; }
+.mesh-traffic-row { background:var(--mesh-surface); }
+.mesh-traffic-row:hover { background:var(--mesh-hover); }
+.mesh-traffic-table a { color:inherit; text-decoration:underline; }
+.mesh-traffic-table .to-mqtt { color:var(--mesh-muted); font-size:12px; font-style:italic; }
+.mesh-traffic-time { white-space:nowrap; }
+.mesh-traffic-type { display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 9px; border-radius:11px; background:var(--mesh-soft); color:var(--mesh-text); font-size:12px; font-weight:500; line-height:1; white-space:nowrap; vertical-align:middle; }
+.mesh-traffic-type::before { content:""; flex-shrink:0; width:8px; height:8px; border-radius:50%; background:var(--port-color,#6c757d); box-shadow:inset 0 0 0 1px rgba(0,0,0,.18); }
+.mesh-traffic-payload[hidden] { display:none; }
+.mesh-traffic-payload td { background:var(--mesh-soft); }
+.mesh-traffic-payload pre { margin:0; max-height:180px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.7 ui-monospace,monospace; }
+#map-traffic-channel { border:1px solid var(--mesh-border); border-radius:5px; color:var(--mesh-text); background:var(--mesh-surface); font-size:12px; padding:6px 8px; max-width:180px; }
+:is(.mesh-traffic-toggle,.mesh-traffic-table a,#map-traffic-channel,.mesh-inspector-packet,.mesh-inspector-back,.mesh-traffic-control):focus-visible { outline:2px solid var(--mesh-primary); outline-offset:2px; }
+.mesh-traffic-note { padding:8px 18px; border-top:1px solid var(--mesh-border); color:var(--mesh-muted); font-size:11px; margin:0; }
+/* Phones: title and buttons share the first row, channel and status the second. */
+@media(max-width:700px) { .mesh-node-inspector { max-height:none; } .mesh-traffic .mesh-panel-title { flex-wrap:wrap; row-gap:10px; } .mesh-traffic .mesh-panel-title h2 { flex:1; } .mesh-traffic-tools { order:3; width:100%; margin-left:0; } }
+/* Picker for nodes that overlap where the map was clicked: a Leaflet popup in
+   a pane of its own above the map controls (see nodePickerPane). */
+.leaflet-pane.node-picker-pane { z-index:1100; }
+.mesh-node-picker .leaflet-popup-content-wrapper { padding:4px; border-radius:9px; box-shadow:0 8px 24px rgba(16,25,37,.22); }
+.mesh-node-picker .leaflet-popup-content { margin:0; width:260px !important; max-width:calc(100vw - 64px); }
+.node-picker-head { display:flex; align-items:center; gap:8px; padding:2px 2px 2px 8px; }
+.mesh-node-picker .node-picker-title { flex:1; margin:0; color:var(--mesh-muted); font-size:12px; font-weight:500; }
+.node-picker-zoom { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--mesh-muted); cursor:pointer; }
+.node-picker-zoom:hover { background:var(--mesh-hover); color:var(--mesh-text); }
+.node-picker-zoom:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:-2px; }
+.node-picker-list { display:flex; flex-direction:column; gap:1px; overflow-y:auto; margin:0; padding:0; list-style:none; }
+.node-picker-item { display:grid; grid-template-columns:10px minmax(0,1fr) auto; align-items:center; gap:9px; width:100%; min-height:40px; padding:6px 8px; border:0; border-radius:6px; background:transparent; color:var(--mesh-text); font-size:13px; line-height:1.3; text-align:left; cursor:pointer; }
+.node-picker-item:hover, .node-picker-item:focus-visible { background:var(--mesh-hover); }
+.node-picker-item:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:-2px; }
+.node-picker-dot { width:10px; height:10px; border-radius:50%; background:var(--node-color); box-shadow:0 0 0 1px #fff, 0 0 0 2px rgba(0,0,0,.18); }
+.node-picker-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.node-picker-name strong { font-weight:600; margin-right:6px; }
+.node-picker-name span, .node-picker-seen { color:var(--mesh-muted); font-size:12px; }
+.node-picker-seen { white-space:nowrap; }
+</style>
+{% endblock %}
+
+{% block body %}
+{% if dashboard %}
+<section class="mesh-page-heading is-compact">
+    <h1>{{ "Mesh overview" | tr }}</h1>
+    <a class="mesh-secondary-button" href="/stats">{{ "View statistics ↗" | tr }}</a>
+</section>
+<section class="mesh-metrics" aria-label="{{ "Network summary" | tr }}">
+    <div class="mesh-metric"><span class="mesh-metric-icon" aria-hidden="true"><span class="ti ti-antenna"></span></span><span>{{ "Recent nodes" | tr }}</span><strong id="metric-nodes">—</strong><small>{{ "Seen in the last 3 days" | tr }}</small></div>
+    <div class="mesh-metric"><span class="mesh-metric-icon" aria-hidden="true"><span class="ti ti-activity"></span></span><span>{{ "Active nodes" | tr }}</span><strong id="metric-active">—</strong><small>{{ "Seen in the last 24 hours" | tr }}</small></div>
+    <div class="mesh-metric"><span class="mesh-metric-icon" aria-hidden="true"><span class="ti ti-router"></span></span><span>{{ "MQTT gateways" | tr }}</span><strong id="metric-gateways">—</strong><small>{{ "Among recent nodes" | tr }}</small></div>
+    <div class="mesh-metric"><span class="mesh-metric-icon" aria-hidden="true"><span class="ti ti-package"></span></span><span>{{ "Total packets" | tr }}</span><strong id="metric-packets">—</strong><small id="metric-status" role="status" aria-busy="true">{{ "Loading network totals…" | tr }}</small></div>
+</section>
+{% else %}
+<h1 class="visually-hidden">{{ "Network map" | tr }}</h1>
+{% endif %}
+<div class="mesh-explorer">
+{% if dashboard %}
+<aside id="mesh-node-panel" class="mesh-node-panel" aria-label="{{ "Node explorer" | tr }}"{% if not dashboard %} hidden{% endif %}>
+    <div id="mesh-node-browser" class="mesh-node-browser">
+    <div class="mesh-panel-title">
+        <h2><button id="node-panel-toggle" class="mesh-panel-toggle" type="button" aria-expanded="true" aria-controls="mesh-node-browser-body" disabled>{{ "Network nodes" | tr }}<span class="ti ti-chevron-right" aria-hidden="true"></span></button></h2>
+        <span class="mesh-count node-result-count">—</span>
+    </div>
+    <div id="mesh-node-browser-body" class="mesh-node-browser-body">
+    <div class="mesh-search-row">
+        <label class="visually-hidden" for="node-search">{{ "Search nodes" | tr }}</label>
+        <span class="ti ti-search" aria-hidden="true"></span>
+        <input id="node-search" class="mesh-search" type="search" placeholder="{{ "Name or node ID…" | tr }}" autocomplete="off">
+        <span class="mesh-count node-result-count" aria-hidden="true">—</span>
+    </div>
+    <div id="mesh-node-list" class="mesh-node-list" aria-live="polite"><p class="mesh-empty is-loading">{{ "Loading nodes…" | tr }}</p></div>
+    </div>
+    </div>
+    <section id="mesh-node-inspector" class="mesh-node-inspector" aria-label="{{ "Selected node" | tr }}" hidden>
+        <div class="mesh-panel-title"><h2>{{ "Node inspector" | tr }}</h2><button id="inspector-back" class="mesh-inspector-back" type="button">{{ "← Nodes" | tr }}</button></div>
+        <div class="mesh-inspector-body">
+            <div class="mesh-inspector-title"><h3 id="inspector-name" class="mesh-inspector-name"></h3><button id="inspector-refresh" class="mesh-traffic-control mesh-traffic-icon" type="button" title="{{ "Refresh data" | tr }}" aria-label="{{ "Refresh data" | tr }}"><span class="ti ti-refresh" aria-hidden="true"></span></button></div>
+            <p id="inspector-node-meta" class="mesh-inspector-meta"></p>
+            <dl id="inspector-facts" class="mesh-inspector-facts"></dl>
+            <div class="mesh-inspector-actions"><a id="inspector-node-link" href="/nodelist">{{ "Full node details ↗" | tr }}</a><a id="inspector-reliability-link" href="/reliability">{{ "Reliability ↗" | tr }}</a></div>
+            <h3 class="mesh-inspector-section">{{ "Latest device telemetry" | tr }}</h3>
+            <div id="inspector-telemetry" aria-live="polite"></div>
+            <h3 class="mesh-inspector-section">{{ "Recent packets · sent & received" | tr }}</h3>
+            <div id="inspector-recent" aria-live="polite"></div>
+        </div>
+    </section>
+</aside>
+{% endif %}
+
+<section class="mesh-map-panel" aria-label="{{ "Network map" | tr }}">
+<!-- Fit (and share, on the map page) live in a map control under the layer picker (moved in by script). -->
+<div id="map-tools" class="mesh-map-tools leaflet-bar">
+    <button type="button" id="fit-network" title="{{ "Fit network" | tr }}"><span class="ti ti-focus-centered" aria-hidden="true"></span><span class="mesh-map-tool-label">{{ "Fit network" | tr }}</span></button>
+    {% if not dashboard %}
+    <button type="button" id="share-button" onclick="shareCurrentView()" title="{{ "Share this view" | tr }}"><span id="share-icon" class="ti ti-link" aria-hidden="true"></span><span id="share-label" class="mesh-map-tool-label" data-translate-lang="share_view">Share This View</span></button>
+    {% endif %}
+</div>
+<p id="map-load-status" role="status" style="margin:0; color:#b23d2f;"></p>
+
+<div id="map-wrapper">
+    <div id="map"></div>
+    {% if not dashboard %}
+    <aside id="mesh-node-panel" class="mesh-node-panel" aria-label="{{ "Selected node" | tr }}" hidden>
+        <button id="map-panel-close" class="mesh-inspector-back mesh-panel-close" type="button" aria-label="{{ "Close node inspector" | tr }}">{{ "Close" | tr }}</button>
+        <a id="inspector-node-link" class="mesh-inspector-short-name" href="/nodelist" title="{{ "View full node details" | tr }}"></a>
+        <h3 id="inspector-name" class="mesh-inspector-name"></h3>
+        <p id="inspector-node-meta" class="mesh-inspector-meta"></p>
+        <dl id="inspector-facts" class="mesh-inspector-facts"></dl>
+    </aside>
+    {% endif %}
+
+    <!-- Map overlays fold to a small pill on phones (opened by script on wider screens). -->
+    <details id="unmapped-packets" class="map-overlay" open>
+        <summary><h3 data-translate-lang="unmapped_packets_title">Unmapped Packets</h3><span id="unmapped-count" class="map-overlay-count" hidden></span></summary>
+        <ul id="unmapped-list">
+            <li class="unmapped-empty" data-translate-lang="unmapped_packets_empty">
+                No recent unmapped packets.
+            </li>
+        </ul>
+    </details>
+<details id="map-legend" open class="legend map-overlay">
+    <summary>{{ "Legend" | tr }}</summary>
+    <div>
+        <i style="background:orange; width:15px; height:3px; border-radius:0;"></i>
+        <span data-translate-lang="legend_traceroute">Traceroute Path (arrowed)</span>
+    </div>
+
+    <div style="margin-top:6px;">
+        <i style="background:gray; width:15px; height:3px; border-radius:0;"></i>
+        <span data-translate-lang="legend_neighbor">Neighbor Link</span>
+    </div>
+</details>
+
+
+</div>
+
+<div id="filter-container">
+    <div class="map-filter-group">
+        <label class="map-filter"><input type="checkbox" class="filter-checkbox" id="filter-routers-only"> <span data-translate-lang="show_routers_only">Show Routers Only</span></label>
+        <label class="map-filter"><input type="checkbox" class="filter-checkbox" id="filter-mqtt-only"> <span data-translate-lang="show_mqtt_only">Show MQTT Gateways Only</span></label>
+    </div>
+    <div id="map-channel-filters" class="map-filter-group" role="group" aria-label="{{ "Channels" | tr }}"></div>
+    {% if not dashboard %}
+    <button id="reset-filters-button" class="map-filter-reset" type="button" onclick="resetFiltersToDefaults()">
+        <span class="ti ti-refresh" aria-hidden="true"></span> <span data-translate-lang="reset_filters">Reset Filters To Defaults</span>
+    </button>
+    {% endif %}
+</div>
+
+
+
+</section>
+</div>
+{% if dashboard %}
+<section class="mesh-traffic" aria-label="{{ "Live network traffic" | tr }}">
+    <div class="mesh-panel-title"><h2>{{ "Live traffic" | tr }}</h2><div class="mesh-traffic-tools"><label for="map-traffic-channel" class="visually-hidden">{{ "Channel" | tr }}</label><select id="map-traffic-channel"><option value="">{{ "All channels" | tr }}</option></select><span id="map-traffic-status" class="live-status" role="status" data-state="loading">{{ "Loading packets…" | tr }}</span></div><div class="mesh-traffic-actions"><button id="map-traffic-pause" class="mesh-traffic-control" type="button" aria-pressed="false" title="{{ "Pause the traffic list; map animations continue" | tr }}">{{ "Pause feed" | tr }}</button><button id="map-traffic-refresh" class="mesh-traffic-control mesh-traffic-icon" type="button" title="{{ "Refresh" | tr }}" aria-label="{{ "Refresh" | tr }}"><span class="ti ti-refresh" aria-hidden="true"></span></button></div></div>
+    <div id="map-traffic-list" class="mesh-traffic-list" role="region" aria-label="{{ "Live packet table" | tr }}" tabindex="0">
+        <table class="mesh-traffic-table card-table" data-cards-below="1100"><thead><tr><th>{{ "Time" | tr }}</th><th>{{ "Packet ID" | tr }}</th><th>{{ "From" | tr }}</th><th>{{ "To" | tr }}</th><th>{{ "Channel" | tr }}</th><th>{{ "Port" | tr }}</th></tr></thead><tbody id="map-traffic-body"><tr><td colspan="6" class="mesh-empty">{{ "Loading recent network traffic…" | tr }}</td></tr></tbody></table>
+    </div>
+    <p class="mesh-traffic-note">{{ "Latest 30 packets · expand the arrow to view payloads · follow packet IDs or node names for details." | tr }}</p>
+</section>
+
+{% endif %}
+<script src="/static/vendor/leaflet-1.9.4/dist/leaflet.js"
+        integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH"
+        crossorigin=""></script>
+
+<script src="/static/vendor/leaflet-polylinedecorator-1.6.0/dist/leaflet.polylineDecorator.js"
+        integrity="sha384-FhPn/2P/fJGhQLeNWDn9B/2Gml2bPOrKJwFqJXgR3xOPYxWg5mYQ5XZdhUSugZT0"
+        crossorigin></script>
+<script src="/static/vendor/leaflet.heat-0.2.0/dist/leaflet-heat.js"
+        integrity="sha384-mFKkGiGvT5vo1fEyGCD3hshDdKmW3wzXW/x+fWriYJArD0R3gawT6lMvLboM22c0"
+        crossorigin="anonymous"></script>
+<script src="/static/portmaps.js"></script>
+
+<script>
+/* ======================================================
+   MAP PAGE TRANSLATION SYSTEM
+   ====================================================== */
+
+let mapTranslations = {};
+
+async function loadTranslationsMap() {
+    try {
+        const cfg = await window._siteConfigPromise;
+        const lang = cfg?.site?.language || "en";
+        const res  = await fetch(`/api/v1/lang?lang=${lang}&section=map`);
+        mapTranslations = await res.json();
+        applyTranslationsMap();
+        updateMapLayerTranslations();
+    } catch (err) {
+        console.error("Map translation load failed:", err);
+    }
+}
+
+function applyTranslationsMap(root = document) {
+    root.querySelectorAll("[data-translate-lang]").forEach(el => {
+        const key = el.dataset.translateLang;
+        const val = mapTranslations[key];
+        if (!val) return;
+
+        if (el.tagName === "INPUT" && el.placeholder !== undefined) {
+            el.placeholder = val;
+        } else {
+            el.textContent = val;
+        }
+    });
+}
+
+/* ======================================================
+   EXISTING MAP LOGIC
+   ====================================================== */
+
+var map = L.map('map');
+var baseLayers = { [escapeHtml(meshMapTiles.name)]: meshTileLayer() };
+const topoLayer = meshTopoLayer();
+if (topoLayer) baseLayers["OpenTopoMap"] = topoLayer;
+Object.values(baseLayers)[0].addTo(map);
+L.control.scale({
+    position: 'bottomleft',
+    metric: true,
+    imperial: true
+}).addTo(map);
+var nodeLayer = L.layerGroup().addTo(map);
+var edgeLayer = L.layerGroup().addTo(map);
+var packetSeenLayer = L.layerGroup();
+var trafficHeatLayer = L.heatLayer([], {
+    radius: 34,
+    blur: 18,
+    maxZoom: 12,
+    minOpacity: 0.3,
+    gradient: {
+        0.2: "#0b1f4d",
+        0.45: "#12436b",
+        0.7: "#7f2704",
+        1.0: "#4d0000"
+    }
+});
+var overlayLayers = {
+    [MeshI18n.h("Nodes")]: nodeLayer,
+    [MeshI18n.h("Packets Reach")]: packetSeenLayer,
+    [MeshI18n.h("Traffic HeatMap")]: trafficHeatLayer
+};
+// Always folded: the choices are remembered, so it only needs opening to change them.
+var mapLayerControl = L.control.layers(baseLayers, overlayLayers, { collapsed: true }).addTo(map);
+const layerToggle = mapLayerControl.getContainer().querySelector('.leaflet-control-layers-toggle');
+layerToggle.title = MeshI18n.t("Map layers");
+layerToggle.setAttribute('aria-label', MeshI18n.t("Map layers"));
+
+function updateMapLayerTranslations() {
+    // The page catalog refreshes independently of the server's startup UI catalog.
+    const layers = [
+        [nodeLayer, mapTranslations.layer_nodes || MeshI18n.t("Nodes")],
+        [packetSeenLayer, mapTranslations.layer_packets_reach || MeshI18n.t("Packets Reach")],
+        [trafficHeatLayer, mapTranslations.layer_traffic_heatmap || MeshI18n.t("Traffic HeatMap")]
+    ];
+    layers.forEach(([layer, label]) => {
+        // Removing a layer from the control leaves its visibility on the map intact.
+        mapLayerControl.removeLayer(layer);
+        mapLayerControl.addOverlay(layer, escapeHtml(label));
+    });
+    const title = mapTranslations.map_layers || MeshI18n.t("Map layers");
+    layerToggle.title = title;
+    layerToggle.setAttribute('aria-label', title);
+}
+
+// Data structures
+// The legend sits next to the zoom buttons as a map control.
+const mapLegend = document.getElementById('map-legend');
+if (mapLegend) {
+    const MapLegend = L.Control.extend({
+        onAdd() {
+            L.DomEvent.disableClickPropagation(mapLegend);
+            L.DomEvent.disableScrollPropagation(mapLegend);
+            return mapLegend;
+        }
+    });
+    new MapLegend({position: 'topleft'}).addTo(map);
+}
+// Map page: fit and share as a control under the layer picker.
+const mapTools = document.getElementById('map-tools');
+if (mapTools) {
+    const MapTools = L.Control.extend({
+        onAdd() {
+            L.DomEvent.disableClickPropagation(mapTools);
+            L.DomEvent.disableScrollPropagation(mapTools);
+            return mapTools;
+        }
+    });
+    new MapTools({position: 'topright'}).addTo(map);
+}
+// The layer picker opens on click (or Enter) only, not on hover; clicking the
+// map or pressing Escape folds it again.
+{
+    const layerContainer = mapLayerControl.getContainer();
+    L.DomEvent.off(layerContainer, { mouseenter: mapLayerControl._expandSafely, mouseleave: mapLayerControl.collapse }, mapLayerControl);
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && layerContainer.classList.contains("leaflet-control-layers-expanded")) {
+            mapLayerControl.collapse();
+            layerToggle.focus({ preventScroll: true });
+        }
+    });
+}
+// Remember the base map and overlay choices in this browser, like the filters.
+const MAP_LAYERS_KEY = "mapLayers";
+const mapLayerIds = new Map([[nodeLayer, "nodes"], [packetSeenLayer, "reach"], [trafficHeatLayer, "heat"]]);
+function saveMapLayers() {
+    const state = { base: Object.keys(baseLayers).find(name => map.hasLayer(baseLayers[name])) };
+    mapLayerIds.forEach((id, layer) => { state[id] = map.hasLayer(layer); });
+    try { localStorage.setItem(MAP_LAYERS_KEY, JSON.stringify(state)); } catch (_) { /* storage unavailable */ }
+}
+(function restoreMapLayers() {
+    let state = null;
+    try { state = JSON.parse(localStorage.getItem(MAP_LAYERS_KEY) || "null"); } catch (_) { /* ignore */ }
+    if (!state) return;
+    if (baseLayers[state.base] && !map.hasLayer(baseLayers[state.base])) {
+        Object.values(baseLayers).forEach(layer => map.removeLayer(layer));
+        baseLayers[state.base].addTo(map);
+    }
+    mapLayerIds.forEach((id, layer) => {
+        if (typeof state[id] !== "boolean") return;
+        if (state[id]) map.addLayer(layer); else map.removeLayer(layer);
+    });
+})();
+map.on("baselayerchange overlayadd overlayremove", saveMapLayers);
+var nodes = [], markers = {}, markerById = {}, nodeMap = new Map();
+var selectedNodeId = null;
+var activeBlinks = new Map(), lastImportTime = null;
+var activePacketSeenHighlights = [];
+let packetSeenGeneration = 0;
+var mapInterval = 0;
+var unmappedPackets = [];
+var trafficHeatLoaded = false;
+var trafficHeatLoading = false;
+const UNMAPPED_LIMIT = 50;
+const UNMAPPED_TTL_MS = 5000;
+// Wait for the gateways' reports to arrive before drawing where a packet
+// was heard. Measured on a week of real traffic (O Zulo mesh, ~10k packets
+// heard by two or more gateways): every gateway had reported 85% of them
+// within 5 s, 97% within 10 s and 98% within 15 s. While this runs the
+// sender keeps blinking, faster for the last 3 s, so the reach follows it.
+const PACKET_SEEN_DELAY_MS = 10000;
+const PACKET_SEEN_COLOR = "#1f2937";
+const PACKET_TRACE_MIN_DURATION_MS = 750;
+const PACKET_TRACE_MAX_DURATION_MS = 3250;
+const PACKET_TRACE_MS_PER_PIXEL = 9;
+const PACKET_LANDING_DURATION_MS = 1400;
+
+const portMap = window.PORT_LABEL_MAP;
+
+// Generated colors for channels without a configured override.
+const palette = ["#18aa18","#976049","#a5508c","#1898dc","#3a8846","#dc1884",
+                 "#b8813d","#b64f35","#408b18","#4c719e","#be379c","#18aa52"];
+
+const channelColorOverrides = new Map();
+
+const colorMap = new Map();
+const channelSet = new Set();
+
+map.on("popupopen", function (e) {
+    const popupEl = e.popup.getElement();
+    if (popupEl) applyTranslationsMap(popupEl);
+});
+
+function timeAgoFromUs(us){
+    const diff = Date.now() - (us / 1000);
+    const s = Math.floor(diff/1000), m = Math.floor(s/60),
+          h = Math.floor(m/60),       d = Math.floor(h/24);
+    return d>0?d+"d":h>0?h+"h":m>0?m+"m":s+"s";
+}
+
+function normalizeChannelName(str){
+    return String(str || MeshI18n.t("Unknown")).toLowerCase().replace(/[\s_-]+/g, "");
+}
+
+function hashToColor(str){
+    const channel = String(str || MeshI18n.t("Unknown"));
+    if(colorMap.has(channel)) return colorMap.get(channel);
+
+    const override = channelColorOverrides.get(normalizeChannelName(channel));
+    const c = override || palette[Math.floor(hashToUnit(channel) * palette.length) % palette.length];
+    colorMap.set(channel,c);
+    return c;
+}
+
+function hashToUnit(str){
+    let h = 2166136261;
+    for(let i=0;i<str.length;i++){
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+    }
+    return (h >>> 0) / 0xffffffff;
+}
+
+function jitterLatLng(lat, lon, key){
+    const meters = 15; // small, visually separates overlaps
+    const angle = hashToUnit(String(key)) * Math.PI * 2;
+    const r = meters * (0.3 + 0.7 * hashToUnit(`r:${key}`));
+    const dLat = (r * Math.cos(angle)) / 111320;
+    const dLon = (r * Math.sin(angle)) / (111320 * Math.cos(lat * Math.PI / 180));
+    return [lat + dLat, lon + dLon];
+}
+
+function isInvalidCoord(n){
+    return !n || !n.lat || !n.long || n.lat === 0 || n.long === 0 ||
+           Number.isNaN(n.lat) || Number.isNaN(n.long);
+}
+
+function getNodeLatLng(n){
+    const marker = markerById[n.key];
+    if(marker){
+        return marker.getLatLng();
+    }
+    return { lat: n.lat, lng: n.long };
+}
+
+/* ======================================================
+   SHARED PACKET FETCHING: MAP ANIMATIONS AND TRAFFIC FEED
+   ====================================================== */
+
+let mapPacketFetchBusy = false;
+let mapActivityGeneration = 0;
+function publishMapTrafficStatus(state) {
+    document.dispatchEvent(new CustomEvent("mesh:traffic-status", { detail: state }));
+}
+function publishMapPackets(packets) {
+    document.dispatchEvent(new CustomEvent("mesh:packets", { detail: packets }));
+}
+async function fetchLatestPacket(){
+    if(document.hidden || mapPacketFetchBusy) return;
+    const generation = mapActivityGeneration;
+    mapPacketFetchBusy = true;
+    try {
+        const res = await fetch('/api/v1/packets?limit=30');
+        if(!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if(generation !== mapActivityGeneration || document.hidden) return;
+        if(!Array.isArray(data.packets)) throw new Error("Invalid packet response");
+        lastImportTime = Math.max(lastImportTime || 0, ...data.packets.map(p => Number(p.import_time_us) || 0));
+        publishMapPackets(data.packets);
+        publishMapTrafficStatus("ready");
+    } catch(error) {
+        if(generation !== mapActivityGeneration || document.hidden) return;
+        console.error("Map traffic:", error);
+        publishMapTrafficStatus("error");
+    } finally {
+        if(generation === mapActivityGeneration) mapPacketFetchBusy = false;
+    }
+}
+async function fetchNewPackets(){
+    if(document.hidden || mapInterval <= 0 || mapPacketFetchBusy) return;
+    if(lastImportTime === null) return fetchLatestPacket();
+    const generation = mapActivityGeneration;
+    mapPacketFetchBusy = true;
+    try {
+        const url = new URL('/api/v1/packets', window.location.origin);
+        url.searchParams.set("since", lastImportTime);
+        url.searchParams.set("limit", 50);
+        const res = await fetch(url);
+        if(!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if(generation !== mapActivityGeneration || document.hidden) return;
+        if(!Array.isArray(data.packets)) throw new Error("Invalid packet response");
+        data.packets.forEach(pkt => {
+            lastImportTime = Math.max(lastImportTime || 0, Number(pkt.import_time_us) || 0);
+            const marker = markerById[pkt.from_node_id];
+            const nodeData = nodeMap.get(pkt.from_node_id);
+            if(marker && nodeData) blinkNode(marker, nodeData.long_name, pkt.portnum, pkt.payload);
+            else addUnmappedPacket(pkt, nodeData);
+            schedulePacketSeenNodes(pkt);
+        });
+        publishMapPackets(data.packets);
+        publishMapTrafficStatus("ready");
+    } catch(error) {
+        if(generation !== mapActivityGeneration || document.hidden) return;
+        console.error("Map traffic:", error);
+        publishMapTrafficStatus("error");
+    } finally {
+        if(generation === mapActivityGeneration) mapPacketFetchBusy = false;
+    }
+}
+
+let packetInterval=null;
+
+function startPacketFetcher(){
+    if(document.hidden || mapInterval<=0) return;
+    if(!packetInterval){
+        if(lastImportTime === null) fetchLatestPacket();
+        else fetchNewPackets();
+        packetInterval=setInterval(fetchNewPackets,mapInterval*1000);
+    }
+}
+
+function stopPacketFetcher(){
+    if(packetInterval){
+        clearInterval(packetInterval);
+        packetInterval=null;
+    }
+}
+
+function resetMapActivity(){
+    stopPacketFetcher();
+    mapActivityGeneration++;
+    mapPacketFetchBusy = false;
+    lastImportTime = null;
+    clearActiveBlinks();
+    clearPacketSeenHighlights();
+    unmappedPackets = [];
+    renderUnmappedPackets();
+}
+function resumeMapActivity(){
+    resetMapActivity();
+    if(document.hidden) return;
+    publishMapTrafficStatus("loading");
+    if(mapInterval > 0) startPacketFetcher();
+    else fetchLatestPacket();
+}
+document.addEventListener("visibilitychange",()=>{
+    if(document.hidden) resetMapActivity();
+    else resumeMapActivity();
+});
+window.addEventListener("pagehide", resetMapActivity);
+window.addEventListener("pageshow", event => {
+    if(event.persisted) resumeMapActivity();
+});
+
+map.on("overlayadd", e => {
+    if(e.layer === nodeLayer) updateNodeVisibility();
+    if(e.layer === trafficHeatLayer) loadTrafficHeat();
+});
+
+map.on("overlayremove", e => {
+    if(e.layer === nodeLayer) {
+        clearActiveBlinks();
+        clearPacketSeenHighlights();
+    }
+    if(e.layer === packetSeenLayer) clearPacketSeenHighlights();
+});
+
+async function waitForConfig() {
+    while (typeof window._siteConfigPromise === "undefined") {
+        await new Promise(r => setTimeout(r, 100));
+    }
+    try {
+        const cfg = await window._siteConfigPromise;
+        for(const [channel, color] of Object.entries(cfg.site?.map_channel_colors || {})){
+            channelColorOverrides.set(normalizeChannelName(channel), color);
+        }
+        return cfg.site || {};
+    } catch (err) {
+        console.error("Error loading site config:", err);
+        return {};
+    }
+}
+
+async function initMapPolling() {
+    try {
+        const site = await waitForConfig();
+        mapInterval = parseInt(site.map_interval, 10) || 0;
+
+        const params = new URLSearchParams(window.location.search);
+        const lat  = parseFloat(params.get('lat'));
+        const lng  = parseFloat(params.get('lng'));
+        const zoom = parseInt(params.get('zoom'), 10);
+
+        // A shared link wins, then the view this browser left the map in
+        // (kept separately for the home page and the map page), then the
+        // configured area. Kiosk screens always use the configured area.
+        const viewKey = document.body.classList.contains("mesh-dashboard") ? "mapView:home" : "mapView:map";
+        const kiosk = params.get("kiosk") === "1";
+        let savedView = null;
+        if (!kiosk) {
+            try { savedView = JSON.parse(localStorage.getItem(viewKey) || "null"); } catch (_) { /* ignore */ }
+        }
+
+        if (!isNaN(lat) && !isNaN(lng) && !isNaN(zoom)) {
+            map.setView([lat, lng], zoom);
+            window.configBoundsApplied = true;
+            setTimeout(() => map.invalidateSize(), 100);
+        }
+        else if (savedView && [savedView.lat, savedView.lng, savedView.zoom].every(Number.isFinite)) {
+            map.setView([savedView.lat, savedView.lng], savedView.zoom);
+            window.configBoundsApplied = true;
+            setTimeout(() => map.invalidateSize(), 100);
+        }
+        else {
+            const tl = [parseFloat(site.map_top_left_lat), parseFloat(site.map_top_left_lon)];
+            const br = [parseFloat(site.map_bottom_right_lat), parseFloat(site.map_bottom_right_lon)];
+
+            if (tl.every(isFinite) && br.every(isFinite)) {
+                map.fitBounds([tl, br]);
+                window.configBoundsApplied = true;
+                setTimeout(() => map.invalidateSize(), 100);
+            }
+        }
+
+        if (!kiosk) {
+            // Start remembering once the initial view (and its resize) settled.
+            setTimeout(() => map.on("moveend", () => {
+                const c = map.getCenter();
+                const view = { lat: +c.lat.toFixed(5), lng: +c.lng.toFixed(5), zoom: map.getZoom() };
+                try { localStorage.setItem(viewKey, JSON.stringify(view)); } catch (_) { /* storage unavailable */ }
+            }), 500);
+        }
+
+        if (mapInterval > 0) startPacketFetcher();
+        else if (document.getElementById("map-traffic-list")) fetchLatestPacket();
+
+    } catch (err) {
+        console.error("Failed to load /api/v1/config:", err);
+    }
+}
+
+initMapPolling();
+
+/* ======================================================
+   LOAD NODES
+   ====================================================== */
+
+fetch('/api/v1/nodes?days_active=3')
+    .then(r=>r.json())
+    .then(async data=>{
+        await waitForConfig();
+        if(!Array.isArray(data.nodes)) throw new Error("Invalid node response");
+
+        nodes = data.nodes.map(n=>({
+            key: n.node_id ?? n.id,
+            id: n.id,
+            node_id: n.node_id,
+            lat: n.last_lat ? n.last_lat/1e7 : null,
+            long: n.last_long ? n.last_long/1e7 : null,
+            long_name: n.long_name || "",
+            short_name: n.short_name || "",
+            channel: n.channel || "",
+            hw_model: n.hw_model || "",
+            role: n.role || "",
+            firmware: n.firmware || "",
+            last_seen_us: n.last_seen_us || null,
+            is_mqtt_gateway: n.is_mqtt_gateway === true,
+            isRouter: (n.role||"").toLowerCase().includes("router")
+        }));
+
+        nodes.forEach(n=>{
+            nodeMap.set(n.key, n);
+            if(n.channel) channelSet.add(n.channel);
+        });
+
+        renderNodesOnMap();
+        createChannelFilters();
+        if (typeof initializeNodeExplorer === "function") initializeNodeExplorer();
+        if(map.hasLayer(trafficHeatLayer)){
+            loadTrafficHeat();
+        }
+    })
+    .catch(error => {
+        console.error(error);
+        const text = MeshI18n.t("Unable to load nodes. Reload to try again.");
+        const list = document.getElementById("mesh-node-list");
+        if (list) {
+            // Same look as the list's other messages ("No nodes match your search.").
+            const message = document.createElement("p");
+            message.className = "mesh-empty";
+            message.textContent = text;
+            list.replaceChildren(message);
+        } else {
+            document.getElementById("map-load-status").textContent = text;
+        }
+    });
+
+/* ======================================================
+   RENDER NODES
+   ====================================================== */
+
+function renderNodesOnMap(){
+    nodes.forEach(node=>{
+        if(isInvalidCoord(node)) return;
+
+        const color = hashToColor(node.channel);
+
+        const [jLat, jLon] = jitterLatLng(node.lat, node.long, node.key);
+        const marker = L.circleMarker([jLat,jLon], {
+            radius: 6,
+            color: "white",
+            fillColor: color,
+            fillOpacity: 1,
+            weight: 0.7
+        }).addTo(nodeLayer);
+
+        marker.nodeId = node.key;
+        marker.originalColor = color;
+        markerById[node.key] = marker;
+
+        marker.on('click', e => {
+            if(e.originalEvent){
+                L.DomEvent.stopPropagation(e.originalEvent);
+            }
+            pickNodeAt(e.containerPoint, e.originalEvent) || onNodeClick(node);
+        });
+    });
+
+    setTimeout(() => applyTranslationsMap(), 50);
+}
+
+/* ======================================================
+   TRAFFIC HEAT LAYER
+   ====================================================== */
+
+async function loadTrafficHeat(){
+    if(trafficHeatLoaded || trafficHeatLoading) return;
+    if(nodeMap.size === 0) return;
+
+    trafficHeatLoading = true;
+
+    try {
+        const url = new URL("/api/v1/packets", window.location.origin);
+        url.searchParams.set("limit", 1000);
+
+        const res = await fetch(url);
+        if(!res.ok) return;
+
+        const data = await res.json();
+        const counts = new Map();
+
+        (data.packets || []).forEach(pkt => {
+            const nodeId = pkt.from_node_id;
+            if(nodeId == null) return;
+            counts.set(nodeId, (counts.get(nodeId) || 0) + 1);
+        });
+
+        const maxCount = Math.max(...counts.values(), 0);
+        const heatPoints = [];
+
+        counts.forEach((count, nodeId) => {
+            const node = nodeMap.get(nodeId);
+            if(!node || isInvalidCoord(node)) return;
+
+            const markerLatLng = markerById[nodeId]?.getLatLng();
+            const lat = markerLatLng?.lat ?? node.lat;
+            const lng = markerLatLng?.lng ?? node.long;
+            const intensity = maxCount > 0 ? count / maxCount : 0;
+
+            heatPoints.push([lat, lng, Math.max(0.15, intensity)]);
+        });
+
+        trafficHeatLayer.setLatLngs(heatPoints);
+        trafficHeatLoaded = true;
+    } catch(err) {
+        console.error("Failed to load traffic heat layer:", err);
+    } finally {
+        trafficHeatLoading = false;
+    }
+}
+
+/* ======================================================
+   UNMAPPED PACKETS LIST
+   ====================================================== */
+
+function addUnmappedPacket(pkt, nodeData){
+    if(nodeData && !isInvalidCoord(nodeData)) return;
+
+    const now = Date.now();
+    const entry = {
+        id: pkt.id,
+        key: `${pkt.id ?? "x"}-${pkt.import_time_us ?? now}-${Math.random().toString(16).slice(2)}`,
+        import_time_us: pkt.import_time_us || 0,
+        from_node_id: pkt.from_node_id,
+        long_name: pkt.long_name || (nodeData?.long_name || ""),
+        portnum: pkt.portnum,
+        payload: (pkt.payload || "").trim(),
+        expires_at: now + UNMAPPED_TTL_MS
+    };
+
+    unmappedPackets.unshift(entry);
+    pruneUnmappedPackets(now);
+    if(unmappedPackets.length > UNMAPPED_LIMIT){
+        unmappedPackets = unmappedPackets.slice(0, UNMAPPED_LIMIT);
+    }
+    renderUnmappedPackets();
+
+    setTimeout(() => {
+        pruneUnmappedPackets(Date.now());
+        renderUnmappedPackets();
+    }, UNMAPPED_TTL_MS + 50);
+}
+
+function pruneUnmappedPackets(now){
+    unmappedPackets = unmappedPackets.filter(p => p.expires_at > now);
+}
+
+function renderUnmappedPackets(){
+    pruneUnmappedPackets(Date.now());
+    const list = document.getElementById("unmapped-list");
+    if (!list) return;
+    list.innerHTML = "";
+    const count = document.getElementById("unmapped-count");
+    if (count) {
+        count.textContent = unmappedPackets.length;
+        count.hidden = unmappedPackets.length === 0;
+    }
+
+    if(unmappedPackets.length === 0){
+        const empty = document.createElement("li");
+        empty.className = "unmapped-empty";
+        empty.dataset.translateLang = "unmapped_packets_empty";
+        empty.textContent = MeshI18n.t("No recent unmapped packets.");
+        list.appendChild(empty);
+        return;
+    }
+
+    unmappedPackets.forEach(p=>{
+        const li = document.createElement("li");
+
+        const node = document.createElement("span");
+        node.className = "unmapped-node";
+        const type = portMap[p.portnum] || MeshI18n.t("Port {port}", {port: p.portnum ?? "?"});
+        const name = p.long_name || MeshI18n.t("Node {id}", {id: p.from_node_id ?? "?"});
+        node.textContent = `${name} (${type})`;
+
+        li.appendChild(node);
+        list.appendChild(li);
+    });
+}
+
+/* ======================================================
+   ⭐ NEW: DYNAMIC EDGE LOADING
+   ====================================================== */
+
+/* The selected node gets a larger dot with a ring in the primary colour and a
+   soft halo behind it, so it stands out among its neighbours. Blinking only
+   changes the fill, so it keeps working on the selected node. */
+let selectedMarker = null, selectedHalo = null;
+function highlightSelectedNode(id){
+    if(selectedMarker){
+        selectedMarker.setRadius(6);
+        selectedMarker.setStyle({ color: "white", weight: 0.7 });
+    }
+    selectedHalo?.remove();
+    selectedMarker = selectedHalo = null;
+    const marker = id == null ? null : markerById[id];
+    if(!marker) return;
+    const primary = getComputedStyle(document.documentElement).getPropertyValue("--mesh-primary").trim() || "#1f5fae";
+    selectedMarker = marker;
+    marker.setRadius(9);
+    marker.setStyle({ color: primary, weight: 3 });
+    marker.bringToFront();
+    selectedHalo = L.circleMarker(marker.getLatLng(), {
+        radius: 20, stroke: false, fillColor: primary, fillOpacity: 0.22, interactive: false
+    }).addTo(map);
+    selectedHalo.bringToBack();
+}
+window.clearMapSelection = () => { selectedNodeId = null; edgeLayer.clearLayers(); highlightSelectedNode(null); };
+
+async function onNodeClick(node){
+    if (typeof openMapNodeInspector === "function") openMapNodeInspector(node);
+    selectedNodeId = node.key;
+    highlightSelectedNode(node.key);
+    edgeLayer.clearLayers();
+
+    try {
+        const res = await fetch(`/api/v1/edges?node_id=${node.key}`);
+        const data = await res.json();
+        if (selectedNodeId !== node.key) return;
+        const edges = data.edges || [];
+
+        edges.forEach(edge=>{
+            const f = nodeMap.get(edge.from);
+            const t = nodeMap.get(edge.to);
+
+            if(!f || !t || isInvalidCoord(f) || isInvalidCoord(t)) return;
+
+            const color = edge.type === "neighbor" ? "gray" : "orange";
+            const fLatLng = getNodeLatLng(f);
+            const tLatLng = getNodeLatLng(t);
+            const line  = L.polyline([[fLatLng.lat, fLatLng.lng], [tLatLng.lat, tLatLng.lng]], {
+                color, weight: 3
+            }).addTo(edgeLayer);
+
+            if(edge.type === "traceroute"){
+                L.polylineDecorator(line, {
+                    patterns: [
+                        {
+                            offset: '100%',
+                            repeat: 0,
+                            symbol: L.Symbol.arrowHead({
+                                pixelSize:5,
+                                polygon:false,
+                                pathOptions:{stroke:true,color}
+                            })
+                        }
+                    ]
+                }).addTo(edgeLayer);
+            }
+        });
+        // Keep the selected dot above its own connection lines.
+        selectedMarker?.bringToFront();
+
+    } catch(err){
+        console.error("Failed to load edges for node", node.key, err);
+    }
+}
+
+map.on('click', e=>{
+    if(e.originalEvent.defaultPrevented) return;
+
+    if(!e.originalEvent.target.classList.contains('leaflet-interactive')
+        && !pickNodeAt(e.containerPoint, e.originalEvent)){
+        clearMapSelection();
+    }
+});
+
+/* ======================================================
+   NODE PICKER FOR OVERLAPPING NODES
+   ====================================================== */
+
+/* Nodes this close (in pixels) to a click count as clicked: the dots are 12px
+   wide, so neighbours that touch or overlap the one under the pointer join it.
+   A finger covers more, so touch gets a wider reach, which also lets a tap
+   just beside a small dot still hit it. */
+const NODE_PICK_RADIUS_PX = 12;
+const NODE_PICK_RADIUS_TOUCH_PX = 22;
+
+function nodePickRadius(event){
+    const touch = event?.pointerType
+        ? event.pointerType !== "mouse"
+        : matchMedia("(pointer: coarse)").matches;
+    return touch ? NODE_PICK_RADIUS_TOUCH_PX : NODE_PICK_RADIUS_PX;
+}
+
+function nodesNearPoint(point, radius){
+    if(!map.hasLayer(nodeLayer)) return [];
+    const found = [];
+    nodeLayer.eachLayer(marker => {
+        const node = nodeMap.get(marker.nodeId);
+        if(!node) return;
+        const distance = map.latLngToContainerPoint(marker.getLatLng()).distanceTo(point);
+        if(distance <= radius) found.push({ node, marker, distance });
+    });
+    return found.sort((a, b) => a.distance - b.distance);
+}
+
+/* Opens the node under the click, or a list to choose from when several nodes
+   overlap there. Returns false when there is no node within reach. */
+function pickNodeAt(point, event){
+    const found = nodesNearPoint(point, nodePickRadius(event));
+    if(found.length === 0) return false;
+    if(found.length === 1) onNodeClick(found[0].node);
+    else showNodePicker(found, map.containerPointToLatLng(point));
+    return true;
+}
+
+let nodePickerPreview = null;
+function previewPickerNode(marker){
+    nodePickerPreview?.remove();
+    nodePickerPreview = null;
+    if(!marker) return;
+    const primary = getComputedStyle(document.documentElement).getPropertyValue("--mesh-primary").trim() || "#1f5fae";
+    nodePickerPreview = L.circleMarker(marker.getLatLng(), {
+        radius: 11, color: primary, weight: 3, fill: false, interactive: false
+    }).addTo(map);
+}
+
+function showNodePicker(found, latlng){
+    const box = document.createElement("div");
+    const head = document.createElement("div");
+    head.className = "node-picker-head";
+    const title = document.createElement("p");
+    title.className = "node-picker-title";
+    title.id = "node-picker-title";
+    title.textContent = MeshI18n.t("{count} nodes here", { count: found.length });
+    const list = document.createElement("ul");
+    list.className = "node-picker-list";
+    list.setAttribute("aria-labelledby", title.id);
+    // Zooming in on the group separates its dots, handier than a long list.
+    const zoom = document.createElement("button");
+    zoom.type = "button";
+    zoom.className = "node-picker-zoom";
+    zoom.title = MeshI18n.t("Zoom in");
+    zoom.setAttribute("aria-label", zoom.title);
+    zoom.innerHTML = '<span class="ti ti-zoom-in" aria-hidden="true"></span>';
+    zoom.addEventListener("click", () => {
+        closeNodePicker();
+        const bounds = L.latLngBounds(found.map(({ marker }) => marker.getLatLng()));
+        // Dots at nearly the same spot only separate close in (they are spread
+        // about 15 m apart), so allow zooming in that far.
+        map.flyToBounds(bounds, { padding: [60, 60], maxZoom: 18 });
+    });
+    head.append(title, zoom);
+
+    found.forEach(({ node, marker }) => {
+        const item = document.createElement("li");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "node-picker-item";
+        button.style.setProperty("--node-color", marker.originalColor || hashToColor(node.channel));
+
+        const dot = document.createElement("span");
+        dot.className = "node-picker-dot";
+        dot.setAttribute("aria-hidden", "true");
+        const name = document.createElement("span");
+        name.className = "node-picker-name";
+        const shortName = document.createElement("strong");
+        shortName.textContent = node.short_name || node.id || node.key;
+        name.append(shortName);
+        if(node.long_name){
+            const longName = document.createElement("span");
+            longName.textContent = node.long_name;
+            name.append(longName);
+        }
+        name.title = [node.short_name, node.long_name].filter(Boolean).join(" · ");
+        const seen = document.createElement("span");
+        seen.className = "node-picker-seen";
+        seen.textContent = node.last_seen_us ? timeAgoFromUs(node.last_seen_us) : "";
+
+        button.append(dot, name, seen);
+        button.addEventListener("mouseenter", () => previewPickerNode(marker));
+        button.addEventListener("focus", () => previewPickerNode(marker));
+        button.addEventListener("mouseleave", () => previewPickerNode(null));
+        button.addEventListener("click", () => {
+            closeNodePicker();
+            onNodeClick(node);
+        });
+        item.append(button);
+        list.append(item);
+    });
+
+    box.append(head, list);
+    box.addEventListener("keydown", e => {
+        if(e.key === "Escape") closeNodePicker();
+    });
+    L.DomEvent.disableClickPropagation(box);
+    L.DomEvent.disableScrollPropagation(box);
+
+    // Never taller than the map, which is short on phones.
+    const mapHeight = map.getContainer().clientHeight;
+    list.style.maxHeight = `${Math.max(120, Math.min(264, mapHeight - 110))}px`;
+
+    syncNodePickerPane();
+    L.popup({
+        pane: "nodePicker",
+        className: "mesh-node-picker",
+        closeButton: false,
+        autoPanPadding: [12, 12],
+        offset: [0, -4]
+    }).setLatLng(latlng).setContent(box).openOn(map);
+}
+
+/* Leaflet popups live in the map pane, under the map controls (z-index 1000).
+   The picker gets a pane of its own on the map container, above them, moved
+   along with the map pane so the popup keeps its place and autopan works. */
+const nodePickerPane = map.createPane("nodePicker", map.getContainer());
+nodePickerPane.classList.add("node-picker-pane");
+function syncNodePickerPane(){
+    L.DomUtil.setPosition(nodePickerPane, map._getMapPanePos());
+}
+map.on("move viewreset zoomend", syncNodePickerPane);
+
+function closeNodePicker(){
+    map.closePopup();
+    previewPickerNode(null);
+}
+
+map.on("popupclose", () => previewPickerNode(null));
+map.on("zoomstart", closeNodePicker);
+
+/* ======================================================
+   BLINKING
+   ====================================================== */
+
+function escapeHtml(value){
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function isTextPort(portnum){
+    return portnum === 1 || portnum === 7;
+}
+
+function isNodeVisibleForPackets(marker){
+    return !!marker && map.hasLayer(nodeLayer) && nodeLayer.hasLayer(marker);
+}
+
+function isPacketReachVisible(pkt){
+    const channelFilter = pkt.channel ? document.getElementById(`filter-channel-${pkt.channel}`) : null;
+    return map.hasLayer(packetSeenLayer)
+        && isNodeVisibleForPackets(markerById[pkt.from_node_id])
+        && (!pkt.channel || channelFilter?.checked === true);
+}
+
+function clearBlinkForMarker(marker){
+    if(activeBlinks.has(marker)){
+        const blink = activeBlinks.get(marker);
+        clearInterval(blink.interval);
+        if(blink.tooltipTimeout) clearTimeout(blink.tooltipTimeout);
+        activeBlinks.delete(marker);
+    }
+    marker.setStyle({ fillColor: marker.originalColor });
+    if(marker.tooltip){
+        map.removeLayer(marker.tooltip);
+        marker.tooltip = null;
+    }
+}
+
+function clearActiveBlinks(){
+    activeBlinks.forEach((interval, marker) => clearBlinkForMarker(marker));
+    activeBlinks.clear();
+}
+
+function clearPacketSeenHighlights(){
+    packetSeenGeneration++;
+    activePacketSeenHighlights.forEach(timeout => clearTimeout(timeout));
+    activePacketSeenHighlights = [];
+    packetSeenLayer.clearLayers();
+}
+
+function schedulePacketSeenNodes(pkt){
+    if(!isPacketReachVisible(pkt) || pkt.id == null) return;
+
+    const sourceNode = nodeMap.get(pkt.from_node_id);
+    if(!sourceNode || isInvalidCoord(sourceNode)) return;
+
+    const timeout = setTimeout(() => showPacketSeenNodes(pkt), PACKET_SEEN_DELAY_MS);
+    activePacketSeenHighlights.push(timeout);
+}
+
+async function showPacketSeenNodes(pkt){
+    if(document.hidden || !isPacketReachVisible(pkt) || pkt.id == null) return;
+    const generation = mapActivityGeneration;
+    const reachGeneration = packetSeenGeneration;
+
+    try {
+        const res = await fetch(`/api/v1/packets_seen/${pkt.id}`);
+        if(!res.ok) return;
+
+        const data = await res.json();
+        if(generation !== mapActivityGeneration || reachGeneration !== packetSeenGeneration
+            || document.hidden || !isPacketReachVisible(pkt)) return;
+        const seen = data.seen || [];
+        const sourceId = pkt.from_node_id;
+        const sourceNode = nodeMap.get(sourceId);
+        const sourceLatLng = sourceNode && !isInvalidCoord(sourceNode)
+            ? getNodeLatLng(sourceNode)
+            : null;
+
+        seen.forEach(row => {
+            const node = nodeMap.get(row.node_id);
+            if(!node || isInvalidCoord(node) || !isNodeVisibleForPackets(markerById[row.node_id])) return;
+
+            const isSource = row.node_id === sourceId;
+            if(!sourceLatLng || isSource) return;
+
+            const markerLatLng = markerById[row.node_id]?.getLatLng();
+            const lat = markerLatLng?.lat ?? node.lat;
+            const lng = markerLatLng?.lng ?? node.long;
+            const traceOutline = L.polyline([[sourceLatLng.lat, sourceLatLng.lng], [lat, lng]], {
+                color: "#fff",
+                weight: 8,
+                opacity: 1,
+                className: "packet-seen-trace packet-seen-outline",
+                interactive: false
+            }).addTo(packetSeenLayer);
+            const trace = L.polyline([[sourceLatLng.lat, sourceLatLng.lng], [lat, lng]], {
+                color: PACKET_SEEN_COLOR,
+                weight: 6,
+                opacity: 1,
+                className: "packet-seen-trace",
+                interactive: false
+            }).addTo(packetSeenLayer);
+            const traceEl = trace.getElement();
+            let traceDurationMs = PACKET_TRACE_MAX_DURATION_MS;
+            if(traceEl){
+                const traceLength = traceEl.getTotalLength();
+                traceDurationMs = Math.min(
+                    PACKET_TRACE_MAX_DURATION_MS,
+                    Math.max(PACKET_TRACE_MIN_DURATION_MS, traceLength * PACKET_TRACE_MS_PER_PIXEL)
+                );
+                [traceEl, traceOutline.getElement()].forEach(element => {
+                    element.style.setProperty("--packet-trace-gap", `${traceLength + 20}px`);
+                    element.style.setProperty("--packet-trace-distance", `${traceLength + 20}px`);
+                    element.style.setProperty("--packet-trace-duration", `${traceDurationMs}ms`);
+                });
+            }
+
+            const landingTimeout = setTimeout(() => {
+                if(generation !== mapActivityGeneration || reachGeneration !== packetSeenGeneration
+                    || document.hidden || !isPacketReachVisible(pkt)
+                    || !isNodeVisibleForPackets(markerById[row.node_id])) return;
+                const landing = L.circleMarker([lat, lng], {
+                    radius: 12,
+                    color: PACKET_SEEN_COLOR,
+                    fillColor: PACKET_SEEN_COLOR,
+                    fillOpacity: 0.3,
+                    opacity: 0.9,
+                    weight: 2.5,
+                    className: "packet-seen-landing",
+                    interactive: false
+                }).addTo(packetSeenLayer);
+
+                const clearLandingTimeout = setTimeout(() => {
+                    packetSeenLayer.removeLayer(landing);
+                }, PACKET_LANDING_DURATION_MS);
+                activePacketSeenHighlights.push(clearLandingTimeout);
+            }, traceDurationMs);
+            activePacketSeenHighlights.push(landingTimeout);
+
+            const timeout = setTimeout(() => {
+                packetSeenLayer.removeLayer(trace);
+                packetSeenLayer.removeLayer(traceOutline);
+            }, traceDurationMs + PACKET_LANDING_DURATION_MS);
+            activePacketSeenHighlights.push(timeout);
+        });
+    } catch(err) {
+        console.error("Failed to load packet seen nodes", pkt.id, err);
+    }
+}
+
+function blinkNode(marker,longName,portnum,payload){
+    if(!isNodeVisibleForPackets(marker)) return;
+
+    if(activeBlinks.has(marker)){
+        clearBlinkForMarker(marker);
+    }
+
+    const blinkStart = Date.now();
+    const tooltipDurationMs = 5000;
+    const blinkDurationMs = map.hasLayer(packetSeenLayer) ? PACKET_SEEN_DELAY_MS : tooltipDurationMs;
+    const fastBlinkStartMs = blinkDurationMs - 3000;
+    const blinkColor = "yellow";
+    const safeName = escapeHtml(longName);
+    const portLabel = portMap[portnum] || MeshI18n.t("Port {port}", {port: portnum ?? "?"});
+    const payloadText = (payload || "").trim();
+    const showPayload = isTextPort(portnum) && payloadText && payloadText !== "Did not decode";
+    const shortPayload = showPayload && payloadText.length > 80
+        ? `${payloadText.slice(0, 77)}...`
+        : payloadText;
+    const payloadLine = showPayload ? `<br><span>${escapeHtml(shortPayload)}</span>` : "";
+
+    const tooltip = L.tooltip({
+        permanent:true,
+        direction:'top',
+        offset:[0,-marker.options.radius-5],
+        className: isTextPort(portnum) ? 'blinking-tooltip text-packet' : 'blinking-tooltip'
+    })
+    .setContent(`${safeName} (${escapeHtml(portLabel)})${payloadLine}`)
+    .setLatLng(marker.getLatLng())
+    .addTo(map);
+
+    marker.tooltip = tooltip;
+    const tooltipTimeout = setTimeout(() => {
+        if(blinkDurationMs === tooltipDurationMs){
+            clearBlinkForMarker(marker);
+            return;
+        }
+        if(marker.tooltip){
+            map.removeLayer(marker.tooltip);
+            marker.tooltip = null;
+        }
+    }, tooltipDurationMs);
+
+    const interval = setInterval(()=>{
+        const elapsedMs = Date.now() - blinkStart;
+        const blinkPeriodMs = elapsedMs >= fastBlinkStartMs ? 250 : 500;
+        if(isNodeVisibleForPackets(marker)){
+            marker.setStyle({
+                fillColor: Math.floor(elapsedMs / blinkPeriodMs)%2===0
+                    ? blinkColor
+                    : marker.originalColor
+            });
+            marker.bringToFront();
+        } else {
+            clearBlinkForMarker(marker);
+            return;
+        }
+
+        if(elapsedMs > blinkDurationMs){
+            clearBlinkForMarker(marker);
+        }
+
+    },250);
+
+    activeBlinks.set(marker, { interval, tooltipTimeout });
+}
+
+/* ======================================================
+   CHANNEL FILTERS
+   ====================================================== */
+
+function createChannelFilters(){
+    const filterContainer = document.getElementById("map-channel-filters");
+    const saved = JSON.parse(localStorage.getItem("mapFilters") || "{}");
+
+    [...channelSet].sort((a, b) => a.localeCompare(b)).forEach(channel=>{
+        const cb=document.createElement("input");
+        cb.type="checkbox";
+        cb.className="filter-checkbox";
+        cb.id=`filter-channel-${channel}`;
+        cb.checked = saved[channel] !== false;
+
+        cb.addEventListener("change", saveFiltersToLocalStorage);
+        cb.addEventListener("change", updateNodeVisibility);
+
+        // One pill per channel: checkbox, channel color dot and name stay together.
+        const label=document.createElement("label");
+        label.className="map-filter";
+        const dot=document.createElement("span");
+        dot.className="map-filter-dot";
+        dot.style.setProperty("--chip-color", hashToColor(channel));
+        const name=document.createElement("span");
+        name.textContent=channel;
+        label.append(cb, dot, name);
+        filterContainer.appendChild(label);
+    });
+
+    const routerOnly=document.getElementById("filter-routers-only");
+    const mqttOnly=document.getElementById("filter-mqtt-only");
+    routerOnly.checked = saved["routersOnly"] || false;
+    mqttOnly.checked = saved["mqttOnly"] || false;
+
+    routerOnly.addEventListener("change", saveFiltersToLocalStorage);
+    routerOnly.addEventListener("change", updateNodeVisibility);
+    mqttOnly.addEventListener("change", saveFiltersToLocalStorage);
+    mqttOnly.addEventListener("change", updateNodeVisibility);
+
+    updateNodeVisibility();
+}
+
+function saveFiltersToLocalStorage(){
+    const state = {};
+    channelSet.forEach(ch=>{
+        state[ch] = document.getElementById(`filter-channel-${ch}`).checked;
+    });
+    state["routersOnly"] = document.getElementById("filter-routers-only").checked;
+    state["mqttOnly"] = document.getElementById("filter-mqtt-only").checked;
+
+    localStorage.setItem("mapFilters", JSON.stringify(state));
+}
+
+function updateNodeVisibility(){
+    clearPacketSeenHighlights();
+    if(!map.hasLayer(nodeLayer)) return;
+
+    const routerOnly = document.getElementById("filter-routers-only").checked;
+    const mqttOnly = document.getElementById("filter-mqtt-only").checked;
+    const activeChannels = [...channelSet].filter(ch =>
+        document.getElementById(`filter-channel-${ch}`).checked
+    );
+
+    nodes.forEach(n=>{
+        const marker = markerById[n.key];
+        if(marker){
+            const visible =
+                (!routerOnly || n.isRouter) &&
+                (!mqttOnly || n.is_mqtt_gateway) &&
+                activeChannels.includes(n.channel);
+
+            if(visible){
+                nodeLayer.addLayer(marker);
+            } else {
+                clearBlinkForMarker(marker);
+                nodeLayer.removeLayer(marker);
+            }
+        }
+    });
+}
+
+/* ======================================================
+   SHARE / RESET
+   ====================================================== */
+
+let shareViewResetTimer = null;
+function shareCurrentView() {
+    const c = map.getCenter();
+    const url = `${window.location.origin}/map?lat=${c.lat.toFixed(6)}&lng=${c.lng.toFixed(6)}&zoom=${map.getZoom()}`;
+
+    navigator.clipboard.writeText(url).then(()=>{
+        const btn = document.getElementById('share-button');
+        const label = document.getElementById('share-label');
+        const icon = document.getElementById('share-icon');
+        if (!btn.classList.contains('is-copied')) btn.dataset.shareLabel = label.textContent;
+        clearTimeout(shareViewResetTimer);
+        label.textContent = mapTranslations.link_copied || MeshI18n.t("Link Copied!");
+        icon.className = 'ti ti-check';
+        btn.classList.add('is-copied');
+
+        shareViewResetTimer = setTimeout(()=>{
+            label.textContent = btn.dataset.shareLabel;
+            icon.className = 'ti ti-link';
+            btn.classList.remove('is-copied');
+            delete btn.dataset.shareLabel;
+        }, 2000);
+    });
+}
+
+function resetFiltersToDefaults(){
+    document.getElementById("filter-routers-only").checked = false;
+    document.getElementById("filter-mqtt-only").checked = false;
+    channelSet.forEach(ch => {
+        document.getElementById(`filter-channel-${ch}`).checked = true;
+    });
+    saveFiltersToLocalStorage();
+    updateNodeVisibility();
+}
+
+/* ======================================================
+   TRANSLATION LOAD
+   ====================================================== */
+
+document.addEventListener("DOMContentLoaded", () => {
+    loadTranslationsMap();
+});
+
+// Legend and unmapped packets: open by default on wider screens, folded to a
+// pill on phones. Whatever the visitor opens or folds is remembered in this
+// browser, separately for phones and wider screens.
+(() => {
+    const phone = window.matchMedia("(max-width:700px)");
+    const overlays = document.querySelectorAll("details.map-overlay");
+    const key = () => phone.matches ? "mapOverlaysPhone" : "mapOverlaysWide";
+    const load = () => { try { return JSON.parse(localStorage.getItem(key()) || "{}"); } catch (_) { return {}; } };
+    let syncing = false;
+    const sync = () => {
+        const saved = load();
+        syncing = true;
+        overlays.forEach(el => { el.open = saved[el.id] ?? !phone.matches; });
+        // "toggle" fires after the change, so stop ignoring it on the next task.
+        setTimeout(() => { syncing = false; });
+    };
+    overlays.forEach(el => el.addEventListener("toggle", () => {
+        if (syncing) return;
+        const saved = load();
+        saved[el.id] = el.open;
+        try { localStorage.setItem(key(), JSON.stringify(saved)); } catch (_) { /* storage unavailable */ }
+    }));
+    phone.addEventListener("change", sync);
+    sync();
+})();
+</script>
+
+<script src="/static/map-dashboard.js"></script>
+<script src="/static/map-inspector.js"></script>
+{% if dashboard %}
+<script src="/static/map-traffic.js"></script>
+{% endif %}
+{% endblock %}

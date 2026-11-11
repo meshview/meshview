@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block theme %}light{% endblock %}
+{% block body_class %}mesh-data-page mesh-traceroute-page{% endblock %}
+
+{% block head %}
+<script src="/static/vendor/echarts-5.5.0/dist/echarts.min.js"></script>
+{% endblock %}
+
+{% block css %}
+{% include "data-page-styles.html" %}
+<style>
+#traceroute-graph-wrap { position:relative; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; overflow:hidden; }
+#traceroute-graph { width:100%; height:clamp(460px,calc(100dvh - 280px),900px); }
+#traceroute-legend { position:absolute; right:16px; bottom:16px; z-index:2; display:grid; gap:9px; padding:14px 16px; color:var(--mesh-muted); background:#fffffff2; border:1px solid var(--mesh-border); border-radius:7px; font-size:12px; box-shadow:0 2px 8px #17263c08; pointer-events:none; }
+.traceroute-legend-row { display:grid; grid-template-columns:34px auto; align-items:center; gap:10px; }
+.traceroute-legend-line { height:0; border-top:3px solid var(--line-color); }
+.traceroute-legend-line.muted { border-top-width:2px; opacity:.55; }
+.traceroute-legend-line.dashed { border-top-style:dashed; }
+#traceroute-meta { display:flex; align-items:center; flex-wrap:wrap; gap:12px; padding:14px 18px; border:1px solid var(--mesh-border); border-radius:9px; background:var(--mesh-surface); margin-bottom:18px; color:var(--mesh-muted); font-size:13px; }
+#traceroute-title { color:var(--mesh-primary); font-weight:600; }
+#traceroute-error { color:#b23d2f; }
+.traceroute-help { margin-left:auto; font-size:12px; }
+@media(max-width:700px) { #traceroute-graph { height:500px; } #traceroute-legend { left:12px; right:auto; bottom:12px; font-size:11px; padding:12px; } .traceroute-help { width:100%; margin:0; } }
+</style>
+{% endblock %}
+
+{% block body %}
+<header class="data-heading is-compact"><div class="data-title"><h1>{{ "Traceroute" | tr }}</h1></div><div class="data-actions"><a class="mesh-secondary-button" href="/firehose">{{ "Live packets ↗" | tr }}</a></div></header>
+<div id="traceroute-meta">
+    <div><b>{{ "Traceroute" | tr }}</b> <span id="traceroute-title"></span></div>
+    <div id="traceroute-error" role="status"></div>
+    <span class="traceroute-help">{{ "Drag nodes to rearrange · Scroll to zoom" | tr }}</span>
+</div>
+<div id="traceroute-graph-wrap">
+    <div id="traceroute-graph"></div>
+    <div id="traceroute-legend" aria-label="{{ "Traceroute edge legend" | tr }}">
+        <div class="traceroute-legend-row">
+            <span class="traceroute-legend-line" style="--line-color: #34c759"></span>
+            <span>{{ "Winning forward" | tr }}</span>
+        </div>
+        <div class="traceroute-legend-row">
+            <span class="traceroute-legend-line dashed" style="--line-color: #ff3b30"></span>
+            <span>{{ "Reported reverse" | tr }}</span>
+        </div>
+        <div class="traceroute-legend-row">
+            <span class="traceroute-legend-line muted" style="--line-color: #7c858f"></span>
+            <span>{{ "Reported route" | tr }}</span>
+        </div>
+    </div>
+</div>
+
+<script>
+const el = document.getElementById("traceroute-graph");
+const chart = initMeshChart(el);
+
+function packetIdFromPath() {
+    const parts = window.location.pathname.split("/").filter(Boolean);
+    return parts[parts.length - 1];
+}
+
+function addPathEdges(path, edges, style) {
+    for (let i = 0; i < path.length - 1; i++) {
+        edges.push({
+            source: String(path[i]),
+            target: String(path[i + 1]),
+            lineStyle: style
+        });
+    }
+}
+
+function pathKey(path) {
+    return path.map(id => String(id)).join(">");
+}
+
+function addMissingEndpoints(path, startId, endId) {
+    const fullPath = path.map(id => String(id));
+    if (startId && (!fullPath.length || fullPath[0] !== startId)) {
+        fullPath.unshift(startId);
+    }
+    if (endId && (!fullPath.length || fullPath[fullPath.length - 1] !== endId)) {
+        fullPath.push(endId);
+    }
+    return fullPath;
+}
+
+// These lists are deduplicated across observations. A forward path is only known to
+// reach the target if some response reported it; a reverse path carries no such marker.
+function uniqueForwardPaths(data, originId, targetId) {
+    return (data?.unique_forward_paths || [])
+        .map(item => addMissingEndpoints(item.path || [], originId, item.complete ? targetId : null))
+        .filter(path => path.length > 1);
+}
+
+function uniqueReversePaths(data, originId, targetId) {
+    return (data?.unique_reverse_paths || [])
+        .map(path => addMissingEndpoints(path || [], targetId, null))
+        .filter(path => path.length > 1);
+}
+
+async function loadTraceroute() {
+    const packetId = packetIdFromPath();
+    document.getElementById("traceroute-title").textContent = `#${packetId}`;
+
+    const res = await fetch(`/api/v1/traceroute/${packetId}`);
+    if (!res.ok) {
+        document.getElementById("traceroute-error").textContent = MeshI18n.t("Traceroute not found.");
+        return;
+    }
+
+    const data = await res.json();
+    const nodes = new Map();
+    const edges = [];
+
+    // A response packet carries from/to reversed, so use the endpoints the API resolved.
+    const originId = data?.packet?.initiator != null ? String(data.packet.initiator) : null;
+    const targetId = data?.packet?.target != null ? String(data.packet.target) : null;
+    const forwardPaths = (data?.winning_paths?.forward || []).map(path => path.map(id => String(id)));
+    const reversePaths = (data?.winning_paths?.reverse || []).map(path => path.map(id => String(id)));
+    const winningPathKeys = new Set([
+        ...forwardPaths.map(pathKey),
+        ...reversePaths.map(pathKey)
+    ]);
+    const winningForwardNodeIds = new Set(forwardPaths.flat());
+    const hasWinningReversePath = reversePaths.some(path => path.length > 1);
+    const winningForwardPath = forwardPaths.find(path => path.length > 1);
+    const colorStartId = winningForwardPath ? winningForwardPath[0] : originId;
+    const colorEndId = winningForwardPath ? winningForwardPath[winningForwardPath.length - 1] : targetId;
+    const startNodeColor = hasWinningReversePath ? "#ff3b30" : "#34c759";
+    const endNodeColor = hasWinningReversePath ? "#34c759" : "#ff3b30";
+
+    uniqueForwardPaths(data, originId, targetId).forEach(path => {
+        if (winningPathKeys.has(pathKey(path))) {
+            return;
+        }
+        path.forEach(id => nodes.set(String(id), { name: String(id) }));
+        addPathEdges(path, edges, { color: "#7c858f", width: 1.5, opacity: 0.45 });
+    });
+
+    uniqueReversePaths(data, originId, targetId).forEach(path => {
+        if (winningPathKeys.has(pathKey(path))) {
+            return;
+        }
+        path.forEach(id => nodes.set(String(id), { name: String(id) }));
+        addPathEdges(path, edges, { color: "#7c858f", width: 1.5, opacity: 0.45, type: "dashed" });
+    });
+
+    forwardPaths.forEach(path => {
+        path.forEach(id => nodes.set(String(id), { name: String(id) }));
+        addPathEdges(path, edges, { color: "#34c759", width: 3 });
+    });
+
+    reversePaths.forEach(path => {
+        path.forEach(id => nodes.set(String(id), { name: String(id) }));
+        addPathEdges(path, edges, { color: "#ff3b30", width: 2, type: "dashed" });
+    });
+
+    // Names only for the nodes on these routes, not the whole node list.
+    const routeNodes = await meshFetchNodes([...nodes.keys()], "short_name,long_name")
+        .catch(err => { console.error("Failed to load nodes", err); return []; });
+    const nodesData = { nodes: routeNodes };
+    const nodeShortNameById = new Map(
+        (nodesData.nodes || []).map(n => [String(n.node_id), n.short_name || n.long_name || String(n.node_id)])
+    );
+    const nodeLongNameById = new Map(
+        (nodesData.nodes || []).map(n => [String(n.node_id), n.long_name || n.short_name || String(n.node_id)])
+    );
+
+    const graphNodes = Array.from(nodes.values()).map(n => {
+        const isColorStart = colorStartId && n.name === colorStartId;
+        const isColorEnd = colorEndId && n.name === colorEndId;
+        const isWinningForwardNode = winningForwardNodeIds.has(n.name);
+        let color = "#3f454d";
+        if (isColorStart) {
+            color = startNodeColor;
+        } else if (isColorEnd) {
+            color = endNodeColor;
+        } else if (isWinningForwardNode) {
+            color = "#b88a2a";
+        }
+        const size = isColorStart || isColorEnd ? 44 : 36;
+        return {
+            id: n.name,
+            name: nodeShortNameById.get(n.name) || n.name,
+            symbolSize: size,
+            itemStyle: { color },
+            label: {
+                show: true,
+                color: "#334155",
+                position: "bottom",
+                textBorderColor: "#ffffff",
+                textBorderWidth: 3,
+                fontWeight: "bold"
+            },
+            tooltip: {
+                formatter: () => {
+                    const longName = nodeLongNameById.get(n.name) || n.name;
+                    return longName === n.name ? n.name : `${escapeHtml(longName)} (${n.name})`;
+                }
+            }
+        };
+    });
+
+    const option = {
+        backgroundColor: "transparent",
+        tooltip: { trigger: "item", renderMode: "richText" },
+        series: [
+            {
+                type: "graph",
+                layout: "force",
+                roam: true,
+                zoom: 1.2,
+                draggable: true,
+                force: { repulsion: 200, edgeLength: 80 },
+                data: graphNodes,
+                edges: edges,
+                lineStyle: { opacity: 0.8, curveness: 0.1 },
+                edgeSymbol: ["none", "arrow"],
+                edgeSymbolSize: 10
+            }
+        ]
+    };
+
+    chart.setOption(option);
+}
+
+loadTraceroute().catch(error => {
+    console.error("Failed to load traceroute:", error);
+    document.getElementById("traceroute-error").textContent = MeshI18n.t("Unable to load traceroute. Reload to try again.");
+});
+window.addEventListener("resize", () => chart.resize());
+</script>
+{% endblock %}

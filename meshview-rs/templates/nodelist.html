@@ -1,0 +1,741 @@
+{% extends "base.html" %}
+{% block theme %}light{% endblock %}
+{% block body_class %}mesh-data-page mesh-nodelist-page{% endblock %}
+
+{% block css %}
+{% include "data-page-styles.html" %}
+<style>
+#node-list { margin-bottom:0; }
+#node-list table { min-width:1150px; }
+#node-list :is(th,td) { padding-left:10px; padding-right:10px; }
+/* Card layout: short name chip, long name and favourite / role · hardware · firmware /
+   channel and MQTT badge, last seen / location when known. */
+.card-only { display:none; }
+#node-list table.is-cards { min-width:0; }
+#node-list .is-cards td { padding:0; }
+#node-list .is-cards td.card-only { display:block; }
+#node-list .is-cards td.card-only:empty { display:none; }
+#node-list .is-cards :is(.c-hw,.c-fw,.c-role,.c-lat,.c-lon,.c-alt,.c-channel,.c-mqtt) { display:none; }
+#node-list .is-cards tbody tr { grid-template-columns:auto minmax(0,1fr) auto; grid-template-areas:"short long fav" "meta meta meta" "net net seen" "loc loc loc"; }
+#node-list .is-cards .c-short { grid-area:short; }
+#node-list .is-cards .node-short { display:inline-block; padding:2px 7px; border-radius:5px; background:var(--mesh-soft); color:var(--mesh-primary); font-size:12px; font-weight:600; }
+#node-list .is-cards .c-long { grid-area:long; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#node-list .is-cards .c-fav { grid-area:fav; justify-self:end; }
+#node-list .is-cards .c-meta { grid-area:meta; font-size:12px; color:var(--mesh-muted); }
+#node-list .is-cards .c-net { grid-area:net; font-size:12px; }
+#node-list .is-cards .c-seen { grid-area:seen; justify-self:end; white-space:nowrap; font-size:12px; color:var(--mesh-muted); }
+#node-list .is-cards .c-loc { grid-area:loc; font-size:12px; color:var(--mesh-muted); font-variant-numeric:tabular-nums; }
+.node-badge { display:inline-block; margin-left:4px; padding:1px 8px; border-radius:10px; background:var(--mesh-soft); color:var(--mesh-primary); font-size:11px; font-weight:600; }
+/* The sort control only shows in card mode, where there are no column headers. */
+/* Segmented sort control: direction toggle + field select, showing the current order. */
+.sort-control { display:none; align-items:stretch; height:38px; border:1px solid var(--mesh-border); border-radius:6px; background:var(--mesh-surface); overflow:hidden; order:5; }
+.mesh-nodelist-page:has(#node-list .is-cards) .sort-control { display:inline-flex; }
+.sort-control:focus-within { outline:2px solid var(--mesh-primary); outline-offset:1px; }
+.mesh-data-page .mesh-content .sort-direction { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; width:34px; height:auto; padding:0; border:0; border-right:1px solid var(--mesh-border); border-radius:0; background:var(--mesh-soft); color:var(--mesh-primary); font-size:18px; }
+.mesh-data-page .mesh-content .sort-direction:focus-visible { outline:0; }
+.mesh-data-page .sort-control .sort-select { flex:1 1 auto; min-width:0; height:auto; padding:0 20px 0 7px; font-size:13px; background-position:right 4px center; border:0; border-radius:0; background-color:transparent; text-overflow:ellipsis; }
+.mesh-data-page .sort-control .sort-select:focus-visible { outline:0; }
+.filter-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; flex:1 0 auto; order:6; }
+/* Card mode above phones: search and sort on the first row (sort at the right end), the
+   filters and "clear" on a second row of their own. */
+@media(min-width:701px) {
+    .mesh-nodelist-page:has(#node-list .is-cards) .search-box { flex:1 1 260px; order:0; }
+    .mesh-nodelist-page:has(#node-list .is-cards) .sort-control { flex:0 0 230px; order:1; }
+    .mesh-nodelist-page:has(#node-list .is-cards) .filter-panel { display:flex; flex:1 1 100%; flex-wrap:wrap; align-items:center; gap:8px; order:2; }
+    .mesh-nodelist-page:has(#node-list .is-cards) .filter-panel > select { flex:1 1 150px; }
+    .mesh-nodelist-page:has(#node-list .is-cards) .filter-panel .days-active { margin-left:4px; }
+}
+#node-list th { cursor:pointer; }
+.filter-container { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:12px; }
+.filter-panel { display:contents; }
+.mesh-data-page .mesh-content .filters-toggle { display:none; align-items:center; gap:6px; height:38px; padding:0 12px; font-size:13px; }
+.filters-toggle .ti { font-size:17px; }
+.filters-count { display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px; padding:0 6px; border-radius:10px; background:var(--mesh-primary); color:var(--mesh-surface); font-size:11px; font-weight:700; }
+.filters-count[hidden] { display:none; }
+@media(max-width:700px) {
+    .search-box { flex:1 1 100%!important; min-width:0; }
+    /* Filters and sort share the row under the search box, half each. */
+    .mesh-data-page .mesh-content .filters-toggle { display:inline-flex; flex:0 0 calc(50% - 4px); min-width:0; justify-content:center; order:1; }
+    .mesh-nodelist-page:has(#node-list .is-cards) .sort-control { flex:0 0 calc(50% - 4px); min-width:0; order:2; }
+    .filter-panel { order:3; }
+    .filter-panel { display:none; flex:1 1 100%; flex-wrap:wrap; align-items:center; gap:8px; padding:12px; border:1px solid var(--mesh-border); border-radius:9px; background:var(--mesh-surface); }
+    .filter-panel.is-open { display:flex; }
+    .filter-container .filter-panel > select { flex:1 1 calc(50% - 4px); min-width:0; }
+    .filter-panel .days-active { margin-left:0; }
+}
+.days-active { white-space:nowrap; display:inline-flex; align-items:center; gap:6px; margin:0 0 0 4px; font-size:12px; color:var(--mesh-muted); }
+.mesh-data-page .mesh-content .clear-btn { flex-shrink:0; border-color:transparent; background:transparent; }
+.mesh-data-page .mesh-content .clear-btn:hover { background:var(--mesh-soft); }
+.search-box { flex:0 1 260px; }
+.node-status { opacity:0; padding:3px 8px; border-radius:20px; background:var(--mesh-soft); color:var(--mesh-primary); margin-left:10px; font-size:11px; }
+.node-status.active { opacity:1; }
+.mesh-data-page .mesh-content .favorite-star { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--mesh-muted); font-size:18px; cursor:pointer; }
+.mesh-data-page .mesh-content .favorite-star:hover { background:var(--mesh-soft); }
+.mesh-data-page .mesh-content .favorite-star.active { color:#b7791f; }
+.mesh-data-page .favorites-btn.active { background:#fff3d6; border-color:#eacb80; color:#8b6200; }
+.node-load-more { display:flex; align-items:center; justify-content:center; gap:10px; padding:24px 0 8px; color:var(--mesh-muted); font-size:13px; }
+.node-load-more[hidden] { display:none; }
+.node-spinner { width:22px; height:22px; border:3px solid var(--mesh-border); border-top-color:var(--mesh-primary); border-radius:50%; animation:node-spin .8s linear infinite; }
+@keyframes node-spin { to { transform:rotate(360deg); } }
+@media(prefers-reduced-motion:reduce) { .node-spinner { animation-duration:2.4s; } }
+.node-page-range { margin:10px 0 0; text-align:center; color:var(--mesh-muted); font-size:12px; }
+.node-page-range:empty { display:none; }
+.sort-icon { font-size:10px; }
+@media(max-width:768px) { .filter-container select { flex:1 1 130px; } .search-box { flex:1 1 100%; } }
+</style>
+{% endblock %}
+
+{% block body %}
+<header class="data-heading is-compact">
+    <div class="data-title">
+        <h1>{{ "Network nodes" | tr }}</h1>
+        <span id="node-count" class="data-count" aria-live="polite">0</span>
+        <span id="node-status" class="node-status" aria-live="polite"></span>
+    </div>
+    <div class="data-actions">
+        <button type="button" class="favorites-btn" id="favorites-btn" aria-pressed="false">
+            <span class="ti ti-star" aria-hidden="true"></span> <span id="favorites-label" data-translate-lang="show_favorites">Show Favorites</span>
+        </button>
+        <button class="export-btn" id="export-btn" data-translate-lang="export_csv">
+            Export CSV
+        </button>
+        <a class="mesh-secondary-button" href="/map">{{ "View map ↗" | tr }}</a>
+    </div>
+</header>
+<div class="filter-container">
+    <input
+        type="text"
+        id="search-box"
+        class="search-box"
+        aria-label="{{ "Search nodes" | tr }}"
+        data-translate-lang="search_placeholder"
+        placeholder="Search by name or ID or HEX ID..."
+    />
+
+    <button type="button" id="filters-toggle" class="filters-toggle" aria-expanded="false" aria-controls="filter-panel">
+        <span class="ti ti-adjustments-horizontal" aria-hidden="true"></span>
+        <span>{{ "Filters" | tr }}</span>
+        <span id="filters-count" class="filters-count" hidden></span>
+    </button>
+
+    <!-- Sorting is not a filter: it shows the current order and stays outside the panel. -->
+    <div class="sort-control" role="group" aria-label="{{ "Sort by" | tr }}">
+        <button type="button" id="sort-direction" class="sort-direction" aria-pressed="false" aria-label="{{ "Ascending" | tr }}" title="{{ "Ascending" | tr }}"><span class="ti ti-sort-ascending" aria-hidden="true"></span></button>
+        <label for="sort-select" class="visually-hidden">{{ "Sort by" | tr }}</label>
+        <select id="sort-select" class="sort-select"></select>
+    </div>
+
+    <!-- On phones the rest folds behind the Filters button; elsewhere it lays out inline. -->
+    <div id="filter-panel" class="filter-panel">
+    <select id="role-filter" aria-label="{{ "Filter by role" | tr }}">
+        <option value="" data-translate-lang="all_roles">All Roles</option>
+    </select>
+
+    <select id="channel-filter" aria-label="{{ "Filter by channel" | tr }}">
+        <option value="" data-translate-lang="all_channels">All Channels</option>
+    </select>
+
+    <select id="hw-filter" aria-label="{{ "Filter by hardware" | tr }}">
+        <option value="" data-translate-lang="all_hw">All HW Models</option>
+    </select>
+
+    <select id="firmware-filter" aria-label="{{ "Filter by firmware" | tr }}">
+        <option value="" data-translate-lang="all_firmware">All Firmware</option>
+    </select>
+
+    <!-- Active days and "clear" move together: days on the left, clear on the right. -->
+    <div class="filter-footer">
+    <label class="days-active" for="days-active-filter">
+        <span>{{ "Active in the last" | tr }}</span>
+        <select id="days-active-filter">
+            {% for day in range(start=1, end=15) %}
+            <option value="{{ day }}" {% if day == 3 %}selected{% endif %}>{{ day }}</option>
+            {% endfor %}
+        </select>
+        <span>{{ "days" | tr }}</span>
+    </label>
+
+    <button class="clear-btn" id="clear-btn" data-translate-lang="clear_filters">
+        Clear Filters
+    </button>
+    </div>
+    </div>
+</div>
+
+<!-- Desktop table -->
+<div id="node-list" class="data-table-wrap">
+    <table class="card-table nodes-table" data-cards-below="1339">
+        <thead>
+            <tr>
+                <th data-translate-lang="short_name">Short <span class="sort-icon">▲</span></th>
+                <th data-translate-lang="long_name">Long Name <span class="sort-icon"></span></th>
+                <th data-translate-lang="hw_model">HW Model <span class="sort-icon"></span></th>
+                <th data-translate-lang="firmware">Firmware <span class="sort-icon"></span></th>
+                <th data-translate-lang="role">Role <span class="sort-icon"></span></th>
+                <th data-translate-lang="last_lat">Last Latitude <span class="sort-icon"></span></th>
+                <th data-translate-lang="last_long">Last Longitude <span class="sort-icon"></span></th>
+                <th>{{ "Altitude (m)" | tr }} <span class="sort-icon"></span></th>
+                <th data-translate-lang="channel">Channel <span class="sort-icon"></span></th>
+                <th data-translate-lang="mqtt_gateway">MQTT <span class="sort-icon"></span></th>
+                <th data-translate-lang="last_seen">Last Seen <span class="sort-icon"></span></th>
+                <th data-translate-lang="favorite"></th>
+            </tr>
+        </thead>
+        <tbody id="node-table-body">
+            <tr>
+                <td colspan="12" class="is-loading" style="text-align:center; color:var(--mesh-muted);" data-translate-lang="loading_nodes">
+                    Loading nodes...
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div id="node-load-more" class="node-load-more" hidden>
+    <span class="node-spinner" aria-hidden="true"></span>
+    <span>{{ "Loading more nodes…" | tr }}</span>
+</div>
+<p id="node-page-range" class="node-page-range" aria-live="polite"></p>
+
+<script>
+// =====================================================
+// TRANSLATIONS
+// =====================================================
+let nodelistTranslations = {};
+
+function applyTranslationsNodelist() {
+    document.querySelectorAll("[data-translate-lang]").forEach(el => {
+        const key = el.dataset.translateLang;
+        if (nodelistTranslations[key]) {
+            if (el.tagName === "INPUT" && el.placeholder) {
+                el.placeholder = nodelistTranslations[key];
+            } else {
+                MeshI18n.label(el, nodelistTranslations[key]);
+            }
+        }
+    });
+}
+
+async function loadTranslationsNodelist() {
+    try {
+        const cfg = await window._siteConfigPromise;
+        const lang = cfg?.site?.language || "en";
+        const res = await fetch(`/api/v1/lang?lang=${lang}&section=nodelist`);
+        nodelistTranslations = await res.json();
+        applyTranslationsNodelist();
+    } catch (err) {
+        console.error("Failed to load nodelist translations:", err);
+    }
+}
+
+// =====================================================
+// GLOBALS
+// =====================================================
+let sortColumn = "short_name";
+let sortAsc = true;
+let showOnlyFavorites = false;
+let favoritesSet = new Set();
+let isBusy = false;
+let statusHideTimer = null;
+let statusShownAt = 0;
+const minStatusMs = 300;
+
+const headers = document.querySelectorAll("thead th");
+const keyMap = [
+    "short_name","long_name","hw_model","firmware","role",
+    "last_lat","last_long","last_altitude","channel","is_mqtt_gateway","last_seen_us"
+];
+
+function debounce(fn, delay = 250) {
+    let t;
+    return (...args) => {
+        clearTimeout(t);
+        t = setTimeout(() => fn(...args), delay);
+    };
+}
+
+function nextFrame() {
+    return new Promise(resolve => requestAnimationFrame(() => resolve()));
+}
+
+function loadFavorites() {
+    const favorites = localStorage.getItem('nodelist_favorites');
+    if (!favorites) {
+        favoritesSet = new Set();
+        return;
+    }
+
+    try {
+        const parsed = JSON.parse(favorites);
+        favoritesSet = new Set(Array.isArray(parsed) ? parsed : []);
+    } catch (err) {
+        console.warn("Failed to parse favorites, resetting.", err);
+        favoritesSet = new Set();
+    }
+}
+function saveFavorites() {
+    localStorage.setItem('nodelist_favorites', JSON.stringify([...favoritesSet]));
+}
+function toggleFavorite(nodeId) {
+    if (favoritesSet.has(nodeId)) {
+        favoritesSet.delete(nodeId);
+    } else {
+        favoritesSet.add(nodeId);
+    }
+    saveFavorites();
+}
+function isFavorite(nodeId) {
+    return favoritesSet.has(nodeId);
+}
+
+function favoriteStar(nodeId, active) {
+    const label = active ? MeshI18n.h("Remove from favorites") : MeshI18n.h("Add to favorites");
+    return `<button type="button" class="favorite-star${active ? " active" : ""}" data-node-id="${nodeId}"
+        aria-pressed="${active}" aria-label="${label}" title="${label}"><span class="ti ${active ? "ti-star-filled" : "ti-star"}" aria-hidden="true"></span></button>`;
+}
+
+function timeAgoFromMs(msTimestamp) {
+    if (!msTimestamp) return MeshI18n.t("N/A");
+    const diff = Date.now() - msTimestamp;
+
+    if (diff < 60000) return MeshI18n.t("just now");
+    // Intl picks the right plural for every language ("hace 1 día", "3 дня назад").
+    const short = new Intl.RelativeTimeFormat(MeshI18n.language, {numeric: "always", style: "short"});
+    const long = new Intl.RelativeTimeFormat(MeshI18n.language, {numeric: "always", style: "long"});
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return short.format(-mins, "minute");
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return short.format(-hrs, "hour");
+    return long.format(-Math.floor(hrs / 24), "day");
+}
+
+// =====================================================
+// DOM LOADED
+// =====================================================
+document.addEventListener("DOMContentLoaded", async function() {
+
+    const translationsReady = loadTranslationsNodelist();
+    loadFavorites();
+
+    const tbody = document.getElementById("node-table-body");
+
+    const roleFilter = document.getElementById("role-filter");
+    const channelFilter = document.getElementById("channel-filter");
+    const hwFilter = document.getElementById("hw-filter");
+    const firmwareFilter = document.getElementById("firmware-filter");
+    const searchBox = document.getElementById("search-box");
+    const countSpan = document.getElementById("node-count");
+    const statusSpan = document.getElementById("node-status");
+    const daysActiveFilter = document.getElementById("days-active-filter");
+    const exportBtn = document.getElementById("export-btn");
+    const clearBtn = document.getElementById("clear-btn");
+    const favoritesBtn = document.getElementById("favorites-btn");
+
+    // The server filters, sorts and pages the list: a big mesh has thousands of nodes,
+    // megabytes the browser no longer downloads to show fifty rows.
+    const PAGE_SIZE = 50;
+    let loadedNodes = [];   // rows shown so far, in order
+    let totalNodes = 0;     // matching nodes on the server
+    let listGeneration = 0; // bumps on every new query, so late pages are dropped
+    let pageLoading = false;
+    const loadMore = document.getElementById("node-load-more");
+    new IntersectionObserver(entries => {
+        if (entries.some(entry => entry.isIntersecting)) loadNextPage();
+    }, {rootMargin: "400px 0px"}).observe(loadMore);
+
+    function normalizeNode(n) {
+        const last_seen_us = n.last_seen_us || 0;
+        return {
+            ...n,
+            firmware: n.firmware || n.firmware_version || "",
+            last_seen_us,
+            last_seen_ms: last_seen_us ? last_seen_us / 1000 : 0,
+        };
+    }
+
+    // The filters, search, favourites and order as /api/v1/nodes parameters.
+    function listQuery() {
+        const params = new URLSearchParams();
+        params.set("days_active", Number(daysActiveFilter.value) || 3);
+        if (roleFilter.value) params.set("role", roleFilter.value);
+        if (channelFilter.value) params.set("channel", channelFilter.value);
+        if (hwFilter.value) params.set("hw_model", hwFilter.value);
+        if (firmwareFilter.value) params.set("firmware", firmwareFilter.value);
+        const term = searchBox.value.trim();
+        if (term) params.set("search", term.slice(0, 100));
+        // The API takes up to 500 ids in one request.
+        if (showOnlyFavorites) params.set("ids", [...favoritesSet].slice(0, 500).join(","));
+        params.set("sort", `${sortAsc ? "" : "-"}${sortColumn}`);
+        return params;
+    }
+
+    async function fetchNodeList(params) {
+        const res = await fetch(`/api/v1/nodes?${params}`);
+        if (!res.ok) throw new Error(`/api/v1/nodes returned ${res.status}`);
+        return res.json();
+    }
+
+    function showListError(err) {
+        console.error("Failed to load nodes:", err);
+        tbody.innerHTML = `<tr>
+            <td colspan="12" style="text-align:center; color:red;">
+                ${nodelistTranslations.error_loading_nodes || MeshI18n.t("Error loading nodes")}
+            </td></tr>`;
+        loadedNodes = [];
+        totalNodes = 0;
+        countSpan.textContent = 0;
+        updateLoadMore();
+    }
+
+    // Filter menus list the values present among the nodes of the selected period.
+    async function loadFilterOptions() {
+        const days = Number(daysActiveFilter.value) || 3;
+        const res = await fetch(`/api/v1/nodes/facets?days_active=${encodeURIComponent(days)}`);
+        if (!res.ok) throw new Error(`/api/v1/nodes/facets returned ${res.status}`);
+        const {facets} = await res.json();
+        const values = facet => new Set((facet || []).map(item => item.value).filter(Boolean));
+        fillSelect(roleFilter, values(facets.role));
+        fillSelect(channelFilter, values(facets.channel));
+        fillSelect(hwFilter, values(facets.hw_model));
+        fillSelect(firmwareFilter, values(facets.firmware));
+    }
+
+    async function loadNodesForActiveDays() {
+        setStatus(MeshI18n.t("Loading nodes…"));
+        await translationsReady;
+        await loadFilterOptions();
+        await applyFilters();
+    }
+
+    try {
+        await loadNodesForActiveDays();
+    } catch (err) {
+        showListError(err);
+        setStatus("");
+        return;
+    }
+
+    // Phones: the filters fold behind a button that counts the active ones.
+    const filtersToggle = document.getElementById("filters-toggle");
+    const filterPanel = document.getElementById("filter-panel");
+    filtersToggle.addEventListener("click", () => {
+        const open = !filterPanel.classList.contains("is-open");
+        filterPanel.classList.toggle("is-open", open);
+        filtersToggle.setAttribute("aria-expanded", String(open));
+    });
+
+    roleFilter.addEventListener("change", applyFilters);
+    channelFilter.addEventListener("change", applyFilters);
+    hwFilter.addEventListener("change", applyFilters);
+    firmwareFilter.addEventListener("change", applyFilters);
+    daysActiveFilter.addEventListener("change", async () => {
+        try {
+            await loadNodesForActiveDays();
+        } catch (err) {
+            showListError(err);
+            setStatus("");
+        }
+    });
+
+    // Debounced only for search typing
+    searchBox.addEventListener("input", debounce(applyFilters, 250));
+
+    exportBtn.addEventListener("click", exportToCSV);
+    clearBtn.addEventListener("click", clearFilters);
+    favoritesBtn.addEventListener("click", toggleFavoritesFilter);
+
+    // Favorite star click handler (delegated)
+    document.addEventListener("click", e => {
+        const star = e.target.closest('.favorite-star');
+        if (star) {
+            const nodeId = parseInt(star.dataset.nodeId, 10);
+            const fav = isFavorite(nodeId);
+            star.outerHTML = favoriteStar(nodeId, !fav);
+
+            toggleFavorite(nodeId);
+            // Only the favourites view changes its rows; elsewhere keep the scroll position.
+            if (showOnlyFavorites) applyFilters();
+        }
+    });
+
+    headers.forEach((th, index) => {
+        th.addEventListener("click", () => {
+            const key = keyMap[index];
+            // ignore clicks on the "favorite" (last header) which has no sort key
+            if (!key) return;
+
+            sortAsc = (sortColumn === key) ? !sortAsc : true;
+            sortColumn = key;
+
+            applyFilters();
+        });
+    });
+
+    // Card mode has no column headers: sort with the select and direction button instead.
+    const sortSelect = document.getElementById("sort-select");
+    const sortDir = document.getElementById("sort-direction");
+    // Short labels so the current order fits the compact sort button.
+    const SORT_LABELS = {
+        short_name: "Short name", long_name: "Long name", hw_model: "Hardware", firmware: "Firmware",
+        role: "Role", last_lat: "Latitude", last_long: "Longitude", last_altitude: "Altitude",
+        channel: "Channel", is_mqtt_gateway: "MQTT gateway", last_seen_us: "Last heard",
+    };
+    keyMap.forEach(key => sortSelect.add(new Option(MeshI18n.t(SORT_LABELS[key]), key)));
+    sortSelect.addEventListener("change", () => {
+        sortColumn = sortSelect.value;
+        applyFilters();
+    });
+    sortDir.addEventListener("click", () => {
+        sortAsc = !sortAsc;
+        applyFilters();
+    });
+
+    function fillSelect(select, values) {
+        const currentValue = select.value;
+        select.querySelectorAll("option:not(:first-child)").forEach(opt => opt.remove());
+        [...values].sort().forEach(v => {
+            const opt = document.createElement("option");
+            opt.value = v;
+            opt.textContent = v;
+            select.appendChild(opt);
+        });
+        select.value = values.has(currentValue) ? currentValue : "";
+    }
+
+    function toggleFavoritesFilter() {
+        if (showOnlyFavorites) {
+            clearFilters();
+            return;
+        }
+        showOnlyFavorites = true;
+        document.getElementById("favorites-label").textContent = MeshI18n.t("Show All");
+        favoritesBtn.classList.add("active");
+        favoritesBtn.setAttribute("aria-pressed", "true");
+        applyFilters();
+    }
+
+    function updateFiltersCount() {
+        const active = [roleFilter, channelFilter, hwFilter, firmwareFilter].filter(select => select.value).length;
+        const badge = document.getElementById("filters-count");
+        badge.textContent = active;
+        badge.hidden = active === 0;
+    }
+
+    // A new query: load its first page; its rows replace the shown ones in one go, so the
+    // list neither flashes empty nor jumps while it loads.
+    async function applyFilters() {
+        updateFiltersCount();
+        updateSortIcons();
+        const generation = ++listGeneration;
+        loadedNodes = [];
+        totalNodes = 0;
+        pageLoading = false;
+        setStatus(MeshI18n.t("Updating…"));
+        try {
+            await loadPage(generation);
+        } catch (err) {
+            if (generation === listGeneration) showListError(err);
+        } finally {
+            if (generation === listGeneration) setStatus("");
+        }
+    }
+
+    async function loadPage(generation) {
+        const params = listQuery();
+        params.set("limit", PAGE_SIZE);
+        params.set("offset", loadedNodes.length);
+        pageLoading = true;
+        let data;
+        try {
+            data = await fetchNodeList(params);
+        } finally {
+            if (generation === listGeneration) pageLoading = false;
+        }
+        if (generation !== listGeneration) return;
+
+        const first = loadedNodes.length === 0;
+        const page = (data.nodes || []).map(normalizeNode);
+        loadedNodes.push(...page);
+        totalNodes = data.total ?? loadedNodes.length;
+        countSpan.textContent = totalNodes;
+
+        const fragment = document.createDocumentFragment();
+        page.forEach(node => fragment.appendChild(nodeRow(node)));
+        if (first) {
+            tbody.innerHTML = "";
+            if (!page.length) {
+                tbody.innerHTML = `<tr>
+                    <td colspan="12" style="text-align:center; color:var(--mesh-muted);">
+                        ${nodelistTranslations.no_nodes_found || MeshI18n.t("No nodes found")}
+                    </td>
+                </tr>`;
+            }
+        }
+        tbody.appendChild(fragment);
+        updateLoadMore();
+    }
+
+    function loadNextPage() {
+        if (pageLoading || loadedNodes.length >= totalNodes) return;
+        const generation = listGeneration;
+        loadPage(generation).catch(err => console.error("Failed to load more nodes:", err));
+    }
+
+    function updateLoadMore() {
+        const more = loadedNodes.length < totalNodes;
+        loadMore.hidden = !more;
+        document.getElementById("node-page-range").textContent = totalNodes
+            ? MeshI18n.t("Showing {shown} of {total} nodes", {shown: loadedNodes.length, total: totalNodes}) : "";
+        // A short list may not fill the screen: keep loading until it does or nothing is left.
+        if (more && loadMore.getBoundingClientRect().top < window.innerHeight + 400) {
+            requestAnimationFrame(loadNextPage);
+        }
+    }
+
+    function nodeRow(node) {
+        const fav = isFavorite(node.node_id);
+        const na = MeshI18n.t("N/A");
+        const lat = node.last_lat ? (node.last_lat / 1e7).toFixed(7) : null;
+        const lon = node.last_long ? (node.last_long / 1e7).toFixed(7) : null;
+        const alt = node.last_altitude != null ? String(node.last_altitude) : null;
+        // Card-only cells (.card-only) combine fields into one line for the card layout.
+        const meta = [node.role, node.hw_model, node.firmware].filter(Boolean).map(escapeHtml).join(" · ");
+        const mqttBadge = node.is_mqtt_gateway ? `<span class="node-badge">${MeshI18n.h("MQTT gateway")}</span>` : "";
+        const net = [node.channel ? escapeHtml(node.channel) : "", mqttBadge].filter(Boolean).join(" ");
+        const location = lat && lon
+            ? `<span class="ti ti-map-pin" aria-hidden="true"></span> ${lat.slice(0, -2)}, ${lon.slice(0, -2)}${alt ? ` · ${escapeHtml(alt)} m` : ""}`
+            : "";
+        const row = document.createElement("tr");
+        row.innerHTML = `
+            <td class="c-short"><span class="node-short">${escapeHtml(node.short_name || na)}</span></td>
+            <td class="c-long"><a href="/node/${node.node_id}">${escapeHtml(node.long_name || na)}</a></td>
+            <td class="c-hw">${escapeHtml(node.hw_model || na)}</td>
+            <td class="c-fw">${escapeHtml(node.firmware || na)}</td>
+            <td class="c-role">${escapeHtml(node.role || na)}</td>
+            <td class="c-lat">${lat || na}</td>
+            <td class="c-lon">${lon || na}</td>
+            <td class="c-alt">${alt != null ? escapeHtml(alt) : na}</td>
+            <td class="c-channel">${escapeHtml(node.channel || na)}</td>
+            <td class="c-mqtt">${node.is_mqtt_gateway ? (nodelistTranslations.yes || MeshI18n.t("Yes")) : (nodelistTranslations.no || MeshI18n.t("No"))}</td>
+            <td class="c-seen">${timeAgoFromMs(node.last_seen_ms)}</td>
+            <td class="c-fav" style="text-align:center;">${favoriteStar(node.node_id, fav)}</td>
+            <td class="c-meta card-only">${meta}</td>
+            <td class="c-net card-only">${net}</td>
+            <td class="c-loc card-only">${location}</td>
+        `;
+        return row;
+    }
+
+    function clearFilters() {
+        roleFilter.value = "";
+        channelFilter.value = "";
+        hwFilter.value = "";
+        firmwareFilter.value = "";
+        searchBox.value = "";
+
+        sortColumn = "short_name";
+        sortAsc = true;
+        showOnlyFavorites = false;
+
+        document.getElementById("favorites-label").textContent = nodelistTranslations.show_favorites || MeshI18n.t("Show Favorites");
+        favoritesBtn.classList.remove("active");
+        favoritesBtn.setAttribute("aria-pressed", "false");
+
+        applyFilters();
+        updateSortIcons();
+    }
+
+    // The export holds every node matching the filters, not only the pages loaded so far.
+    async function exportToCSV() {
+        exportBtn.disabled = true;
+        let nodes;
+        try {
+            nodes = ((await fetchNodeList(listQuery())).nodes || []).map(normalizeNode);
+        } catch (err) {
+            console.error("Failed to export nodes:", err);
+            return;
+        } finally {
+            exportBtn.disabled = false;
+        }
+        const rows = [Array.from(headers).map(h => h.innerText.replace(/▲|▼/g,''))];
+        nodes.forEach(node => {
+            rows.push([
+                node.short_name || MeshI18n.t("N/A"), node.long_name || MeshI18n.t("N/A"), node.hw_model || MeshI18n.t("N/A"),
+                node.firmware || MeshI18n.t("N/A"), node.role || MeshI18n.t("N/A"),
+                node.last_lat ? (node.last_lat / 1e7).toFixed(7) : MeshI18n.t("N/A"),
+                node.last_long ? (node.last_long / 1e7).toFixed(7) : MeshI18n.t("N/A"),
+                node.last_altitude ?? MeshI18n.t("N/A"),
+                node.channel || MeshI18n.t("N/A"),
+                node.is_mqtt_gateway ? (nodelistTranslations.yes || MeshI18n.t("Yes")) : (nodelistTranslations.no || MeshI18n.t("No")),
+                timeAgoFromMs(node.last_seen_ms), isFavorite(node.node_id) ? "★" : "☆"
+            ]);
+        });
+
+        // A Blob, not a data: URL: encodeURI() leaves "#" alone, which cut the file short at
+        // the first "#" in any cell (node names such as "Big Rock Ridge #1").
+        const blob = new Blob(["\uFEFF" + csvFromRows(rows)], { type: "text/csv;charset=utf-8" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "nodelist.csv";
+        a.click();
+    }
+
+    function updateSortIcons() {
+        const select = document.getElementById("sort-select");
+        const direction = document.getElementById("sort-direction");
+        if (select) select.value = sortColumn;
+        if (direction) {
+            direction.setAttribute("aria-pressed", String(!sortAsc));
+            direction.querySelector(".ti").className = `ti ${sortAsc ? "ti-sort-ascending" : "ti-sort-descending"}`;
+            const label = sortAsc ? MeshI18n.t("Ascending") : MeshI18n.t("Descending");
+            direction.setAttribute("aria-label", label);
+            direction.title = label;
+        }
+        headers.forEach((th, i) => {
+            const span = th.querySelector(".sort-icon");
+            if (!span) return;
+            span.textContent =
+                keyMap[i] === sortColumn ? (sortAsc ? "▲" : "▼") : "";
+        });
+    }
+
+    function setStatus(message) {
+        if (!statusSpan) return;
+        if (statusHideTimer) {
+            clearTimeout(statusHideTimer);
+            statusHideTimer = null;
+        }
+
+        if (message) {
+            statusShownAt = Date.now();
+            console.log("[nodelist] status:", message);
+            statusSpan.textContent = message;
+            statusSpan.setAttribute("aria-busy", "true");
+            statusSpan.classList.add("active");
+            isBusy = true;
+            return;
+        }
+
+        const elapsed = Date.now() - statusShownAt;
+        const remaining = Math.max(0, minStatusMs - elapsed);
+        if (remaining > 0) {
+            statusHideTimer = setTimeout(() => {
+                statusHideTimer = null;
+                console.log("[nodelist] status: cleared");
+                statusSpan.textContent = "";
+                statusSpan.removeAttribute("aria-busy");
+                statusSpan.classList.remove("active");
+                isBusy = false;
+            }, remaining);
+            return;
+        }
+
+        console.log("[nodelist] status: cleared");
+        statusSpan.textContent = "";
+        statusSpan.removeAttribute("aria-busy");
+        statusSpan.classList.remove("active");
+        isBusy = false;
+    }
+});
+</script>
+{% endblock %}
