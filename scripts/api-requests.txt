@@ -252,3 +252,10 @@
 /api/packets?before=-5
 /api/packets?before=x
 /api/packets?contains=gnd&limit=20
+
+/api/traceroute/2091958177
+/api/traceroute/2091958177
+/api/traceroute/4294956189
+/api/traceroute/1
+/api/traceroute/x
+/api/traceroute/-5

@@ -13,4 +13,5 @@ pub mod decode;
 pub mod ingest;
 pub mod jobs;
 pub mod state;
+pub mod traceroute;
 pub mod web;

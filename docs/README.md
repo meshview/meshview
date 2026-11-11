@@ -24,8 +24,8 @@ each checked against the Python version's behaviour before it is called done.
 | Clean shutdown | Done |
 | Daily cleanup and snapshot | Done, identical databases side by side with Python |
 | Consistent backups (`meshview-rs backup`) | Done (new in meshview-rs); the Python version's scheduled backups are deprecated |
-| API: `/version`, `/health`, `config`, `lang`, `channels`, `snapshots/daily`, `packets_seen`, `stats`, `stats/count`, `stats/top`, `nodes`, `nodes/facets`, `packets` | Done |
-| API: `edges`, `traceroute`, `node/{id}/qr` | Not yet |
+| API: `/version`, `/health`, `config`, `lang`, `channels`, `snapshots/daily`, `packets_seen`, `stats`, `stats/count`, `stats/top`, `nodes`, `nodes/facets`, `packets`, `traceroute` | Done |
+| API: `edges`, `node/{id}/qr` | Not yet |
 | Web pages | Not yet |
 | Coverage prediction | Later |
 | PostgreSQL | Later |

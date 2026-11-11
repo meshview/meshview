@@ -16,6 +16,7 @@ mod packets_seen;
 mod site_config;
 mod snapshots;
 mod stats;
+mod traceroute;
 pub mod version;
 
 use crate::db::Reader;
@@ -38,6 +39,7 @@ pub fn v1() -> OpenApiRouter<AppState> {
         .routes(routes!(nodes::nodes))
         .routes(routes!(nodes::facets))
         .routes(routes!(packets::packets))
+        .routes(routes!(traceroute::traceroute))
 }
 
 /// The routes outside any version, at their own full paths.

@@ -9,7 +9,7 @@ use crate::db::{
     DailySnapshot, Facet, JobRun, Node, NodeFacet, NodeFilter, NodeQuery, PacketFilter, PacketSeen,
     Period, PeriodCount, SightingsOf, TopNode, TopQuery,
 };
-use crate::db::{PacketQuery, PacketRow};
+use crate::db::{PacketQuery, PacketRow, TracerouteRow};
 use anyhow::{Context, Result};
 use sqlx::SqlitePool;
 use sqlx::{QueryBuilder, Sqlite};
@@ -468,4 +468,20 @@ pub async fn packets(pool: &SqlitePool, packets: &PacketQuery) -> Result<Vec<Pac
         .fetch_all(pool)
         .await
         .context("listing packets")
+}
+
+pub async fn traceroutes(
+    pool: &SqlitePool,
+    packet_id: i64,
+    limit: i64,
+) -> Result<Vec<TracerouteRow>> {
+    sqlx::query_as(
+        "SELECT gateway_node_id, done, route, import_time_us FROM traceroute \
+         WHERE packet_id = ? ORDER BY import_time_us, id LIMIT ?",
+    )
+    .bind(packet_id)
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .context("listing a packet's traceroutes")
 }

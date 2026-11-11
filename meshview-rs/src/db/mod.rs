@@ -100,6 +100,12 @@ impl Reader {
         sqlite::queries::node_facet(&self.pool, field, filter).await
     }
 
+    /// The traceroute rows of a packet, one per gateway that heard it, the
+    /// first heard first, at most `limit`.
+    pub async fn traceroutes(&self, packet_id: i64, limit: i64) -> Result<Vec<TracerouteRow>> {
+        sqlite::queries::traceroutes(&self.pool, packet_id, limit).await
+    }
+
     /// One packet, by its row id.
     pub async fn packet(&self, id: i64) -> Result<Option<PacketRow>> {
         sqlite::queries::packet(&self.pool, id).await
@@ -193,6 +199,16 @@ pub struct TopNode {
     pub channel: Option<String>,
     pub sent: i64,
     pub seen: i64,
+}
+
+/// A row of `traceroute`.
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct TracerouteRow {
+    pub gateway_node_id: Option<i64>,
+    pub done: Option<bool>,
+    /// The RouteDiscovery, as sent.
+    pub route: Option<Vec<u8>>,
+    pub import_time_us: Option<i64>,
 }
 
 /// A row of `packet`, with the names of its sender and recipient when they

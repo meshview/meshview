@@ -79,3 +79,4 @@ for changing in a future version instead.
 | `/api/v1/nodes` with a `node_id` or `days_active` too large | An empty list without paging, a 500 with it | No nodes; or, for `days_active`, every node. |
 | `/api/v1/packets?contains=` outside text messages | `%` and `_` are wildcards: `contains=%` matches every packet | Taken literally, as the parameter is documented: a substring. Text messages (`portnum=1`) were searched literally already. |
 | `/api/v1/packets` with a packet whose port or payload is null | 500 for the whole page | The packet, with a null `portnum`, or `Did not decode`. |
+| `/api/v1/traceroute/{id}` with a report that has no route | 500 | The report left out, as one whose route cannot be read. |
