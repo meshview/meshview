@@ -120,7 +120,7 @@ ported yet.
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `domain` | string | `""` | Domain metadata exposed by `/api/config`; does not configure binding or TLS. |
-| `language` | string | `"en"` | Language catalog: `en`, `es` or `ru`. |
+| `language` | string | `"en"` | Language of the pages and of the API reference: `en`, `es` or `ru`. |
 | `title` | string | `""` | Site title, in the browser title bar and headers. |
 | `message` | string | `""` | Tagline, shown in the footer and used as the page description. |
 | `announcement` | string | `""` | Banner at the top of every page. Visitors can dismiss it; it shows again when the text changes. |

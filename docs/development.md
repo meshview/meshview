@@ -13,7 +13,7 @@ do, and in a crate of their own they are built once and left alone.
 | `meshview-rs/src/config.rs` | The configuration: TOML, environment variables, defaults. |
 | `meshview-rs/src/db/` | The database. `mod.rs` is what holds for any backend; `sqlite.rs` everything that knows it is SQLite, so that PostgreSQL can be a sibling module. |
 | `meshview-rs/migrations/sqlite/` | The SQLite migrations, compiled into the binary. |
-| `meshview-rs/assets/` | What the web side serves and is built into the binary: so far the translation catalogs under `lang/`, the Python version's. |
+| `meshview-rs/assets/` | What the web side serves and is built into the binary: so far the translation catalogs under `lang/`, the Python version's, and the API reference's introduction (`api/intro.md`) and translations (`api-lang/`). |
 | `meshview-rs/src/ingest/` | MQTT ingestion: the connection (`mod.rs`), keys and decryption (`keys.rs`), opening a message (`opened.rs`) and storing it (`store.rs`). |
 | `meshview-rs/src/traceroute.rs` | Paths out of traceroutes: from the node that started one to the one it traced, and back. |
 | `meshview-rs/src/coverage.rs` | Predicted coverage: where a node is heard, sampled around it with the ITM. |
@@ -186,6 +186,34 @@ for checking the port, and is not a setting.
 The differences that are meant, listed in [API](api.md#differences-from-the-python-version),
 are of values the comparison does not see (the JSON's spacing) or of answers
 the requests do not ask for.
+
+## The API reference
+
+The reference is written where the API is: each endpoint's doc comment is its
+title (the first line) and description, its `#[utoipa::path]` has the
+parameters and answers, and the doc comments of the answers' fields describe
+them. What holds for the whole API, the reference's front page, is
+`meshview-rs/assets/api/intro.md`. All of it is Markdown, for Scalar to render.
+
+The reference is translated into the languages of `assets/api-lang/`, one JSON
+catalog each from the English text to its translation, piece by piece: a
+paragraph, a heading or an item of a list, its lines joined by spaces. A test
+fails while a catalog lacks a piece, or has one there no longer is, so any
+change to the reference's text has to be followed by its catalogs:
+
+```sh
+cargo test -p meshview-rs --lib reference
+```
+
+prints, for each catalog, what is missing as JSON with empty translations, to
+fill in and add, and what is stale, to remove. A piece is its whole paragraph,
+so changing a word of it makes the paragraph missing and its old translation
+stale: translate it anew rather than only renaming the key.
+
+A new language is a new `assets/api-lang/<code>.json`, with every piece; the
+reference is then served in it when it is `[site] language`. Scalar has its
+own words in a few languages, `es` and `ru` among them; in one it does not
+have, they are English.
 
 ## CI
 

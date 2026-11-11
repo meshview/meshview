@@ -102,3 +102,32 @@ async fn an_ingester_only_answers_the_probes() {
         StatusCode::NOT_FOUND
     );
 }
+
+#[tokio::test]
+async fn the_reference_is_in_the_sites_language() {
+    let catalog: std::collections::HashMap<String, String> =
+        serde_json::from_str(include_str!("../assets/api-lang/es.json")).unwrap();
+    let nodes = |document: &serde_json::Value| {
+        document["paths"]["/api/v1/nodes"]["get"]["summary"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    let mut config = Config::default();
+    config.site.language = "es".into();
+    let state = AppState::new(Arc::new(Readiness::new([CHECK_DATABASE])), config);
+    let app = web::router(Role::Serve, state);
+
+    let spanish = json(get(&app, "/api/openapi.json").await).await;
+    assert_eq!(nodes(&spanish), catalog["Nodes"]);
+    let english = json(get(&app, "/api/openapi.json?lang=en").await).await;
+    assert_eq!(nodes(&english), "Nodes");
+    let unknown = json(get(&app, "/api/openapi.json?lang=xx").await).await;
+    assert_eq!(nodes(&unknown), "Nodes");
+
+    let page = get(&app, "/api/docs").await;
+    let html = page.into_body().collect().await.unwrap().to_bytes();
+    let html = String::from_utf8(html.to_vec()).unwrap();
+    assert!(html.contains(r#""localization":{"locale":"es"}"#));
+    assert!(html.contains(&catalog["Nodes"]));
+}
