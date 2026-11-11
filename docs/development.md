@@ -23,7 +23,7 @@ do, and in a crate of their own they are built once and left alone.
 | `meshview-rs/src/jobs.rs` | The daily cleanup and snapshot, and their schedule. |
 | `meshview-rs/src/app.rs` | The roles, starting and stopping a process, and `backup`. |
 | `meshview-rs/tests/` | Integration tests. |
-| `scripts/` | Updating the protobufs, comparing databases and API answers with the Python version, converting its configuration, and giving a database back to it. |
+| `scripts/` | Updating the protobufs, and for those coming from the Python version, converting its configuration and giving a database back to it. |
 
 ## Building and testing
 
@@ -94,99 +94,6 @@ cargo test --workspace
 
 Only the official protobufs are vendored; fields added by modified firmware are
 not declared (see [Ingestion](ingestion.md#fields-these-protobufs-do-not-know)).
-
-## Comparing with the Python version
-
-Ingestion is meant to store what the Python meshview stores. The way to check
-it is to run both against the same broker at the same time, each into its own
-database, and compare.
-
-1. Get the Python meshview 4.0 running from a checkout, with its virtual
-   environment, and a `config.ini` whose database is `python.db`, cleanup
-   disabled.
-2. Write the same broker, credentials and topics into a `config.toml` for
-   meshview-rs, with `rust.db` as its database and a port that does not clash.
-3. Start both at once, and leave them for a while: half an hour on a quiet mesh
-   is enough to see every kind of packet.
-
-   ```sh
-   python startdb.py --config config.ini &
-   meshview-rs --config config.toml ingest &
-   ```
-
-4. Stop both, and compare:
-
-   ```sh
-   scripts/compare-ingest.py python.db rust.db
-   ```
-
-```text
-OK   packet (real ids): python=129 rust=129 only_python=0 only_rust=0
-OK   packet (map reports): python=2 rust=2 only_python=0 only_rust=0
-OK   packet_seen: python=155 rust=155 only_python=0 only_rust=0
-OK   packet_seen (map reports): python=2 rust=2 only_python=0 only_rust=0
-OK   node: python=76 rust=76 only_python=0 only_rust=0
-OK   traceroute: python=10 rust=10 only_python=0 only_rust=0
-ALL MATCH
-```
-
-Times of import differ by construction and are not compared. A packet that
-arrives while only one of the two is connected, right at the start or the end,
-shows up as a difference, and is not one.
-
-## Comparing the API
-
-The API is meant to answer what the Python meshview answers. The way to check
-it is to run both web servers on copies of the same database, with nothing
-ingesting into either, and send both the same requests.
-
-1. Make two copies of a Python meshview database: `python.db` stays the
-   Python version's, `rust.db` is taken over with `meshview-rs migrate`.
-2. Start the Python web server on `python.db` (`python main.py --config
-   config.ini`), and `meshview-rs serve` on `rust.db` on another port, both with
-   the same `[site]` settings: the Python `sample.config.ini` and this project's
-   `sample.config.toml` are the same configuration.
-3. Compare:
-
-   ```sh
-   scripts/compare-api.py http://localhost:8081 http://localhost:8082 scripts/api-requests.txt
-   ```
-
-`scripts/api-requests.txt` has the requests, ordinary ones and the edge cases:
-every endpoint ported adds its own. Each is sent to the Python server at its
-unversioned address and to meshview-rs under `/api/v1`, and the status, content
-type and JSON values compared; keys that differ by nature, such as the version,
-are listed after the request as `ignore=`. A request about a particular packet
-or node needs one that is in the database: the file has those of the database
-it was last run against, and they may need changing for another.
-
-Some answers only cover the latest hours (`/api/v1/edges` the latest 12, the
-statistics by default the latest day), and a copy of an old database has
-nothing in them. Shift both copies by the same amount so that they end now, and
-they stay equal to each other:
-
-```sh
-for db in python.db rust.db; do
-  sqlite3 "$db" "UPDATE packet SET import_time_us = import_time_us + $SHIFT;
-                 UPDATE packet_seen SET import_time_us = import_time_us + $SHIFT;
-                 UPDATE traceroute SET import_time_us = import_time_us + $SHIFT;
-                 UPDATE node SET last_seen_us = last_seen_us + $SHIFT,
-                                 first_seen_us = first_seen_us + $SHIFT;"
-done
-```
-
-The Python version caches `/api/edges` for a minute, as meshview-rs does: wait
-that long after changing the data before comparing it.
-
-`/api/v1/coverage` only compares equal with `MESHVIEW_COVERAGE_MODEL=pyitm` in
-meshview-rs's environment, which switches its propagation model to the
-`longley-rice` crate's reproduction of pyitm, the one the Python version uses.
-Without it meshview-rs uses NTIA's model, which differs a little; the knob is
-for checking the port, and is not a setting.
-
-The differences that are meant, listed in [API](api.md#differences-from-the-python-version),
-are of values the comparison does not see (the JSON's spacing) or of answers
-the requests do not ask for.
 
 ## The API reference
 
