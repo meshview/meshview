@@ -141,6 +141,11 @@ pub fn router(role: Role, state: AppState) -> Router {
     } else {
         router
     };
+    let router = if state.config.logging.access_log {
+        router.layer(axum::middleware::from_fn(access_log))
+    } else {
+        router
+    };
 
     router.with_state(state)
 }
@@ -161,6 +166,22 @@ fn documents(reference: &utoipa::openapi::OpenApi) -> BTreeMap<String, Bytes> {
         Bytes::from(english.to_string()),
     );
     documents
+}
+
+/// `[logging] access_log`: a line for every request, with how it was answered
+/// and how long that took.
+async fn access_log(request: axum::extract::Request, next: axum::middleware::Next) -> Response {
+    let method = request.method().clone();
+    let uri = request.uri().clone();
+    let started = std::time::Instant::now();
+    let response = next.run(request).await;
+    tracing::info!(
+        target: "meshview_rs::access",
+        "{method} {uri} {} {:.1} ms",
+        response.status().as_u16(),
+        started.elapsed().as_secs_f64() * 1000.0
+    );
+    response
 }
 
 /// Gzip for what is worth compressing, as the Python version did: JSON, SVG,
