@@ -126,6 +126,7 @@ with every key, and [Configuration](configuration.md) has them all.
 | API reference | `static/api.html` | `/api/docs`, generated from the code |
 | Probes | `/health` | `/livez` and `/readyz`, for orchestrators; `/health` comes back with the API |
 | MQTT over TLS | no | yes |
+| Coverage prediction | pyitm, installed apart | NTIA's model, built in (see [API](api.md#differences-from-the-python-version)) |
 | Stopping | the database's side files can be left behind | stops in order and leaves only the database file |
 | Backups | scheduled, copying the live file | `meshview-rs backup`, a consistent copy, for your scheduler to run |
 | Last cleanup | a JSON file beside the cleanup log | the `job_run` table |
@@ -134,7 +135,6 @@ with every key, and [Configuration](configuration.md) has them all.
 
 The port, 8081, and the database file, `packets.db`, are the same.
 
-Not ported yet, so missing for now: the web pages and the API endpoints, and
-coverage prediction. Their settings
+Not ported yet, so missing for now: the web pages. Their settings
 are already accepted, so the configuration does not need to change when they
 arrive.

@@ -8,6 +8,7 @@
 
 pub mod app;
 pub mod config;
+pub mod coverage;
 pub mod db;
 pub mod decode;
 pub mod ingest;

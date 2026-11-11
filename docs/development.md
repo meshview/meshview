@@ -8,6 +8,7 @@ do, and in a crate of their own they are built once and left alone.
 
 | Path | What it is |
 |---|---|
+| `longley-rice/` | The ITS Irregular Terrain Model in area mode, from NTIA's C++, with its own licence and README: a crate meant to be published on its own. |
 | `meshview-proto/` | The Meshtastic protobufs, vendored under `protobufs/` and compiled by prost, and their descriptors. Also `wire`, for what prost reads differently from Python's protobuf (unknown fields, fields of the wrong wire type), and `text_format`, the protobuf text format as Python writes it. |
 | `meshview-rs/src/config.rs` | The configuration: TOML, environment variables, defaults. |
 | `meshview-rs/src/db/` | The database. `mod.rs` is what holds for any backend; `sqlite.rs` everything that knows it is SQLite, so that PostgreSQL can be a sibling module. |
@@ -15,6 +16,7 @@ do, and in a crate of their own they are built once and left alone.
 | `meshview-rs/assets/` | What the web side serves and is built into the binary: so far the translation catalogs under `lang/`, the Python version's. |
 | `meshview-rs/src/ingest/` | MQTT ingestion: the connection (`mod.rs`), keys and decryption (`keys.rs`), opening a message (`opened.rs`) and storing it (`store.rs`). |
 | `meshview-rs/src/traceroute.rs` | Paths out of traceroutes: from the node that started one to the one it traced, and back. |
+| `meshview-rs/src/coverage.rs` | Predicted coverage: where a node is heard, sampled around it with the ITM. |
 | `meshview-rs/src/decode.rs` | What a stored packet says, as the pages show it: decoded, in the protobuf text format, redacted or `Did not decode`. |
 | `meshview-rs/src/web/` | HTTP: the API router, its reference, the redirects and the probes. `web/api/` has the API's endpoints, its errors, and its parameter parsing. |
 | `meshview-rs/src/jobs.rs` | The daily cleanup and snapshot, and their schedule. |
@@ -174,6 +176,12 @@ done
 
 The Python version caches `/api/edges` for a minute, as meshview-rs does: wait
 that long after changing the data before comparing it.
+
+`/api/v1/coverage` only compares equal with `MESHVIEW_COVERAGE_MODEL=pyitm` in
+meshview-rs's environment, which switches its propagation model to the
+`longley-rice` crate's reproduction of pyitm, the one the Python version uses.
+Without it meshview-rs uses NTIA's model, which differs a little; the knob is
+for checking the port, and is not a setting.
 
 The differences that are meant, listed in [API](api.md#differences-from-the-python-version),
 are of values the comparison does not see (the JSON's spacing) or of answers

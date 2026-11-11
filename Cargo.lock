@@ -1253,6 +1253,7 @@ dependencies = [
  "http-body-util",
  "jiff",
  "log",
+ "longley-rice",
  "meshview-proto",
  "prost",
  "rumqttc",

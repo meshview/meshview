@@ -80,3 +80,7 @@ for changing in a future version instead.
 | `/api/v1/packets?contains=` outside text messages | `%` and `_` are wildcards: `contains=%` matches every packet | Taken literally, as the parameter is documented: a substring. Text messages (`portnum=1`) were searched literally already. |
 | `/api/v1/packets` with a packet whose port or payload is null | 500 for the whole page | The packet, with a null `portnum`, or `Did not decode`. |
 | `/api/v1/traceroute/{id}` with a report that has no route | 500 | The report left out, as one whose route cannot be read. |
+| `/api/v1/coverage/{id}`: the model | pyitm 0.3, a Python translation of ITM 1.2.2 with four bugs of its own | NTIA's ITM, version 1.4, through the [`longley-rice`](../longley-rice) crate. At a reliability of 50% or more, as the pages ask for, the loss differs by about 0.001 dB and the reach comes out the same, or one step shorter; below 50% pyitm was up to 6.6 dB too pessimistic. |
+| `/api/v1/coverage/{id}` when the model refuses the inputs (an antenna height of 0 m) | 500 | The points it refuses are left out, and the answer has those it does not. |
+| `/api/v1/coverage/{id}` asked for at the same time | pyitm keeps its working values in globals and the predictions run in threads, so predictions made at once can mix them up and come out wrong | Each prediction is computed on its own; answers do not depend on what else is asked for. |
+| `/api/v1/coverage/{id}` without the model | 503, when pyitm is not installed | Always available: the model is built in. |

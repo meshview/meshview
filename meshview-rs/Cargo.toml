@@ -26,6 +26,8 @@ jiff = { version = "0.2", features = ["tzdb-bundle-always"] }
 # Only for the level sqlx logs slow statements at.
 log = "0.4"
 meshview-proto = { path = "../meshview-proto" }
+# The radio propagation model behind the predicted coverage.
+longley-rice = { path = "../longley-rice" }
 prost.workspace = true
 # TLS through rustls, but with no crypto provider chosen here: its default is
 # aws-lc, which wants cmake and a C toolchain to cross compile. `ring` is chosen
