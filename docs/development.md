@@ -24,7 +24,7 @@ do, and in a crate of their own they are built once and left alone.
 | `meshview-rs/src/jobs.rs` | The daily cleanup and snapshot, and their schedule. |
 | `meshview-rs/src/app.rs` | The roles, starting and stopping a process, and `backup`. |
 | `meshview-rs/tests/` | Integration tests. |
-| `scripts/` | Updating the protobufs, comparing databases and API answers with the Python version, and giving a database back to it. |
+| `scripts/` | Updating the protobufs, comparing databases and API answers with the Python version, importing its web pages, converting its configuration, and giving a database back to it. |
 
 ## Building and testing
 

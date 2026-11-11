@@ -80,7 +80,25 @@ from which version on the script refuses.
 ## Converting `config.ini`
 
 meshview-rs reads `config.toml`, not `config.ini`, and never writes either. The
-sections and keys are the same, so converting is a matter of syntax:
+sections and keys are the same, so converting is a matter of syntax, which
+`scripts/convert-config.py` does:
+
+```sh
+scripts/convert-config.py config.ini -o config.toml
+```
+
+It reads the INI file as the Python version reads it and writes every key with
+its type. What meshview-rs has no use for it leaves out, saying why on standard
+error: the deprecated keys below, keys the Python version had stopped using
+(`starting`), keys neither knows, with the one they look like (a misspelt
+`firehose_interal`, which the Python version ignored, is left out rather than
+corrected, so the configuration keeps doing what it did), empty values, and the
+Python sample's channel colours, which meshview-rs has its own of.
+`conversations` is written as `chat`, and `sqlite+aiosqlite://` as `sqlite://`.
+Read its notes, and check the result by starting meshview-rs with it: anything
+it does not take, it refuses.
+
+By hand, the differences are these:
 
 | | `config.ini` | `config.toml` |
 |---|---|---|
