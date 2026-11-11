@@ -22,7 +22,7 @@ use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::watch;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// How long requests in flight, and messages waiting to be stored, get to finish
 /// once the process has been asked to stop. Comfortably under the ten seconds a
@@ -127,9 +127,14 @@ pub async fn run_until(
     });
 
     let prepared = tokio::select! {
-        prepared = prepare(role, database, state) => prepared,
+        prepared = prepare(role, database.clone(), state) => prepared,
         _ = wait_until(stopping.clone()) => Ok(None),
     };
+
+    // Once the web can answer, the first requests to the busiest pages should
+    // not be the ones that read their part of the database from the disk.
+    let warming = (role.serves() && prepared.is_ok() && !*stopping.borrow())
+        .then(|| tokio::spawn(warm_cache(database, stopping.clone())));
 
     // Kept here as well as in the store, so that it can be closed properly
     // however the ingester ends.
@@ -172,6 +177,9 @@ pub async fn run_until(
         Ok(Err(e)) => warn!("the web server task failed: {e}"),
         Err(_) => warn!("still serving requests after {DRAIN_GRACE:?}; stopping anyway"),
     }
+    if let Some(warming) = warming {
+        let _ = warming.await;
+    }
     if let Some(reader) = state_reader.get().cloned() {
         db::sqlite::close_reader(reader.pool().clone()).await;
     }
@@ -197,6 +205,49 @@ pub async fn backup(config: &Config, output: &std::path::Path) -> Result<()> {
         output.display()
     );
     Ok(())
+}
+
+/// How far back the top nodes look by default: a day.
+const TOP_WINDOW_US: i64 = 86_400 * 1_000_000;
+
+/// Reads, once and in the background, what the busiest pages read first: the
+/// totals of the home page and the statistics, and the window of the top
+/// nodes. Right after a start none of it is in memory, and on a slow disk the
+/// first visitor waits seconds for each, after which it is instant. Done on a
+/// connection of its own, which does not warn about slow statements as the
+/// web's do, and given up as soon as the process stops.
+async fn warm_cache(database: PathBuf, stopping: watch::Receiver<bool>) {
+    let started = std::time::Instant::now();
+    let pool = match db::sqlite::open_quietly_for_reading(&database).await {
+        Ok(pool) => pool,
+        Err(e) => {
+            debug!("not warming the cache: {e:#}");
+            return;
+        }
+    };
+    let reader = db::Reader::new(pool.clone());
+    let work = async {
+        reader.count_packets(None).await?;
+        reader.count_sightings(db::SightingsOf::All).await?;
+        reader
+            .top_nodes(&db::TopQuery {
+                window_us: TOP_WINDOW_US,
+                channel: None,
+                active: true,
+                limit: 50,
+                offset: 0,
+            })
+            .await?;
+        anyhow::Ok(())
+    };
+    tokio::select! {
+        done = work => match done {
+            Ok(()) => info!("database cache warmed in {:.1?}", started.elapsed()),
+            Err(e) => debug!("warming the cache: {e:#}"),
+        },
+        _ = wait_until(stopping) => {}
+    }
+    pool.close().await;
 }
 
 /// Gets the database where this role needs it, and says so through readiness.

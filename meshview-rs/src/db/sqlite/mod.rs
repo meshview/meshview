@@ -128,6 +128,20 @@ pub async fn open_for_reading(path: &Path) -> Result<Option<SqlitePool>> {
     Ok(Some(pool))
 }
 
+/// Opens one read only connection that does not warn about slow statements:
+/// for reading through the database on purpose, which is slow and meant to be.
+pub async fn open_quietly_for_reading(path: &Path) -> Result<SqlitePool> {
+    SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(
+            options(path)
+                .read_only(true)
+                .log_slow_statements(log::LevelFilter::Off, Duration::MAX),
+        )
+        .await
+        .with_context(|| format!("opening {} for reading", path.display()))
+}
+
 /// Closes the writer so that nothing is left beside the database file.
 ///
 /// Under WAL, committed data can still be in the `-wal` file, with the `-shm`
