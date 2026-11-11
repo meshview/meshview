@@ -48,6 +48,20 @@ pub struct Config {
     /// The file this came from, if any.
     #[serde(skip)]
     source: Option<PathBuf>,
+    /// The `MESHVIEW_` variables laid over it, by name.
+    #[serde(skip)]
+    environment: Vec<EnvSetting>,
+    /// Whether the file named the database.
+    #[serde(skip)]
+    database_in_file: bool,
+}
+
+/// A variable of the environment that set a key.
+#[derive(Debug, Clone, PartialEq)]
+struct EnvSetting {
+    name: String,
+    section: String,
+    key: String,
 }
 
 /// `[server]`: where the web server listens.
@@ -264,7 +278,8 @@ impl Config {
 
         let mut table: Table =
             toml::from_str(&text).with_context(|| format!("parsing {}", path.display()))?;
-        apply_env(&mut table, std::env::vars())?;
+        let database_in_file = names_the_database(&table);
+        let environment = apply_env(&mut table, std::env::vars())?;
 
         let mut config: Self = Value::Table(table)
             .try_into()
@@ -273,6 +288,8 @@ impl Config {
                 None => "in the environment".to_string(),
             })?;
         config.source = source;
+        config.environment = environment;
+        config.database_in_file = database_in_file;
         Ok(config)
     }
 
@@ -288,8 +305,33 @@ impl Config {
         vars: impl IntoIterator<Item = (String, String)>,
     ) -> Result<Self> {
         let mut table: Table = toml::from_str(text)?;
-        apply_env(&mut table, vars)?;
-        Ok(Value::Table(table).try_into()?)
+        let database_in_file = names_the_database(&table);
+        let environment = apply_env(&mut table, vars)?;
+        let mut config: Self = Value::Table(table).try_into()?;
+        config.environment = environment;
+        config.database_in_file = database_in_file;
+        Ok(config)
+    }
+
+    /// The `MESHVIEW_` variables that set keys, by name: what to log at start,
+    /// without their values, which can be secrets.
+    pub fn environment_variables(&self) -> impl Iterator<Item = &str> {
+        self.environment.iter().map(|setting| setting.name.as_str())
+    }
+
+    /// Where the database's connection string came from, to log beside it: a
+    /// variable left set in the environment wins over the file without a word
+    /// otherwise.
+    pub fn database_origin(&self) -> String {
+        let from_env =
+            self.environment.iter().rev().find(|setting| {
+                setting.section == "database" && setting.key == "connection_string"
+            });
+        match from_env {
+            Some(setting) => format!("set by {}", setting.name),
+            None if self.database_in_file => "set in the configuration file".to_string(),
+            None => "the default".to_string(),
+        }
     }
 
     /// What in this configuration is deprecated, as warnings to log at start-up.
@@ -359,13 +401,26 @@ impl Config {
     }
 }
 
-/// Lays `MESHVIEW_<SECTION>__<KEY>` variables over a parsed file.
+/// Whether a parsed file has `[database] connection_string`.
+fn names_the_database(table: &Table) -> bool {
+    table
+        .get("database")
+        .and_then(Value::as_table)
+        .is_some_and(|database| database.contains_key("connection_string"))
+}
+
+/// Lays `MESHVIEW_<SECTION>__<KEY>` variables over a parsed file, and answers
+/// those it laid.
 ///
 /// Each value is read as the type its key has, which the defaults say. A key
 /// that has no default to go by (an optional number) is read as a TOML value if
 /// it is one and as a string otherwise. Unknown sections and keys are put in
 /// anyway, so that reading the result refuses them as it would in the file.
-fn apply_env(table: &mut Table, vars: impl IntoIterator<Item = (String, String)>) -> Result<()> {
+fn apply_env(
+    table: &mut Table,
+    vars: impl IntoIterator<Item = (String, String)>,
+) -> Result<Vec<EnvSetting>> {
+    let mut applied = Vec::new();
     let defaults = Table::try_from(Config::default()).expect("the defaults serialise");
     let a_string = Value::String(String::new());
 
@@ -395,9 +450,10 @@ fn apply_env(table: &mut Table, vars: impl IntoIterator<Item = (String, String)>
         let Value::Table(keys) = entry else {
             bail!("{name}: [{section}] is not a section");
         };
-        keys.insert(key, value);
+        keys.insert(key.clone(), value);
+        applied.push(EnvSetting { name, section, key });
     }
-    Ok(())
+    Ok(applied)
 }
 
 /// Reads a value from the environment as the type of `expected`.
@@ -603,6 +659,36 @@ mod tests {
         );
         assert!(warnings[0].contains("reverse proxy"));
         assert!(warnings[1].contains("meshview-rs backup"));
+    }
+
+    #[test]
+    fn where_the_database_was_named_is_known() {
+        let default = Config::parse_with_env("", Vec::new()).unwrap();
+        assert_eq!(default.database_origin(), "the default");
+
+        let file = "[database]\nconnection_string = \"sqlite:////var/lib/m/packets.db\"\n";
+        let in_file = Config::parse_with_env(file, Vec::new()).unwrap();
+        assert_eq!(in_file.database_origin(), "set in the configuration file");
+
+        let overridden = Config::parse_with_env(
+            file,
+            env(&[
+                (
+                    "MESHVIEW_DATABASE__CONNECTION_STRING",
+                    "sqlite:////data/packets.db",
+                ),
+                ("MESHVIEW_MQTT__PASSWORD", "secret"),
+            ]),
+        )
+        .unwrap();
+        assert_eq!(
+            overridden.database_origin(),
+            "set by MESHVIEW_DATABASE__CONNECTION_STRING"
+        );
+        // Names only: values can be secrets.
+        let names: Vec<_> = overridden.environment_variables().collect();
+        assert_eq!(names.len(), 2, "{names:?}");
+        assert!(names.contains(&"MESHVIEW_MQTT__PASSWORD"));
     }
 
     #[test]
