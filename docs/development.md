@@ -8,12 +8,13 @@ do, and in a crate of their own they are built once and left alone.
 
 | Path | What it is |
 |---|---|
-| `meshview-proto/` | The Meshtastic protobufs, vendored under `protobufs/` and compiled by prost. Also `wire`, for the protobuf wire format prost does not cover (keeping unknown fields), and `known_fields`, generated from the descriptors. |
+| `meshview-proto/` | The Meshtastic protobufs, vendored under `protobufs/` and compiled by prost, and their descriptors. Also `wire`, for what prost reads differently from Python's protobuf (unknown fields, fields of the wrong wire type), and `text_format`, the protobuf text format as Python writes it. |
 | `meshview-rs/src/config.rs` | The configuration: TOML, environment variables, defaults. |
 | `meshview-rs/src/db/` | The database. `mod.rs` is what holds for any backend; `sqlite.rs` everything that knows it is SQLite, so that PostgreSQL can be a sibling module. |
 | `meshview-rs/migrations/sqlite/` | The SQLite migrations, compiled into the binary. |
 | `meshview-rs/assets/` | What the web side serves and is built into the binary: so far the translation catalogs under `lang/`, the Python version's. |
 | `meshview-rs/src/ingest/` | MQTT ingestion: the connection (`mod.rs`), keys and decryption (`keys.rs`), opening a message (`opened.rs`) and storing it (`store.rs`). |
+| `meshview-rs/src/decode.rs` | What a stored packet says, as the pages show it: decoded, in the protobuf text format, redacted or `Did not decode`. |
 | `meshview-rs/src/web/` | HTTP: the API router, its reference, the redirects and the probes. `web/api/` has the API's endpoints, its errors, and its parameter parsing. |
 | `meshview-rs/src/jobs.rs` | The daily cleanup and snapshot, and their schedule. |
 | `meshview-rs/src/app.rs` | The roles, starting and stopping a process, and `backup`. |
@@ -48,6 +49,7 @@ What the integration tests cover:
 | `shutdown.rs` | Closing the database leaves no `-wal` or `-shm` behind. |
 | `lifecycle.rs` | Whole processes, `run` and `ingest`, started against an unreachable broker and stopped. |
 | `jobs.rs` | The daily cleanup and snapshot, the record of their runs, and `backup` copying a database that is being written. |
+| `decode.rs` | Real packets of every port, shown exactly as the Python version showed them. |
 | `revert.rs` | `scripts/revert-to-python.py` gives a taken over database back exactly as Python left it, and refuses what it cannot. Needs `python3`; skipped without it. |
 
 The fixtures were made with the Python meshview; each test says how.

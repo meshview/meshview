@@ -9,6 +9,7 @@ use crate::db::{
     DailySnapshot, Facet, JobRun, Node, NodeFacet, NodeFilter, NodeQuery, PacketFilter, PacketSeen,
     Period, PeriodCount, SightingsOf, TopNode, TopQuery,
 };
+use crate::db::{PacketQuery, PacketRow};
 use anyhow::{Context, Result};
 use sqlx::SqlitePool;
 use sqlx::{QueryBuilder, Sqlite};
@@ -398,4 +399,73 @@ pub async fn node_facet(
         .fetch_all(pool)
         .await
         .with_context(|| format!("counting nodes by {column}"))
+}
+
+const PACKET_COLUMNS: &str = "SELECT packet.id, packet.portnum, packet.from_node_id, \
+     packet.to_node_id, packet.payload, packet.import_time_us, packet.channel, \
+     sender.node_id IS NOT NULL AS from_known, sender.long_name AS from_long_name, \
+     recipient.node_id IS NOT NULL AS to_known, recipient.long_name AS to_long_name \
+     FROM packet \
+     LEFT OUTER JOIN node AS sender ON packet.from_node_id = sender.node_id \
+     LEFT OUTER JOIN node AS recipient ON packet.to_node_id = recipient.node_id";
+
+pub async fn packet(pool: &SqlitePool, id: i64) -> Result<Option<PacketRow>> {
+    let mut query = QueryBuilder::new(PACKET_COLUMNS);
+    query.push(" WHERE packet.id = ").push_bind(id);
+    query
+        .build_query_as()
+        .fetch_optional(pool)
+        .await
+        .context("reading a packet")
+}
+
+pub async fn packets(pool: &SqlitePool, packets: &PacketQuery) -> Result<Vec<PacketRow>> {
+    let mut query = QueryBuilder::new(PACKET_COLUMNS);
+    query.push(" WHERE 1");
+    if let Some(from) = packets.from_node_id {
+        query.push(" AND packet.from_node_id = ").push_bind(from);
+    }
+    if let Some(to) = packets.to_node_id {
+        query.push(" AND packet.to_node_id = ").push_bind(to);
+    }
+    if let Some(node) = packets.node_id {
+        query
+            .push(" AND (packet.from_node_id = ")
+            .push_bind(node)
+            .push(" OR packet.to_node_id = ")
+            .push_bind(node)
+            .push(")");
+    }
+    if let Some(channel) = &packets.channel {
+        query
+            .push(" AND packet.channel = ")
+            .push_bind(channel.clone());
+    }
+    if let Some(portnum) = packets.portnum {
+        query.push(" AND packet.portnum = ").push_bind(portnum);
+    }
+    if let Some(after) = packets.after_us {
+        query.push(" AND packet.import_time_us > ").push_bind(after);
+    }
+    if let Some(before) = packets.before_us {
+        query
+            .push(" AND packet.import_time_us < ")
+            .push_bind(before);
+    }
+    if let Some(contains) = &packets.contains {
+        query
+            .push(" AND lower(CAST(packet.payload AS TEXT)) LIKE '%' || ")
+            .push_bind(like_literal(&contains.to_lowercase()))
+            .push(" || '%' ESCAPE '/' AND (packet.portnum != 1 OR packet.to_node_id = ")
+            .push_bind(crate::decode::BROADCAST)
+            .push(")");
+    }
+    query
+        .push(" ORDER BY packet.import_time_us DESC, packet.id DESC LIMIT ")
+        .push_bind(packets.limit);
+    query
+        .build_query_as()
+        .fetch_all(pool)
+        .await
+        .context("listing packets")
 }
