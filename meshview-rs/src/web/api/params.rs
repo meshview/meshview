@@ -52,6 +52,29 @@ impl Params {
     }
 }
 
+impl Params {
+    /// A boolean parameter, in any of the spellings the Python version
+    /// accepts, or `None` when absent or empty.
+    pub fn bool(&self, name: &str) -> Result<Option<bool>, ApiError> {
+        match self.get(name) {
+            None | Some("") => Ok(None),
+            Some(raw) => match raw.trim().to_lowercase().as_str() {
+                "1" | "true" | "yes" | "on" => Ok(Some(true)),
+                "0" | "false" | "no" | "off" => Ok(Some(false)),
+                _ => Err(ApiError::bad_request(format!(
+                    "{name} must be true or false"
+                ))),
+            },
+        }
+    }
+
+    /// A text parameter, with an empty value taken as none: a filter on
+    /// nothing filters nothing.
+    pub fn text(&self, name: &str) -> Option<&str> {
+        self.get(name).filter(|value| !value.is_empty())
+    }
+}
+
 impl<S: Send + Sync> FromRequestParts<S> for Params {
     type Rejection = Infallible;
 

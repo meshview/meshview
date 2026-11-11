@@ -58,6 +58,32 @@ impl Reader {
         sqlite::queries::latest_job_run(&self.pool, job).await
     }
 
+    /// How many packets were imported in each hour or day since `filter.since_us`,
+    /// oldest first, leaving out those with none.
+    pub async fn packets_per_period(
+        &self,
+        period: Period,
+        filter: &PacketFilter,
+    ) -> Result<Vec<PeriodCount>> {
+        sqlite::queries::packets_per_period(&self.pool, period, filter).await
+    }
+
+    /// How many packets match `filter`, all of them when it is `None`.
+    pub async fn count_packets(&self, filter: Option<&PacketFilter>) -> Result<i64> {
+        sqlite::queries::count_packets(&self.pool, filter).await
+    }
+
+    /// How many sightings there are: of one packet, of the packets matching a
+    /// filter, or all of them.
+    pub async fn count_sightings(&self, of: SightingsOf<'_>) -> Result<i64> {
+        sqlite::queries::count_sightings(&self.pool, of).await
+    }
+
+    /// The nodes by traffic, the most heard first, and how many there are.
+    pub async fn top_nodes(&self, query: &TopQuery) -> Result<(i64, Vec<TopNode>)> {
+        sqlite::queries::top_nodes(&self.pool, query).await
+    }
+
     /// Every sighting of one packet, latest first.
     pub async fn packet_sightings(&self, packet_id: i64) -> Result<Vec<PacketSeen>> {
         sqlite::queries::packet_sightings(&self.pool, packet_id).await
@@ -72,6 +98,75 @@ pub struct DailySnapshot {
     pub packet_count: i64,
     pub gateway_count: i64,
     pub captured_at_us: i64,
+}
+
+/// The length of the periods packets are counted in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Period {
+    Hour,
+    Day,
+}
+
+impl Period {
+    pub fn micros(self) -> i64 {
+        match self {
+            Self::Hour => 3_600_000_000,
+            Self::Day => 86_400_000_000,
+        }
+    }
+}
+
+/// Which packets to count: those imported since a time, and optionally only
+/// those on a channel, of a port, or to or from a node.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PacketFilter {
+    pub since_us: i64,
+    /// Compared with the channel lowercased.
+    pub channel: Option<String>,
+    pub portnum: Option<i64>,
+    pub to_node: Option<i64>,
+    pub from_node: Option<i64>,
+}
+
+/// One period and how many packets it had.
+#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
+pub struct PeriodCount {
+    /// `YYYY-MM-DD HH:00` for hours, `YYYY-MM-DD` for days, in UTC.
+    pub period: String,
+    pub count: i64,
+}
+
+/// Whose sightings to count.
+#[derive(Debug, Clone, Copy)]
+pub enum SightingsOf<'a> {
+    All,
+    Packet(i64),
+    /// The packets matching a filter, by when the packet was imported.
+    Packets(&'a PacketFilter),
+}
+
+/// What the top nodes are asked for with.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TopQuery {
+    /// How far back from the latest packet, and the latest sighting, to count.
+    pub window_us: i64,
+    /// Only nodes on this channel.
+    pub channel: Option<String>,
+    /// Only nodes that sent or were heard in the window.
+    pub active: bool,
+    pub limit: i64,
+    pub offset: i64,
+}
+
+/// A node, and how much it sent and was heard in the window.
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct TopNode {
+    pub node_id: Option<i64>,
+    pub long_name: Option<String>,
+    pub short_name: Option<String>,
+    pub channel: Option<String>,
+    pub sent: i64,
+    pub seen: i64,
 }
 
 /// A row of `job_run`: one run of a daily job.

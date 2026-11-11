@@ -13,6 +13,7 @@ mod lang;
 mod packets_seen;
 mod site_config;
 mod snapshots;
+mod stats;
 pub mod version;
 
 use crate::db::Reader;
@@ -29,6 +30,9 @@ pub fn v1() -> OpenApiRouter<AppState> {
         .routes(routes!(packets_seen::packets_seen))
         .routes(routes!(site_config::config))
         .routes(routes!(lang::lang))
+        .routes(routes!(stats::stats))
+        .routes(routes!(stats::count))
+        .routes(routes!(stats::top))
 }
 
 /// The routes outside any version, at their own full paths.
