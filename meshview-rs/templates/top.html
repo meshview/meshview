@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% block theme %}light{% endblock %}
+{% block body_class %}mesh-data-page mesh-top-page{% endblock %}
+
+{% block css %}
+{% include "data-page-styles.html" %}
+<style>
+.top-container { width:100%; }
+#channelFilter { width:200px; }
+#nodesTable tbody tr { cursor:pointer; }
+#nodesTable td:nth-child(n+4) { font-variant-numeric:tabular-nums; }
+.good-x,.ok-x,.bad-x { display:inline-block; padding:3px 8px; border-radius:5px; font-weight:600; font-size:12px; }
+.good-x { background:#e8f5ee; color:#187346; }
+.ok-x { background:#fff4d9; color:#8a6200; }
+.bad-x { background:#fff0ed; color:#b23d2f; }
+.top-load-more { display:flex; align-items:center; justify-content:center; padding:20px 0 6px; color:var(--mesh-muted); font-size:13px; }
+.top-load-more[hidden] { display:none; }
+.top-range { margin:10px 0 0; text-align:center; color:var(--mesh-muted); font-size:12px; }
+.top-range:empty { display:none; }
+@media(max-width:700px) { #channelFilter { width:180px; } }
+</style>
+{% endblock %}
+
+{% block body %}
+
+<header class="data-heading is-compact">
+    <div class="data-title">
+        <h1 data-translate-lang="top_traffic_nodes">Top nodes</h1>
+        <span id="node-count" class="data-count" aria-live="polite">0</span>
+        <span class="data-context">{{ "Last 24 hours" | tr }}</span>
+    </div>
+    <div class="data-actions">
+        <label for="channelFilter" data-translate-lang="channel">Channel:</label>
+        <select id="channelFilter"></select>
+        <a class="mesh-secondary-button" href="/stats">{{ "View statistics ↗" | tr }}</a>
+    </div>
+</header>
+
+<div class="top-container">
+
+    <div class="data-table-wrap" role="region" aria-label="{{ "Top nodes traffic table" | tr }}" tabindex="0">
+    <table id="nodesTable" class="card-table top-table" data-cards-below="820">
+        <thead>
+            <tr>
+                <th data-translate-lang="long_name">Long Name</th>
+                <th data-translate-lang="short_name">Short Name</th>
+                <th data-translate-lang="channel">Channel</th>
+                <th data-translate-lang="packets_sent">Sent (24h)</th>
+                <th data-translate-lang="times_seen">Seen (24h)</th>
+                <th data-translate-lang="avg_gateways">Avg Gateways</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    </div>
+
+    <!-- Infinite scroll: the next page is requested as this comes into view. -->
+    <div id="top-load-more" class="top-load-more is-loading" hidden>{{ "Loading more nodes…" | tr }}</div>
+    <p id="top-range" class="top-range" aria-live="polite"></p>
+
+</div>
+
+<script>
+/* ======================================================
+   TRANSLATIONS
+   ====================================================== */
+let topTranslations = {};
+
+function applyTranslationsTop(dict, root=document) {
+    root.querySelectorAll("[data-translate-lang]").forEach(el => {
+        const key = el.dataset.translateLang;
+        if (!dict[key]) return;
+        el.textContent = dict[key];
+    });
+}
+
+async function loadTranslationsTop() {
+    const cfg = await window._siteConfigPromise;
+    const lang = cfg?.site?.language || "en";
+    const res = await fetch(`/api/v1/lang?lang=${lang}&section=top`);
+    topTranslations = await res.json();
+    applyTranslationsTop(topTranslations);
+}
+
+/* ======================================================
+   CONFIG
+   ====================================================== */
+// The leaderboard is paged by the server: each request asks for the next PAGE_SIZE rows.
+const PAGE_SIZE = 50;
+let loadedRows = 0;
+let totalRows = 0;
+let loading = false;
+let requestId = 0;
+
+/* ======================================================
+   HELPERS
+   ====================================================== */
+function avgClass(v) {
+    if (v >= 10) return "good-x";
+    if (v >= 2)  return "ok-x";
+    return "bad-x";
+}
+
+/* ======================================================
+   LOAD CHANNELS
+   ====================================================== */
+async function loadChannels() {
+    const res = await fetch("/api/v1/channels");
+    const data = await res.json();
+    const sel = document.getElementById("channelFilter");
+
+    sel.innerHTML = "";
+    const allOpt = document.createElement("option");
+    allOpt.value = "";
+    allOpt.textContent = topTranslations.all_channels || MeshI18n.t("All channels");
+    sel.appendChild(allOpt);
+
+    for (const ch of data.channels || []) {
+        const opt = document.createElement("option");
+        opt.value = ch;
+        opt.textContent = ch;
+        sel.appendChild(opt);
+    }
+
+    sel.value = "";
+}
+
+/* ======================================================
+   FETCH + RENDER
+   ====================================================== */
+function resetTable() {
+    document.querySelector("#nodesTable tbody").innerHTML = "";
+    loadedRows = 0;
+    totalRows = 0;
+    loading = false;
+    requestId++;
+    loadMore();
+}
+
+async function loadMore() {
+    if (loading || (loadedRows && loadedRows >= totalRows)) return;
+    loading = true;
+    const request = requestId;
+    const tbody = document.querySelector("#nodesTable tbody");
+    const loader = document.getElementById("top-load-more");
+    loader.hidden = false;
+
+    const url = new URL("/api/v1/stats/top", window.location.origin);
+    url.searchParams.set("limit", PAGE_SIZE);
+    url.searchParams.set("offset", loadedRows);
+    // Only nodes with traffic: the list ends with the last of them, not every node ever seen.
+    url.searchParams.set("active", "true");
+    const channel = document.getElementById("channelFilter").value;
+    if (channel) url.searchParams.set("channel", channel);
+
+    let data = {};
+    try {
+        const res = await fetch(url);
+        data = await res.json();
+    } catch (err) {
+        console.error("Top nodes request failed", err);
+    }
+    // A channel change while waiting started a new list: drop this answer.
+    if (request !== requestId) return;
+
+    totalRows = data.total || 0;
+    const nodes = data.nodes || [];
+    if (!loadedRows && !nodes.length) {
+        const row = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.colSpan = 6;
+        cell.className = "data-empty";
+        cell.textContent = MeshI18n.t("No node traffic found for this channel.");
+        row.append(cell);
+        tbody.append(row);
+    }
+
+    // Mobile cards label the counters with the column headings.
+    // The page heading already states the 24 hour window.
+    const headings = [...document.querySelectorAll("#nodesTable thead th")].map(th => escapeHtml(th.textContent.replace(/\s*\(24\s?h\)/i, "").trim()));
+    for (const n of nodes) {
+        const tr = document.createElement("tr");
+        tr.onclick = () => location.href = `/node/${n.node_id}`;
+
+        tr.innerHTML = `
+            <td class="c-name">
+                <a class="node-link" href="/node/${n.node_id}"
+                   onclick="event.stopPropagation()">
+                    ${escapeHtml(n.long_name || n.node_id)}
+                </a>
+            </td>
+            <td class="c-short">${escapeHtml(n.short_name || "")}</td>
+            <td class="c-channel">${escapeHtml(n.channel || "")}</td>
+            <td class="c-sent" data-label="${headings[3] || ""}">${n.sent}</td>
+            <td class="c-seen" data-label="${headings[4] || ""}">${n.seen}</td>
+            <td class="c-avg" title="${headings[5] || ""}"><span class="${avgClass(n.avg)}">${n.avg.toFixed(1)}</span></td>
+        `;
+        tbody.appendChild(tr);
+    }
+    loadedRows += nodes.length;
+    // Stop if the server returned nothing, even when its total says more remain.
+    if (!nodes.length) totalRows = loadedRows;
+
+    document.getElementById("node-count").textContent = totalRows;
+    document.getElementById("top-range").textContent = totalRows
+        ? MeshI18n.t("Showing {shown} of {total} nodes", {shown: loadedRows, total: totalRows}) : "";
+    const more = loadedRows < totalRows;
+    loader.hidden = !more;
+    loading = false;
+    // Keep loading while the loader is still on screen (short pages, tall windows).
+    if (more && loader.getBoundingClientRect().top < window.innerHeight + 400) loadMore();
+}
+
+/* ======================================================
+   INIT
+   ====================================================== */
+document.addEventListener("DOMContentLoaded", async () => {
+    await loadTranslationsTop();
+    await loadChannels();
+    new IntersectionObserver(entries => {
+        if (entries.some(entry => entry.isIntersecting)) loadMore();
+    }, {rootMargin: "400px 0px"}).observe(document.getElementById("top-load-more"));
+    resetTable();
+
+    channelFilter.onchange = resetTable;
+});
+</script>
+
+{% endblock %}
