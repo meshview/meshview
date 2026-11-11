@@ -498,3 +498,26 @@ pub async fn traceroutes_since(pool: &SqlitePool, since_us: i64) -> Result<Vec<T
     .await
     .context("listing the latest traceroutes")
 }
+
+pub async fn node(pool: &SqlitePool, node_id: i64) -> Result<Option<Node>> {
+    sqlx::query_as(
+        "SELECT id, node_id, long_name, short_name, hw_model, firmware, role, last_lat, \
+         last_long, last_altitude, channel, is_mqtt_gateway, first_seen_us, last_seen_us \
+         FROM node WHERE node_id = ?",
+    )
+    .bind(node_id)
+    .fetch_optional(pool)
+    .await
+    .context("reading a node")
+}
+
+pub async fn nodeinfo_payloads(pool: &SqlitePool, node_id: i64) -> Result<Vec<Option<Vec<u8>>>> {
+    sqlx::query_scalar(
+        "SELECT payload FROM packet WHERE from_node_id = ? AND portnum = 4 \
+         ORDER BY import_time_us DESC NULLS LAST, id DESC",
+    )
+    .bind(node_id)
+    .fetch_all(pool)
+    .await
+    .context("reading a node's node info")
+}

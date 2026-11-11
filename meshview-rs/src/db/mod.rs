@@ -89,6 +89,16 @@ impl Reader {
         sqlite::queries::nodes(&self.pool, query).await
     }
 
+    /// One node, by its number.
+    pub async fn node(&self, node_id: i64) -> Result<Option<Node>> {
+        sqlite::queries::node(&self.pool, node_id).await
+    }
+
+    /// The stored node info packets a node sent, the latest first.
+    pub async fn nodeinfo_payloads(&self, node_id: i64) -> Result<Vec<Option<Vec<u8>>>> {
+        sqlite::queries::nodeinfo_payloads(&self.pool, node_id).await
+    }
+
     /// How many nodes match a filter.
     pub async fn count_nodes(&self, filter: &NodeFilter) -> Result<i64> {
         sqlite::queries::count_nodes(&self.pool, filter).await

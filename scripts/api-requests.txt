@@ -271,3 +271,10 @@
 /api/edges?node_id=1
 /api/edges?node_id=x
 /api/edges?node_id=99999999999999999999999
+
+/api/node/1125685839/qr
+/api/node/0x4318924f/qr
+/api/node/2925607268/qr
+/api/node/1/qr
+/api/node/x/qr
+/api/node/010/qr
