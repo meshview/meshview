@@ -96,11 +96,13 @@ sections and keys are the same, so converting is a matter of syntax:
 | Comments | `# ...` or `; ...` | `# ...` only |
 
 The Python version's backup settings (`[cleanup] backup_enabled`, `backup_dir`,
-`backup_hour`, `backup_minute`) and `[logging] db_cleanup_logfile` are
-deprecated: they are accepted with a warning and ignored, and will be removed in
-the next version. Leave them out. Backups are made with `meshview-rs backup`
-from a scheduler (see [Deployment](deployment.md#backups)), and the cleanup logs
-where everything else does.
+`backup_hour`, `backup_minute`), `[logging] db_cleanup_logfile` and
+`[server] tls_cert` are deprecated: they are accepted with a warning and
+ignored, and will be removed in the next version. Leave them out. Backups are
+made with `meshview-rs backup` from a scheduler (see
+[Deployment](deployment.md#backups)), the cleanup logs where everything else
+does, and HTTPS is served by a reverse proxy in front (see
+[Deployment](deployment.md#https)).
 
 Two things that the INI file let pass are errors now:
 

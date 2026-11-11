@@ -17,9 +17,6 @@
 bind = "*"
 # Port to run the web server on.
 port = 8081
-# PEM file containing the TLS certificate and private key. Not supported yet:
-# terminate TLS in front of meshview-rs.
-tls_cert = ""
 
 # -------------------------
 # Site Appearance & Behavior

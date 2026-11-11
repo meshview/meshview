@@ -106,7 +106,7 @@ Where the web server, and the probes, listen. Every role listens.
 |---|---|---|---|
 | `bind` | string | `"*"` | Address to listen on. `*` means every interface. |
 | `port` | whole number | `8081` | Port to listen on. |
-| `tls_cert` | string | `""` | PEM with certificate and key for HTTPS. **Not supported yet**: a warning is logged and it is ignored. Terminate TLS in front. |
+| `tls_cert` | string | | **Deprecated**, ignored with a warning, and removed in the next version: serve HTTPS from a [reverse proxy](deployment.md#https) in front. |
 
 ### `[site]`
 
