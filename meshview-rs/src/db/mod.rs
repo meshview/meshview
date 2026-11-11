@@ -100,6 +100,16 @@ impl Reader {
         sqlite::queries::node_facet(&self.pool, field, filter).await
     }
 
+    /// One packet, by its row id.
+    pub async fn packet(&self, id: i64) -> Result<Option<PacketRow>> {
+        sqlite::queries::packet(&self.pool, id).await
+    }
+
+    /// The latest packets matching a filter, latest first.
+    pub async fn packets(&self, query: &PacketQuery) -> Result<Vec<PacketRow>> {
+        sqlite::queries::packets(&self.pool, query).await
+    }
+
     /// Every sighting of one packet, latest first.
     pub async fn packet_sightings(&self, packet_id: i64) -> Result<Vec<PacketSeen>> {
         sqlite::queries::packet_sightings(&self.pool, packet_id).await
@@ -183,6 +193,44 @@ pub struct TopNode {
     pub channel: Option<String>,
     pub sent: i64,
     pub seen: i64,
+}
+
+/// A row of `packet`, with the names of its sender and recipient when they
+/// are known nodes.
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct PacketRow {
+    pub id: i64,
+    pub portnum: Option<i64>,
+    pub from_node_id: Option<i64>,
+    pub to_node_id: Option<i64>,
+    pub payload: Option<Vec<u8>>,
+    pub import_time_us: Option<i64>,
+    pub channel: Option<String>,
+    /// Whether the sender is a node there is a row for, whose long name may
+    /// still be null.
+    pub from_known: bool,
+    pub from_long_name: Option<String>,
+    pub to_known: bool,
+    pub to_long_name: Option<String>,
+}
+
+/// Which packets to list.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PacketQuery {
+    pub from_node_id: Option<i64>,
+    pub to_node_id: Option<i64>,
+    /// From or to this node.
+    pub node_id: Option<i64>,
+    pub channel: Option<String>,
+    pub portnum: Option<i64>,
+    /// Imported after this time.
+    pub after_us: Option<i64>,
+    /// Imported before this time: the page cursor.
+    pub before_us: Option<i64>,
+    /// In the stored packet's bytes read as text, ignoring case, literally.
+    /// Text messages only to everyone, as the Python version filtered them.
+    pub contains: Option<String>,
+    pub limit: i64,
 }
 
 /// A row of `node`.

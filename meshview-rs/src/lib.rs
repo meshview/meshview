@@ -9,6 +9,7 @@
 pub mod app;
 pub mod config;
 pub mod db;
+pub mod decode;
 pub mod ingest;
 pub mod jobs;
 pub mod state;

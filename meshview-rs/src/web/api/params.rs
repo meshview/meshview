@@ -122,6 +122,48 @@ pub fn parse_python_int(text: &str) -> Option<i128> {
     Some(if negative { -value } else { value })
 }
 
+/// An integer as Python's `int(text, 0)` reads it: decimal without leading
+/// zeros, or with a `0x`, `0o` or `0b` prefix in any case, a sign and
+/// underscores between digits allowed; limited to 64 signed bits.
+pub fn parse_db_int_any_base(text: &str) -> Option<i64> {
+    let text = text.trim();
+    let (negative, rest) = match text.as_bytes().first() {
+        Some(b'-') => (true, &text[1..]),
+        Some(b'+') => (false, &text[1..]),
+        _ => (false, text),
+    };
+    let lower = rest.to_ascii_lowercase();
+    let (radix, digits) = match lower.get(..2) {
+        Some("0x") => (16, &lower[2..]),
+        Some("0o") => (8, &lower[2..]),
+        Some("0b") => (2, &lower[2..]),
+        _ => {
+            // Decimal: a leading zero only in a number that is all zeros.
+            let all_zeros = lower.bytes().all(|b| b == b'0' || b == b'_');
+            if lower.starts_with('0') && !all_zeros {
+                return None;
+            }
+            (10, lower.as_str())
+        }
+    };
+    // After a prefix a single underscore may come first, as in 0x_ff.
+    let digits = if radix != 10 {
+        digits.strip_prefix('_').unwrap_or(digits)
+    } else {
+        digits
+    };
+    if digits.is_empty()
+        || digits.starts_with('_')
+        || digits.ends_with('_')
+        || digits.contains("__")
+    {
+        return None;
+    }
+    let digits: String = digits.chars().filter(|&c| c != '_').collect();
+    let value = i128::from_str_radix(&digits, radix).ok()?;
+    i64::try_from(if negative { -value } else { value }).ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -139,6 +181,19 @@ mod tests {
         }
         assert_eq!(parse_db_int("9223372036854775807"), Some(i64::MAX));
         assert_eq!(parse_db_int("9223372036854775808"), None);
+    }
+
+    #[test]
+    fn any_base_reads_as_python_reads_it() {
+        assert_eq!(parse_db_int_any_base("0x1A"), Some(26));
+        assert_eq!(parse_db_int_any_base("0X_ff"), Some(255));
+        assert_eq!(parse_db_int_any_base(" 42 "), Some(42));
+        assert_eq!(parse_db_int_any_base("0"), Some(0));
+        assert_eq!(parse_db_int_any_base("00"), Some(0));
+        assert_eq!(parse_db_int_any_base("-0o17"), Some(-15));
+        for bad in ["010", "0x", "0xg", "", "1__0", "!abcd"] {
+            assert_eq!(parse_db_int_any_base(bad), None, "{bad:?}");
+        }
     }
 
     #[test]
