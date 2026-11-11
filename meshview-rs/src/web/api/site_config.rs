@@ -22,71 +22,143 @@ const DEFAULT_TILE_ATTRIBUTION: &str =
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct SiteConfig {
+    /// `[site]`, with the map's tiles resolved.
     pub site: Site,
+    /// The broker the mesh is read from.
     pub mqtt: Mqtt,
+    /// The daily cleanup.
     pub cleanup: Cleanup,
 }
 
 /// `[site]`, as the pages read it.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct Site {
+    /// The installation's domain, as configured; it is only shown.
+    #[schema(example = "example.com")]
     pub domain: String,
+    /// The language of the pages: `en`, `es` or `ru`.
+    #[schema(example = "en")]
     pub language: String,
+    /// The site's title, for the title bar and the headers.
+    #[schema(example = "Meshview")]
     pub title: String,
+    /// The tagline, for the page footer and description; empty when unset.
     pub message: String,
+    /// The text of the banner every page shows until a visitor dismisses
+    /// it; empty when unset.
     pub announcement: String,
-    /// `"true"` or `"false"`, as are the other switches.
+    /// Whether to link the nodes page: `"true"` or `"false"`, a string, as
+    /// are the other switches. They only hide links; the pages and the API
+    /// answer either way.
     #[schema(example = "true")]
     pub nodes: &'static str,
+    /// Whether to link the chat.
+    #[schema(example = "true")]
     pub chat: &'static str,
+    /// Whether to link the firehose, every packet.
+    #[schema(example = "true")]
     pub everything: &'static str,
+    /// Whether to link the graphs.
+    #[schema(example = "true")]
     pub graphs: &'static str,
+    /// Whether to link the statistics.
+    #[schema(example = "true")]
     pub stats: &'static str,
+    /// Whether to link the weekly net.
+    #[schema(example = "true")]
     pub net: &'static str,
+    /// Whether to link the map.
+    #[schema(example = "true")]
     pub map: &'static str,
+    /// Whether to link the top nodes.
+    #[schema(example = "true")]
     pub top: &'static str,
+    /// Whether to link this reference.
+    #[schema(example = "true")]
     pub api: &'static str,
+    /// Whether to link MeshviewWorld.
+    #[schema(example = "true")]
     pub meshviewworld: &'static str,
+    /// The map's bounds: latitude of the top left corner, in degrees.
+    #[schema(example = 39.0)]
     pub map_top_left_lat: f64,
+    /// Longitude of the top left corner.
+    #[schema(example = -123.0)]
     pub map_top_left_lon: f64,
+    /// Latitude of the bottom right corner.
+    #[schema(example = 36.0)]
     pub map_bottom_right_lat: f64,
+    /// Longitude of the bottom right corner.
+    #[schema(example = -121.0)]
     pub map_bottom_right_lon: f64,
+    /// Seconds between the map's refreshes; 0 or less, none.
+    #[schema(example = 3)]
     pub map_interval: i64,
-    /// The tile server: the configured one, or OpenStreetMap.
+    /// The template of the tiles' addresses: the configured one, or
+    /// OpenStreetMap's.
+    #[schema(example = "https://tile.openstreetmap.org/{z}/{x}/{y}.png")]
     pub map_tile_url: String,
+    /// The tiles' attribution, in HTML.
+    #[schema(
+        example = "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors"
+    )]
     pub map_tile_attribution: String,
+    /// The highest zoom the tiles have.
+    #[schema(example = 19)]
     pub map_tile_max_zoom: u8,
+    /// The name of the tiles in the map's layer picker.
+    #[schema(example = "OpenStreetMap")]
     pub map_tile_name: String,
-    /// Whether the tiles come from a server of the installation's own.
+    /// Whether the tiles come from a server of the installation's own; the
+    /// maps then leave out the OpenTopoMap layer too.
     pub map_tile_custom: bool,
-    /// Channel colours, by lowercased channel name, only those that are
-    /// `#rrggbb`.
+    /// Colours for channels on the map, by lowercased channel name: only
+    /// those configured as `#rrggbb`. Other channels get a colour of their
+    /// own. The map matches names ignoring case, spaces, hyphens and
+    /// underscores.
+    #[schema(example = json!({"longfast": "#4363d8"}))]
     pub map_channel_colors: BTreeMap<String, String>,
+    /// Seconds between the firehose's refreshes; 0 or less, none.
+    #[schema(example = 3)]
     pub firehose_interval: i64,
+    /// The text of the weekly net page.
+    #[schema(example = "Weekly Mesh check-in message.")]
     pub weekly_net_message: String,
+    /// The tag the weekly net page looks for in messages.
+    #[schema(example = "#BayMeshNet")]
     pub net_tag: String,
     /// meshview-rs's version.
+    #[schema(example = "0.1.0")]
     pub version: &'static str,
 }
 
 /// The broker, without its credentials.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct Mqtt {
+    /// The broker's host.
+    #[schema(example = "mqtt.example.com")]
     pub server: String,
+    /// The topics read.
+    #[schema(example = json!(["msh/EU_868/#"]))]
     pub topics: Vec<String>,
 }
 
 /// `[cleanup]`, every value a string, as in the Python version.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct Cleanup {
+    /// Whether old data is deleted every day.
     #[schema(example = "false")]
     pub enabled: &'static str,
+    /// How many days of data are kept.
     #[schema(example = "14")]
     pub days_to_keep: String,
+    /// The hour of the day it is done at, local time.
     #[schema(example = "2")]
     pub hour: String,
+    /// The minute of that hour.
     #[schema(example = "0")]
     pub minute: String,
+    /// Whether the database is vacuumed afterwards, to give the space back.
     #[schema(example = "false")]
     pub vacuum: &'static str,
 }
@@ -191,6 +263,12 @@ pub fn build(config: &Config) -> SiteConfig {
 /// What the web pages need to know about this installation: its title and
 /// texts, which links to show, the map's bounds and tiles, the broker it reads
 /// (not its credentials) and when it cleans up.
+///
+/// The types are the Python version's, which the pages were written against:
+/// switches are the strings `"true"` and `"false"`, and so are the cleanup's
+/// figures; the map's bounds are numbers, the refresh intervals integers and
+/// `map_tile_custom` a boolean. The configuration is read at start: a change
+/// shows once the server is restarted and the page reloaded.
 #[utoipa::path(
     get,
     path = "/config",

@@ -25,7 +25,8 @@ pub struct Channels {
 
 /// Channels
 ///
-/// The channels packets have been heard on in the latest hours or days.
+/// The channels packets have been heard on in the latest hours or days, by
+/// the time they were imported.
 ///
 /// An unknown `period_type` is answered with 200, no channels and an `error`,
 /// as the Python version answers it.
@@ -34,8 +35,8 @@ pub struct Channels {
     path = "/channels",
     tag = "channels",
     params(
-        ("period_type" = Option<String>, Query, description = "`hour` or `day`. Default `hour`."),
-        ("length" = Option<i64>, Query, description = "How many of them, 1 to 3650. Default 24."),
+        ("period_type" = Option<String>, Query, description = "`hour` or `day`, exactly. Default `hour`."),
+        ("length" = Option<i64>, Query, description = "How many of them, 1 to 3650; beyond those, the nearest. Default 24."),
     ),
     responses(
         (status = 200, description = "The channels", body = Channels),

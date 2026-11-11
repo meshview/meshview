@@ -88,6 +88,9 @@ fn merged(code: &str) -> Value {
 ///
 /// The catalog of the web pages' strings in one language, or one section of
 /// it. Strings the language has no translation for are in English.
+///
+/// The answer is the catalog itself, or the section, with nothing around it:
+/// an object of sections, each an object of strings by key.
 #[utoipa::path(
     get,
     path = "/lang",
@@ -97,7 +100,10 @@ fn merged(code: &str) -> Value {
         ("section" = Option<String>, Query, description = "Only this section of the catalog, such as `top`."),
     ),
     responses(
-        (status = 200, description = "The catalog, or the section asked for", body = Object),
+        (status = 200, description = "The catalog, or the section asked for", body = Object, example = json!({
+            "title": "Meshview",
+            "search_placeholder": "Search...",
+        })),
         (status = 404, description = "No such section", body = ErrorBody),
     )
 )]

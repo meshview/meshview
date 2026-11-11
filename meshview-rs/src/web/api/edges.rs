@@ -34,6 +34,7 @@ const NEIGHBOR: &str = "neighbor";
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct Edges {
+    /// The links, each once.
     pub edges: Vec<Edge>,
 }
 
@@ -118,8 +119,20 @@ async fn build(db: &Reader, kind: Option<&'static str>) -> anyhow::Result<Vec<Ed
 /// Links
 ///
 /// The links between nodes in the latest 12 hours: those a traceroute went
-/// through, from the node that started it, and those a node reported to its
-/// neighbours, from the neighbour to it. Built at most once a minute.
+/// through, from the node that started it, and those a node reported having
+/// with its neighbours, from the neighbour to it. Built at most once a minute, so a new
+/// link can take a minute to show.
+///
+/// A finished traceroute is heard as its answer, which goes the other way, so
+/// its links run from the answer's `to`, through its route, to its `from`.
+/// Hops the mesh could not name come as `0xFFFFFFFF`: the links on either side
+/// of one are left out, because the nodes around an unknown hop are not
+/// neighbours.
+///
+/// Neighbour links come from each node's latest neighbour info report (port
+/// 71) in the window, which lists its neighbours of the moment.
+///
+/// A node with no links, or that is not there, gets none, with 200.
 #[utoipa::path(
     get,
     path = "/edges",
@@ -129,7 +142,12 @@ async fn build(db: &Reader, kind: Option<&'static str>) -> anyhow::Result<Vec<Ed
         ("node_id" = Option<i64>, Query, description = "Only links from or to this node."),
     ),
     responses(
-        (status = 200, description = "The links", body = Edges),
+        (status = 200, description = "The links", body = Edges, example = json!({
+            "edges": [
+                {"from": 12345678, "to": 87654321, "type": "traceroute"},
+                {"from": 11111111, "to": 22222222, "type": "neighbor"},
+            ],
+        })),
         (status = 400, description = "`node_id` is not an integer", body = ErrorBody),
         (status = 500, description = "They could not be read", body = ErrorBody),
     )

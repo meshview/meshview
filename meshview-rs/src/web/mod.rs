@@ -51,7 +51,8 @@ const CURRENT_VERSION: &str = "v1";
 const LEGACY_DEPRECATED_AT: i64 = 1_794_355_200;
 
 /// Scalar's page with a title of our own, and the sidebar listing paths rather
-/// than summaries: a reference is navigated by URL.
+/// than summaries: a reference is navigated by URL. Scalar is pinned, so that
+/// the page does not change under us from one day to the next.
 const SCALAR_HTML: &str = r#"<!doctype html>
 <html>
   <head>
@@ -65,7 +66,7 @@ const SCALAR_HTML: &str = r#"<!doctype html>
       type="application/json"
       data-configuration='{"operationTitleSource":"path"}'
     >$spec</script>
-    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.76.4"></script>
   </body>
 </html>
 "#;
@@ -74,8 +75,7 @@ const SCALAR_HTML: &str = r#"<!doctype html>
 #[openapi(
     info(
         title = "meshview-rs",
-        description = "Real-time data from a Meshtastic mesh network: its nodes, the packets \
-                       they send and the paths those packets take.",
+        description = include_str!("../../assets/api/intro.md"),
         license(name = "AGPL-3.0-or-later", identifier = "AGPL-3.0-or-later"),
     ),
     tags(

@@ -32,25 +32,44 @@ pub struct Health {
     /// Now, in UTC.
     #[schema(example = "2026-11-11T10:20:30.123456+00:00")]
     pub timestamp: String,
+    /// meshview-rs's version.
+    #[schema(example = "0.1.0")]
     pub version: &'static str,
     /// The commit this was built from, shortened.
+    #[schema(example = "c43c989")]
     pub git_revision: &'static str,
+    /// The daily cleanup: `enabled`, `days_to_keep`, `vacuum`, its
+    /// `scheduled_time` (local, `HH:MM`) and `status`: `disabled`, `unknown`
+    /// before its first run, or how the last run went (`ok`, `error`,
+    /// `running`, `interrupted`), which is then in `last_run`, with when it
+    /// started and finished, the cutoff and the rows deleted from each table.
     #[schema(value_type = Object)]
     pub cleanup: Value,
+    /// Backups, which meshview-rs does not make: always `disabled`. Use
+    /// `meshview-rs backup`, from outside.
     #[schema(value_type = Object)]
     pub backup: Value,
-    /// The daily snapshot, which the Python version did not report.
+    /// The daily snapshot, which the Python version did not report: its
+    /// `scheduled_time`, `status` and `last_run`, as the cleanup's, with the
+    /// day and the figures recorded.
     #[schema(value_type = Object)]
     pub snapshot: Value,
     /// `connected` or `disconnected`.
+    #[schema(example = "connected")]
     pub database: &'static str,
-    /// How long ago the latest packet was stored, to a tenth of a second.
+    /// How long ago the latest packet was stored, to a tenth of a second;
+    /// not there before the first one.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = 4.2)]
     pub seconds_since_last_message: Option<f64>,
-    /// The database file's size, readable, as `412.37 MB`.
+    /// The database file's size, readable, as `412.37 MB`, when it can be
+    /// known.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "245.66 MB")]
     pub database_size: Option<String>,
+    /// The same size, in bytes.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = 257589248)]
     pub database_size_bytes: Option<u64>,
 }
 
@@ -134,12 +153,45 @@ fn database_size(config: &Config) -> Option<u64> {
 /// The installation at a glance: whether the database can be read and how long
 /// ago the latest packet arrived, its size, and how the daily jobs last went.
 /// 503 when the database cannot be read.
+///
+/// For people and monitoring, as in the Python version. A daily job gone
+/// wrong shows in its `status` but does not make the answer a failure. For
+/// orchestrators, `/livez` and `/readyz` are simpler.
 #[utoipa::path(
     get,
     path = "/health",
     tag = "meta",
     responses(
-        (status = 200, description = "Healthy", body = Health),
+        (status = 200, description = "Healthy", body = Health, example = json!({
+            "status": "healthy",
+            "timestamp": "2026-11-11T16:01:22.553357+00:00",
+            "version": "0.1.0",
+            "git_revision": "c43c989",
+            "cleanup": {
+                "days_to_keep": 14,
+                "enabled": true,
+                "scheduled_time": "02:00",
+                "status": "ok",
+                "vacuum": false,
+                "last_run": {
+                    "status": "ok",
+                    "started_at": "2026-11-11T01:00:00.012345+00:00",
+                    "completed_at": "2026-11-11T01:00:03.456789+00:00",
+                    "cutoff_at": "2026-10-28T01:00:00.012345+00:00",
+                    "days_to_keep": 14,
+                    "vacuum_requested": false,
+                    "vacuum_completed": false,
+                    "rows_deleted": {"packet": 1200, "packet_seen": 3400, "traceroute": 42, "node": 3},
+                    "error": null,
+                },
+            },
+            "backup": {"enabled": false, "status": "disabled"},
+            "snapshot": {"scheduled_time": "01:00", "status": "unknown"},
+            "database": "connected",
+            "seconds_since_last_message": 4.2,
+            "database_size": "245.66 MB",
+            "database_size_bytes": 257589248,
+        })),
         (status = 503, description = "The database cannot be read", body = Health),
     )
 )]

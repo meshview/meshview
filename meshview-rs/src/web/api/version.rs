@@ -5,7 +5,7 @@ use axum::Json;
 use serde::Serialize;
 use utoipa::ToSchema;
 
-/// Which build this is.
+/// Which build is answering.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct Version {
     /// The version, as in Cargo.toml.
@@ -42,6 +42,7 @@ pub fn current() -> Version {
 /// Version
 ///
 /// The version of meshview-rs answering, and the commit it was built from.
+/// The commit is `unknown` when it was built from outside a Git checkout.
 #[utoipa::path(
     get,
     path = "/version",

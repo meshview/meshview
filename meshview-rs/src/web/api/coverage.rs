@@ -65,18 +65,30 @@ pub enum Coverage {
     Perimeter {
         #[schema(example = "perimeter")]
         mode: &'static str,
+        /// The threshold asked for.
+        #[schema(example = -120.0)]
         threshold_dbm: f64,
-        /// `[latitude, longitude]`, a point a bearing, every 5°.
-        #[schema(value_type = Vec<Vec<f64>>)]
+        /// `[latitude, longitude]` in degrees: for each bearing, every 5°,
+        /// the furthest point that reaches the threshold. Bearings where none
+        /// does are left out, and the first point is not repeated at the end:
+        /// it is not a closed GeoJSON polygon.
+        #[schema(value_type = Vec<Vec<f64>>, example = json!([[42.9581, -8.4], [42.958, -8.3934]]))]
         perimeter: Vec<(f64, f64)>,
     },
     Heatmap {
         #[schema(example = "heatmap")]
         mode: &'static str,
+        /// The weakest power among the points, or -130 if none is weaker:
+        /// the bottom of a colour scale.
+        #[schema(example = -130.0)]
         min_dbm: f64,
+        /// The strongest power among the points, or -80 if none is
+        /// stronger: the top of a colour scale.
+        #[schema(example = -62.4)]
         max_dbm: f64,
-        /// `[latitude, longitude, received_power_dbm]`.
-        #[schema(value_type = Vec<Vec<f64>>)]
+        /// `[latitude, longitude, received_power_dbm]`, latitude and
+        /// longitude in degrees, by distance and then bearing.
+        #[schema(value_type = Vec<Vec<f64>>, example = json!([[42.609, -8.4, -62.4]]))]
         points: Vec<(f64, f64, f64)>,
     },
 }
@@ -88,6 +100,17 @@ pub enum Coverage {
 /// furthest point every 5° where the power received still reaches
 /// `threshold_dbm`; with any other `mode`, the power received at every point
 /// sampled.
+///
+/// It is a prediction from the model, centred on the node's latest position,
+/// not a measure of where it was heard, and it knows nothing of the actual
+/// terrain. Points are sampled every 5° of bearing and every `step_km` from 1
+/// km, or `step_km` if further, out to `radius_km`: a smaller step costs more
+/// to compute. Numbers can be written as Python reads them, `1_000` or `1e3`;
+/// every one has to be finite and within its range, ends included.
+///
+/// An empty outline or list of points is an answer too: nowhere reaches the
+/// threshold, or the model has no answer for the inputs, as with an antenna 0
+/// m high.
 #[utoipa::path(
     get,
     path = "/coverage/{node_id}",
@@ -102,12 +125,13 @@ pub enum Coverage {
         ("radius_km" = Option<f64>, Query, description = "How far out to look, 1 to 200 km. Default 40."),
         ("step_km" = Option<f64>, Query, description = "The step out, 0.05 to 50 km, at most 4000 to the radius. Default 0.25."),
         ("reliability" = Option<f64>, Query, description = "The fraction of time and locations to be heard in, 0.01 to 0.99. Default 0.5."),
-        ("threshold_dbm" = Option<f64>, Query, description = "The weakest power that counts as heard, -200 to 0 dBm. Default -120."),
+        ("threshold_dbm" = Option<f64>, Query, description = "The weakest power that counts as heard, -200 to 0 dBm. Default -120. Checked, but not used, for the points."),
     ),
     responses(
         (status = 200, description = "The prediction", body = Coverage),
-        (status = 400, description = "A parameter is not valid", body = ErrorBody),
+        (status = 400, description = "`node_id` is not a number, or a parameter is not a number or out of its range", body = ErrorBody),
         (status = 404, description = "No such node, or it has no position", body = ErrorBody),
+        (status = 500, description = "It could not be computed", body = ErrorBody),
     )
 )]
 pub async fn coverage(

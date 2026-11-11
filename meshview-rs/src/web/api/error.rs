@@ -17,6 +17,7 @@ use utoipa::ToSchema;
 /// The body of every error the API answers.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ErrorBody {
+    /// What was wrong.
     #[schema(example = "length must be an integer")]
     pub error: String,
 }
