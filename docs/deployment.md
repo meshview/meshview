@@ -205,7 +205,7 @@ podman run -d --name meshview -p 8081:8081 \
 | Command | `run` by default; pass `ingest`, `serve` or `migrate` to choose another role. |
 | User | UID and GID 10001, never root: no user a system already has, and the Python version's image's, so its volumes carry over without a `chown`. |
 | Working directory | `/data`, so a `config.toml` there is found without saying where it is. It only needs to be readable. |
-| Database | `MESHVIEW_DATABASE__CONNECTION_STRING=sqlite:////data/packets.db` is set in the image. |
+| Database | `/data/packets.db` unless the configuration names another: the default, `packets.db`, is relative to the working directory. |
 | Port | 8081. |
 | Volumes | None declared: where the database lives is yours to decide and to name. Without a volume it lives and dies with the container. |
 | Health check | None built in: point your runtime at `/livez` and `/readyz`. |
