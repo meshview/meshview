@@ -27,7 +27,7 @@ jiff = { version = "0.2", features = ["tzdb-bundle-always"] }
 log = "0.4"
 meshview-proto = { path = "../meshview-proto" }
 # The radio propagation model behind the predicted coverage.
-longley-rice = { path = "../longley-rice" }
+longley-rice = { version = "0.1", path = "../longley-rice" }
 prost.workspace = true
 # TLS through rustls, but with no crypto provider chosen here: its default is
 # aws-lc, which wants cmake and a C toolchain to cross compile. `ring` is chosen
