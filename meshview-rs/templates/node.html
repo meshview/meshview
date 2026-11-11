@@ -104,13 +104,13 @@
         <p class="node-action-note is-warning" id="coverageNote" hidden><span class="ti ti-info-circle" aria-hidden="true"></span> <span id="coverageNoteText"></span></p>
     </div>
 
-    <!-- Coverage help: docs/COVERAGE.md rendered in a dialog. -->
+    <!-- Coverage help: meshview-rs's own, local/templates/coverage-help.html. -->
     <dialog id="coverage-help" class="mesh-dialog" aria-labelledby="coverage-help-title">
         <div class="mesh-dialog-header">
             <h2 id="coverage-help-title">{{ "Coverage help" | tr }}</h2>
             <button type="button" class="mesh-dialog-close" aria-label="{{ "Close" | tr }}" title="{{ "Close" | tr }}"><span class="ti ti-x" aria-hidden="true"></span></button>
         </div>
-        <div id="coverage-help-body" class="mesh-dialog-body"><p class="is-loading">{{ "Loading..." | tr }}</p></div>
+        <div id="coverage-help-body" class="mesh-dialog-body">{% include "coverage-help.html" %}</div>
     </dialog>
 
     <!-- Node Info -->
@@ -1945,18 +1945,6 @@ function renderSimpleMarkdown(markdown) {
     let loaded = false;
     document.getElementById("coverageHelpBtn").addEventListener("click", async () => {
         dialog.showModal();
-        if (loaded) return;
-        try {
-            // Prefer the site language's translation (docs/COVERAGE.<lang>.md), else English.
-            const lang = (MeshI18n.language || "en").split("-")[0];
-            let res = lang === "en" ? null : await fetch(`/docs/COVERAGE.${encodeURIComponent(lang)}.md`);
-            if (!res || !res.ok) res = await fetch("/docs/COVERAGE.md");
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            body.innerHTML = renderSimpleMarkdown(await res.text());
-            loaded = true;
-        } catch (err) {
-            body.innerHTML = `<p>${escapeHtml(MeshI18n.t("Unable to load the help text."))}</p>`;
-        }
     });
     dialog.querySelector(".mesh-dialog-close").addEventListener("click", () => dialog.close());
     // A click on the backdrop lands on the dialog element itself.

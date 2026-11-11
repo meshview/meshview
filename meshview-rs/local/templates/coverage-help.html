@@ -1,0 +1,27 @@
+{#- The node page's coverage help, meshview-rs's own: scripts/import-web.py puts it
+    where the Python version fetched docs/COVERAGE.md. Its strings are translated in
+    local/lang/. -#}
+<h3>{{ "Predicted coverage" | tr }}</h3>
+<p>{{ "Meshview can display a predicted coverage boundary for a node. This is a model estimate, not a guarantee of real-world performance." | tr }}</p>
+
+<h4>{{ "How it works" | tr }}</h4>
+<p>{{ "The coverage boundary is computed with the Longley-Rice / ITM propagation model in area mode, from NTIA's reference implementation, built into the server. Area mode estimates average path loss over generic terrain and does not use a terrain profile. This means it captures general distance effects, but does not account for terrain shadows, buildings or foliage." | tr }}</p>
+
+<h4>{{ "What you are seeing" | tr }}</h4>
+<p>{{ "The map draws a perimeter (not a heatmap) that represents the furthest distance where the predicted signal strength is above a threshold, -120 dBm by default. The model is run in many directions around the node, and the last point above the threshold in each one forms the outline." | tr }}</p>
+
+<h4>{{ "Key parameters" | tr }}</h4>
+<ul>
+    <li><strong>{{ "Frequency" | tr }}</strong>: {{ "default" | tr }} <code>907 MHz</code></li>
+    <li><strong>{{ "Transmit power" | tr }}</strong>: {{ "default" | tr }} <code>20 dBm</code></li>
+    <li><strong>{{ "Antenna heights" | tr }}</strong>: {{ "default" | tr }} <code>5 m</code> (TX) {{ "and" | tr }} <code>1.5 m</code> (RX)</li>
+    <li><strong>{{ "Reliability" | tr }}</strong>: {{ "default" | tr }} <code>0.5</code> ({{ "median" | tr }})</li>
+    <li><strong>{{ "Terrain irregularity" | tr }}</strong>: {{ "default" | tr }} <code>90 m</code> ({{ "average terrain" | tr }})</li>
+</ul>
+
+<h4>{{ "Limitations" | tr }}</h4>
+<ul>
+    <li>{{ "No terrain or building data is used (area mode only)." | tr }}</li>
+    <li>{{ "Results are sensitive to power, height and threshold." | tr }}</li>
+    <li>{{ "Environmental factors can cause large real-world deviations." | tr }}</li>
+</ul>
