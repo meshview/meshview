@@ -10,9 +10,11 @@
 
 use crate::config::{Config, DatabaseUrl};
 use crate::db::{self, Compatibility};
-use crate::state::{AppState, CHECK_DATABASE, Readiness};
+use crate::ingest::{self, store::Store};
+use crate::state::{AppState, CHECK_DATABASE, CHECK_MQTT, Readiness};
 use crate::web;
 use anyhow::{Context, Result, bail};
+use sqlx::SqlitePool;
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
@@ -58,14 +60,25 @@ pub async fn run(role: Role, config: Config) -> Result<()> {
         return Ok(());
     }
 
-    if config
-        .get("server", "tls_cert")
-        .is_some_and(|v| !v.trim().is_empty())
-    {
+    if !config.server.tls_cert.trim().is_empty() {
         warn!("[server] tls_cert is not supported yet and is ignored: terminate TLS in front");
     }
 
-    let readiness = Arc::new(Readiness::new([CHECK_DATABASE]));
+    // Read before anything starts, so that a mistake in [mqtt] stops the process
+    // at once rather than after it has reported itself alive.
+    let mqtt = if role.ingests() {
+        Some(ingest::Settings::from_config(&config)?)
+    } else {
+        None
+    };
+
+    // The broker counts towards readiness only for a process that does nothing
+    // else. One that also serves the web can still serve while the broker is
+    // away, and pulling it out of rotation for that would only make things worse.
+    let readiness = Arc::new(match role {
+        Role::Ingest => Readiness::new([CHECK_DATABASE, CHECK_MQTT]),
+        _ => Readiness::new([CHECK_DATABASE]),
+    });
     let state = AppState {
         readiness: readiness.clone(),
         reader: Arc::new(OnceLock::new()),
@@ -92,9 +105,21 @@ pub async fn run(role: Role, config: Config) -> Result<()> {
             .await
     });
 
-    let result = tokio::select! {
-        result = prepare(role, database, state) => result,
-        _ = wait_until(stopping.clone()) => Ok(()),
+    let prepared = tokio::select! {
+        prepared = prepare(role, database, state) => prepared,
+        _ = wait_until(stopping.clone()) => Ok(None),
+    };
+
+    let result = match (prepared, mqtt) {
+        (Ok(Some(writer)), Some(settings)) => match Store::new(writer).await {
+            Ok(store) => ingest::run(settings, store, readiness, stopping.clone()).await,
+            Err(e) => Err(e),
+        },
+        (Ok(_), _) => {
+            wait_until(stopping.clone()).await;
+            Ok(())
+        }
+        (Err(e), _) => Err(e),
     };
 
     if let Err(e) = result {
@@ -104,21 +129,17 @@ pub async fn run(role: Role, config: Config) -> Result<()> {
         return Err(e);
     }
 
-    if role.ingests() {
-        warn!("ingesting from MQTT is not implemented yet: the database is ready and idle");
-    }
-
-    wait_until(stopping).await;
     info!("stopping");
     server.await.context("the web server task")??;
     Ok(())
 }
 
 /// Gets the database where this role needs it, and says so through readiness.
-async fn prepare(role: Role, database: PathBuf, state: AppState) -> Result<()> {
+/// Answers the writer, for a role that ingests.
+async fn prepare(role: Role, database: PathBuf, state: AppState) -> Result<Option<SqlitePool>> {
     // The writer migrates. Doing it before the reader looks is what lets `run`
     // be ready at once instead of waiting on itself.
-    let _writer = if role.ingests() {
+    let writer = if role.ingests() {
         Some(db::sqlite::open_for_writing(&database).await?)
     } else {
         None
@@ -130,11 +151,9 @@ async fn prepare(role: Role, database: PathBuf, state: AppState) -> Result<()> {
     }
 
     state.readiness.set(CHECK_DATABASE, true);
-    info!("ready");
+    info!("database ready");
 
-    // The writer is kept for the ingester, which does not exist yet, and so is
-    // dropped here. Holding it would change nothing but the lock file.
-    Ok(())
+    Ok(writer)
 }
 
 /// Waits until the database is at the schema this build knows, and answers a
@@ -144,7 +163,7 @@ async fn prepare(role: Role, database: PathBuf, state: AppState) -> Result<()> {
 /// behind, means the ingester has not got to it and the thing to do is wait. One
 /// that is ahead was migrated by a newer build and would be misread, and one that
 /// cannot be migrated never will be: both stop the process.
-async fn wait_for_schema(database: &std::path::Path) -> Result<sqlx::SqlitePool> {
+async fn wait_for_schema(database: &std::path::Path) -> Result<SqlitePool> {
     let known = db::sqlite::known_versions();
     let mut said = false;
 

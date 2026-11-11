@@ -1,24 +1,27 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Óscar García Amor <ogarcia@connectical.com>
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::{Parser, Subcommand};
 use meshview_rs::app::{self, Role};
 use meshview_rs::config::Config;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 /// The configuration file read when none is named. Optional: without it the
 /// defaults and the environment are the whole configuration.
-const DEFAULT_CONFIG: &str = "config.ini";
+const DEFAULT_CONFIG: &str = "config.toml";
+
+/// The Python version's configuration file, which this does not read.
+const PYTHON_CONFIG: &str = "config.ini";
 
 /// Real-time monitoring and diagnostics for Meshtastic mesh networks.
 #[derive(Debug, Parser)]
 #[command(version, about)]
 struct Cli {
     /// The configuration file. Named here or in MESHVIEW_CONFIG it has to exist;
-    /// otherwise ./config.ini is read if it is there.
+    /// otherwise ./config.toml is read if it is there.
     #[arg(long, short, env = "MESHVIEW_CONFIG", global = true)]
     config: Option<PathBuf>,
 
@@ -66,7 +69,19 @@ async fn main() -> Result<()> {
 
     let config = match &cli.config {
         Some(path) => Config::load(path, true)?,
-        None => Config::load(DEFAULT_CONFIG.as_ref(), false)?,
+        None => {
+            // A config.ini left from the Python version and no config.toml is
+            // somebody who has not converted it yet. Starting on the defaults
+            // instead would quietly create a new, empty database somewhere else.
+            if Path::new(PYTHON_CONFIG).exists() && !Path::new(DEFAULT_CONFIG).exists() {
+                bail!(
+                    "found {PYTHON_CONFIG} but no {DEFAULT_CONFIG}: meshview-rs reads TOML, with \
+                     the same sections and keys. Convert it (see sample.config.toml) or name a \
+                     file with --config."
+                );
+            }
+            Config::load(DEFAULT_CONFIG.as_ref(), false)?
+        }
     };
     match config.source() {
         Some(path) => info!("configuration read from {}", path.display()),

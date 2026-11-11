@@ -1,6 +1,6 @@
 target/
 /dist
-/config.ini
+/config.toml
 *.db
 *.db-shm
 *.db-wal

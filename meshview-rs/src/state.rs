@@ -66,3 +66,6 @@ pub struct AppState {
 
 /// The readiness check for the database being at the expected schema.
 pub const CHECK_DATABASE: &str = "database";
+
+/// The readiness check for being connected to the MQTT broker.
+pub const CHECK_MQTT: &str = "mqtt";

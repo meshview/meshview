@@ -9,5 +9,6 @@
 pub mod app;
 pub mod config;
 pub mod db;
+pub mod ingest;
 pub mod state;
 pub mod web;

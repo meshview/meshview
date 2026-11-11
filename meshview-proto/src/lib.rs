@@ -5,6 +5,10 @@
 //! `protobufs/`. Which upstream revision those are is in `protobufs/UPSTREAM_REV`,
 //! and `scripts/update-protobufs.sh` is how they get replaced.
 
+pub mod wire;
+
+include!(concat!(env!("OUT_DIR"), "/known_fields.rs"));
+
 /// Everything in the `meshtastic` protobuf package.
 #[allow(clippy::all, clippy::pedantic, missing_docs)]
 pub mod meshtastic {
