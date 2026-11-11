@@ -16,7 +16,7 @@ do, and in a crate of their own they are built once and left alone.
 | `meshview-rs/src/web/` | HTTP: the API router, its reference, the redirects and the probes. |
 | `meshview-rs/src/app.rs` | The roles, and starting and stopping a process. |
 | `meshview-rs/tests/` | Integration tests. |
-| `scripts/` | Updating the protobufs, and comparing databases with the Python version. |
+| `scripts/` | Updating the protobufs, comparing databases with the Python version, and giving a database back to it. |
 
 ## Building and testing
 
@@ -44,6 +44,7 @@ What the integration tests cover:
 | `http.rs` | Routes per role, probes, the reference, and the redirects. |
 | `shutdown.rs` | Closing the database leaves no `-wal` or `-shm` behind. |
 | `lifecycle.rs` | Whole processes, `run` and `ingest`, started against an unreachable broker and stopped. |
+| `revert.rs` | `scripts/revert-to-python.py` gives a taken over database back exactly as Python left it, and refuses what it cannot. Needs `python3`; skipped without it. |
 
 The fixtures were made with the Python meshview; each test says how.
 
@@ -54,6 +55,14 @@ by the writer on start. A migration that has been released is never edited: a
 change is a new migration. They should only add to the schema, so that web
 servers of the previous version keep working while an update rolls out (see
 [Deployment](deployment.md#kubernetes)).
+
+A new migration also ends the way back to the Python version, unless
+`scripts/revert-to-python.py` is taught to undo it: the script keeps the list of
+migrations it can undo in `REVERTIBLE`, and a test fails as soon as the
+migrations and that list disagree. Either extend the script, and its test in
+`tests/revert.rs`, or retire it and say from which version on in
+[Coming from the Python meshview](migrating-from-python.md#going-back) and in the
+release notes.
 
 `0001_baseline.sql` is the Python meshview's schema at Alembic revision
 `44612e74a798`, copied from what `alembic upgrade head` produces rather than from

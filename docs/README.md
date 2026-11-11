@@ -17,6 +17,7 @@ each checked against the Python version's behaviour before it is called done.
 | Part | State |
 |---|---|
 | Configuration, database takeover and migrations | Done |
+| Giving a database back to the Python version | Done, while the schema is unchanged |
 | MQTT ingestion (packets, sightings, nodes, traceroutes) | Done, identical databases side by side with Python |
 | MQTT over TLS | Done (new in meshview-rs) |
 | Probes, API reference, redirects from the unversioned API | Done |
