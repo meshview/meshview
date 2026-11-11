@@ -546,6 +546,70 @@ mod tests {
         assert!(format!("{error:#}").contains("sample.config.toml"));
     }
 
+    /// Every key there is, as sections of key names: the defaults with every
+    /// optional key given a value, so that serialising them leaves none out.
+    /// A new optional key has to be set here too, or the check below misses it.
+    fn every_key() -> BTreeMap<String, Vec<String>> {
+        let mut config = Config::default();
+        config.mqtt.port = Some(1883);
+        config.cleanup.backup_hour = Some(2);
+        config.cleanup.backup_minute = Some(0);
+
+        Table::try_from(config)
+            .unwrap()
+            .into_iter()
+            .map(|(section, keys)| {
+                let keys = match keys {
+                    Value::Table(keys) => keys.keys().cloned().collect(),
+                    _ => Vec::new(),
+                };
+                (section, keys)
+            })
+            .collect()
+    }
+
+    /// The documented keys, by section: the rows of each section's table in
+    /// docs/configuration.md.
+    fn documented_keys() -> BTreeMap<String, Vec<String>> {
+        const DOCS: &str = include_str!("../../docs/configuration.md");
+        let mut documented = BTreeMap::new();
+
+        for part in DOCS.split("\n### `[").skip(1) {
+            let (section, body) = part.split_once("]`").unwrap();
+            let body = body.split("\n## ").next().unwrap();
+            let keys = body
+                .lines()
+                .filter_map(|line| line.strip_prefix("| `"))
+                .filter_map(|line| line.split_once("` |"))
+                .map(|(key, _)| key.to_string())
+                .collect();
+            documented.insert(section.to_string(), keys);
+        }
+        documented
+    }
+
+    #[test]
+    fn the_documentation_has_every_key_and_no_other() {
+        let every = every_key();
+        let documented = documented_keys();
+
+        assert_eq!(
+            every.keys().collect::<Vec<_>>(),
+            documented.keys().collect::<Vec<_>>(),
+            "docs/configuration.md and the code disagree about the sections"
+        );
+        for (section, keys) in &every {
+            let mut keys = keys.clone();
+            let mut written = documented[section].clone();
+            keys.sort();
+            written.sort();
+            assert_eq!(
+                keys, written,
+                "docs/configuration.md and the code disagree about [{section}]"
+            );
+        }
+    }
+
     #[test]
     fn connection_strings_mean_what_they_meant_in_python() {
         let sqlite = |value| DatabaseUrl::parse(value).unwrap();
