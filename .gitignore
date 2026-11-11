@@ -1,0 +1,6 @@
+target/
+/dist
+/config.ini
+*.db
+*.db-shm
+*.db-wal

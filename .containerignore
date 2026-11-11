@@ -1,0 +1,9 @@
+# The build context only needs what the Containerfile copies, and these are the
+# directories that would otherwise make it large for nothing.
+target
+.git
+.githooks
+.github
+*.db
+*.db-shm
+*.db-wal
