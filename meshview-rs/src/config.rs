@@ -494,7 +494,8 @@ mod tests {
         assert_eq!(config.site.title, "Bay Area Mesh");
         assert!(config.site.nodes);
         assert_eq!(config.site.map_top_left_lon, -123.0);
-        assert_eq!(config.map_channel_colors["LongFast"], "#4363d8");
+        // The presets' colours are built in: the sample sets none.
+        assert!(config.map_channel_colors.is_empty());
         assert_eq!(
             config.mqtt.topics,
             [

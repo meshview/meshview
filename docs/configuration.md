@@ -147,9 +147,38 @@ once it is restarted.
 ### `[map_channel_colors]`
 
 A table of channel names to six digit hex colours, such as
-`LongFast = "#4363d8"`. Names are matched ignoring case, spaces, hyphens and
+`MyChannel = "#18aa18"`. Names are matched ignoring case, spaces, hyphens and
 underscores; channels without one get a generated colour. Its keys are the
 channel names, so there is no fixed list of them.
+
+The channels of Meshtastic's presets, named as the firmware names them, have
+colours built in, which a colour here replaces. They go by family, a hue each,
+with the slow presets darker and the turbo ones lighter, and LongFast in the
+site's own blue. `Custom` is the channel of a radio set up without a preset.
+
+| Channel | Colour |
+|---|---|
+| LongSlow | `#133a6c` |
+| LongFast | `#245ea8` |
+| LongMod | `#617dd1` |
+| LongTurbo | `#1f96d6` |
+| MediumSlow | `#0b5a5f` |
+| MediumFast | `#12858b` |
+| MediumTurbo | `#1aa39c` |
+| ShortSlow | `#9c4506` |
+| ShortFast | `#e07012` |
+| ShortTurbo | `#f29a3f` |
+| NarrowSlow | `#4b2a8a` |
+| NarrowFast | `#7a4cc8` |
+| LiteSlow | `#8a1d51` |
+| LiteFast | `#cf3d7e` |
+| TinySlow | `#765800` |
+| TinyFast | `#b38600` |
+| Custom | `#6e6e6e` |
+
+On the map every dot gets the border that stands out more from its colour,
+white or near-black, so that light and dark colours both show on the day map
+and on the night one.
 
 ### `[mqtt]`
 

@@ -16,6 +16,31 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 use utoipa::ToSchema;
 
+/// The map's colours for the channels the official presets name, by the name
+/// the firmware gives each, lowercased as the map compares them: a hue a family
+/// of presets, darker for the slow ones and lighter for the turbo ones, with
+/// LongFast in the site's own blue. `custom` is the channel of a radio set up
+/// without a preset. `[map_channel_colors]` overrides any of them.
+pub const PRESET_COLOURS: [(&str, &str); 17] = [
+    ("longslow", "#133a6c"),
+    ("longfast", "#245ea8"),
+    ("longmod", "#617dd1"),
+    ("longturbo", "#1f96d6"),
+    ("mediumslow", "#0b5a5f"),
+    ("mediumfast", "#12858b"),
+    ("mediumturbo", "#1aa39c"),
+    ("shortslow", "#9c4506"),
+    ("shortfast", "#e07012"),
+    ("shortturbo", "#f29a3f"),
+    ("narrowslow", "#4b2a8a"),
+    ("narrowfast", "#7a4cc8"),
+    ("liteslow", "#8a1d51"),
+    ("litefast", "#cf3d7e"),
+    ("tinyslow", "#765800"),
+    ("tinyfast", "#b38600"),
+    ("custom", "#6e6e6e"),
+];
+
 const DEFAULT_TILE_URL: &str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const DEFAULT_TILE_ATTRIBUTION: &str =
     "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors";
@@ -112,11 +137,11 @@ pub struct Site {
     /// Whether the tiles come from a server of the installation's own; the
     /// maps then leave out the OpenTopoMap layer too.
     pub map_tile_custom: bool,
-    /// Colours for channels on the map, by lowercased channel name: only
-    /// those configured as `#rrggbb`. Other channels get a colour of their
-    /// own. The map matches names ignoring case, spaces, hyphens and
-    /// underscores.
-    #[schema(example = json!({"longfast": "#4363d8"}))]
+    /// Colours for channels on the map, by lowercased channel name: those of
+    /// the official presets' channels, and those configured as `#rrggbb`,
+    /// which take their place. Other channels get a colour of their own. The
+    /// map matches names ignoring case, spaces, hyphens and underscores.
+    #[schema(example = json!({"longfast": "#245ea8", "narrowfast": "#7a4cc8"}))]
     pub map_channel_colors: BTreeMap<String, String>,
     /// Seconds between the firehose's refreshes; 0 or less, none.
     #[schema(example = 3)]
@@ -229,15 +254,22 @@ pub fn build(config: &Config) -> SiteConfig {
                 "OpenStreetMap".to_string()
             },
             map_tile_custom: custom,
-            map_channel_colors: config
-                .map_channel_colors
+            map_channel_colors: PRESET_COLOURS
                 .iter()
-                .map(|(channel, colour)| (channel.to_lowercase(), colour.trim().to_string()))
-                .filter(|(_, colour)| {
-                    colour.len() == 7
-                        && colour.starts_with('#')
-                        && colour[1..].bytes().all(|b| b.is_ascii_hexdigit())
-                })
+                .map(|(channel, colour)| (channel.to_string(), colour.to_string()))
+                .chain(
+                    config
+                        .map_channel_colors
+                        .iter()
+                        .map(|(channel, colour)| {
+                            (channel.to_lowercase(), colour.trim().to_string())
+                        })
+                        .filter(|(_, colour)| {
+                            colour.len() == 7
+                                && colour.starts_with('#')
+                                && colour[1..].bytes().all(|b| b.is_ascii_hexdigit())
+                        }),
+                )
                 .collect(),
             firehose_interval: site.firehose_interval,
             weekly_net_message: site.weekly_net_message.clone(),

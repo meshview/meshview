@@ -91,7 +91,7 @@ sections and keys are the same, so converting is a matter of syntax:
 | Topics were already a list | `topics = ["msh/US/bayarea/#"]` | `topics = ["msh/US/bayarea/#"]` |
 | Node ids become a list of numbers | `skip_node_ids = 0xdeadbeef, 305419896` | `skip_node_ids = [0xdeadbeef, 305419896]` |
 | Keys become a list of strings | `secondary_keys = AQ==, Ag==` | `secondary_keys = ["AQ==", "Ag=="]` |
-| Colours are strings | `LongFast = #4363d8` | `LongFast = "#4363d8"` |
+| Colours are strings | `MyChannel = #18aa18` | `MyChannel = "#18aa18"` |
 | Empty values can go | `announcement =` | `announcement = ""`, or nothing |
 | Comments | `# ...` or `; ...` | `# ...` only |
 
@@ -129,6 +129,7 @@ with every key, and [Configuration](configuration.md) has them all.
 | Web pages | rendered on every request | the same pages, rendered once at start, and their files built into the binary |
 | Traceroute graph | `/graph/traceroute/{id}`, an SVG drawn by Graphviz | redirects to the traceroute's page, `/traceroute/{id}`, which draws it |
 | Scripts and styles | sent as they are | compressed for browsers that take it |
+| Channel colours on the map | the presets' in `config.ini`'s `[map_channel_colors]`, without the 2.8 ones and with `LongModerate` for the channel the firmware calls `LongMod` | built in for every preset, `[map_channel_colors]` only for what you change: the Python sample's can be left out |
 | Coverage help | `docs/COVERAGE*.md`, fetched and rendered when it is opened, also served at `/docs/…` | part of the node page, translated with it |
 | Probes | `/health` | `/livez` and `/readyz`, for orchestrators, beside `/health` |
 | MQTT over TLS | no | yes |

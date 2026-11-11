@@ -253,7 +253,9 @@ async fn the_site_configuration_keeps_the_python_shapes() {
     // Switches are strings, as the pages expect them.
     assert_eq!(body["site"]["nodes"], "true");
     assert_eq!(body["site"]["map_tile_name"], "OpenStreetMap");
-    assert_eq!(body["site"]["map_channel_colors"]["longfast"], "#4363d8");
+    // The presets' colours are built in, the 2.8 ones too.
+    assert_eq!(body["site"]["map_channel_colors"]["longfast"], "#245ea8");
+    assert_eq!(body["site"]["map_channel_colors"]["narrowfast"], "#7a4cc8");
     assert_eq!(body["mqtt"]["server"], "mqtt.bayme.sh");
     assert!(body["mqtt"].get("password").is_none(), "no credentials");
     assert_eq!(

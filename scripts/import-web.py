@@ -19,7 +19,9 @@ meshview-rs needs:
 - the old API pages themselves are left out, as the reference replaces them;
 - the node page's coverage help, which the Python version fetched from its
   docs/COVERAGE*.md and rendered, is meshview-rs's own template instead,
-  local/templates/coverage-help.html, translated as the rest of the page is.
+  local/templates/coverage-help.html, translated as the rest of the page is;
+- the map's node dots get a border that stands out from their fill,
+  local/templates/marker-stroke.js, rather than always a white one.
 
 Anything in a template it does not know how to convert stops it, rather than
 leaving a page that fails to render. What it copied from is written to
@@ -142,10 +144,50 @@ def local_coverage_help(path, text):
     return text
 
 
+# The map's node dots: drawn, and given back their look when deselected, with a
+# thin white border.
+MARKER_DRAWN = (
+    '            color: "white",\n            fillColor: color,\n'
+    "            fillOpacity: 1,\n            weight: 0.7\n"
+)
+MARKER_RESTORED = 'selectedMarker.setStyle({ color: "white", weight: 0.7 });'
+MARKER_COLOURS = "function hashToColor(str){"
+
+
+def local_marker_stroke(path, text):
+    replacements = [
+        (
+            MARKER_DRAWN,
+            (
+                "            color: markerStroke(color),\n            fillColor: color,\n"
+                "            fillOpacity: 1,\n            weight: 1\n"
+            ),
+        ),
+        (
+            MARKER_RESTORED,
+            (
+                "selectedMarker.setStyle({ color: markerStroke(selectedMarker.originalColor), "
+                "weight: 1 });"
+            ),
+        ),
+        (MARKER_COLOURS, '{% include "marker-stroke.js" %}\n' + MARKER_COLOURS),
+    ]
+    for old, new in replacements:
+        if text.count(old) != 1:
+            fail(
+                path,
+                "the node dots are not drawn as they were: teach local_marker_stroke",
+            )
+        text = text.replace(old, new)
+    return text
+
+
 def convert_template(path):
     text = drop_unknown_blocks(path, path.read_text(encoding="utf-8"))
     if path.name == "node.html":
         text = local_coverage_help(path, text)
+    if path.name == "map-view.html":
+        text = local_marker_stroke(path, text)
 
     top_level = TOP_LEVEL_SETS.get(path.name)
     if top_level:
