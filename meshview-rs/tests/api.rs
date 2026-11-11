@@ -809,3 +809,74 @@ async fn edges_are_traceroute_hops_and_reported_neighbours() {
         3
     );
 }
+
+async fn nodeinfo(api: &Api, id: i64, node_id: i64, key: Vec<u8>, at: i64) {
+    use meshview_proto::meshtastic::mesh_packet::PayloadVariant;
+    use meshview_proto::meshtastic::{Data, MeshPacket, PortNum, User};
+    use prost::Message;
+
+    let packet = MeshPacket {
+        from: node_id as u32,
+        payload_variant: Some(PayloadVariant::Decoded(Data {
+            portnum: PortNum::NodeinfoApp as i32,
+            payload: User {
+                id: format!("!{node_id:08x}"),
+                public_key: key,
+                is_unmessagable: Some(false),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+            ..Default::default()
+        })),
+        ..Default::default()
+    };
+    sqlx::query(
+        "INSERT INTO packet (id, portnum, from_node_id, payload, import_time_us) \
+         VALUES (?, 4, ?, ?, ?)",
+    )
+    .bind(id)
+    .bind(node_id)
+    .bind(packet.encode_to_vec())
+    .bind(at)
+    .execute(&api.pool)
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn a_node_is_offered_as_the_contact_python_encoded() {
+    let api = api().await;
+    api.exec(
+        "INSERT INTO node (id, node_id, long_name, short_name, hw_model, role, last_seen_us) \
+         VALUES ('!0000abcd', 43981, 'Ñandú', 'ÑD', 'heltec_v3', 'ROUTER', 1)",
+    )
+    .await;
+    nodeinfo(&api, 1, 0xabcd, (0..32).collect(), 10).await;
+
+    let (status, body) = api.get("/api/v1/node/0xabcd/qr").await;
+    assert_eq!(status, StatusCode::OK);
+    // Made with Python's protobuf from the same node and key.
+    assert_eq!(
+        body["meshtastic_url"],
+        "https://meshtastic.org/v/#CM3XAhJBCgkhMDAwMGFiY2QSB8ORYW5kw7oaA8ORRCgrOAJCIAABAgMEBQYHCAkKCwwN\
+         Dg8QERITFBUWFxgZGhscHR4fSAA"
+    );
+    assert_eq!(body["public_key_conflict"], false);
+    assert_eq!(body["role"], "ROUTER");
+
+    // Two keys: no contact, but the latest key is still reported.
+    nodeinfo(&api, 2, 0xabcd, vec![7; 32], 20).await;
+    let (_, conflict) = api.get("/api/v1/node/43981/qr").await;
+    assert_eq!(conflict["public_key_conflict"], true);
+    assert_eq!(conflict["meshtastic_url"], Value::Null);
+    assert!(conflict["public_key"].is_string());
+
+    assert_eq!(
+        api.get("/api/v1/node/1/qr").await,
+        (StatusCode::NOT_FOUND, json!({"error": "Node not found"}))
+    );
+    assert_eq!(
+        api.get("/api/v1/node/x/qr").await,
+        (StatusCode::BAD_REQUEST, json!({"error": "Invalid node_id"}))
+    );
+}

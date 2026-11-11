@@ -14,6 +14,7 @@ mod lang;
 mod nodes;
 mod packets;
 mod packets_seen;
+mod qr;
 mod site_config;
 mod snapshots;
 mod stats;
@@ -42,6 +43,7 @@ pub fn v1() -> OpenApiRouter<AppState> {
         .routes(routes!(packets::packets))
         .routes(routes!(traceroute::traceroute))
         .routes(routes!(edges::edges))
+        .routes(routes!(qr::qr))
 }
 
 /// The routes outside any version, at their own full paths.
