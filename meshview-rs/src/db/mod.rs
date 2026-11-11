@@ -84,6 +84,22 @@ impl Reader {
         sqlite::queries::top_nodes(&self.pool, query).await
     }
 
+    /// The nodes matching a filter, in order, a page of them if asked.
+    pub async fn nodes(&self, query: &NodeQuery) -> Result<Vec<Node>> {
+        sqlite::queries::nodes(&self.pool, query).await
+    }
+
+    /// How many nodes match a filter.
+    pub async fn count_nodes(&self, filter: &NodeFilter) -> Result<i64> {
+        sqlite::queries::count_nodes(&self.pool, filter).await
+    }
+
+    /// The values a node field has among the nodes matching a filter, the most
+    /// common first, with how many nodes have each.
+    pub async fn node_facet(&self, field: NodeFacet, filter: &NodeFilter) -> Result<Vec<Facet>> {
+        sqlite::queries::node_facet(&self.pool, field, filter).await
+    }
+
     /// Every sighting of one packet, latest first.
     pub async fn packet_sightings(&self, packet_id: i64) -> Result<Vec<PacketSeen>> {
         sqlite::queries::packet_sightings(&self.pool, packet_id).await
@@ -167,6 +183,143 @@ pub struct TopNode {
     pub channel: Option<String>,
     pub sent: i64,
     pub seen: i64,
+}
+
+/// A row of `node`.
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct Node {
+    pub id: String,
+    pub node_id: Option<i64>,
+    pub long_name: Option<String>,
+    pub short_name: Option<String>,
+    pub hw_model: Option<String>,
+    pub firmware: Option<String>,
+    pub role: Option<String>,
+    pub last_lat: Option<i64>,
+    pub last_long: Option<i64>,
+    pub last_altitude: Option<i64>,
+    pub channel: Option<String>,
+    pub is_mqtt_gateway: Option<bool>,
+    pub first_seen_us: Option<i64>,
+    pub last_seen_us: Option<i64>,
+}
+
+/// Which nodes. Every condition set must hold; only nodes ever seen count.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct NodeFilter {
+    /// This node, or none at all when the id asked for is not a number.
+    pub node_id: Option<Option<i64>>,
+    /// Compared uppercased.
+    pub role: Option<String>,
+    pub channel: Option<String>,
+    pub hw_model: Option<String>,
+    pub firmware: Option<String>,
+    /// Seen after this time.
+    pub seen_since_us: Option<i64>,
+    /// Somewhere in the long or short name, the id or the number, ignoring
+    /// case; taken literally, wildcards and all.
+    pub search: Option<String>,
+    /// One of these nodes: an empty list matches none.
+    pub ids: Option<Vec<i64>>,
+    pub is_mqtt_gateway: Option<bool>,
+    /// Whether it has a position other than (0, 0).
+    pub has_position: Option<bool>,
+}
+
+/// The columns nodes can be sorted by.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NodeSort {
+    ShortName,
+    LongName,
+    HwModel,
+    Firmware,
+    Role,
+    Channel,
+    LastLat,
+    LastLong,
+    LastAltitude,
+    IsMqttGateway,
+    FirstSeenUs,
+    LastSeenUs,
+    NodeId,
+}
+
+impl NodeSort {
+    pub const ALL: [(&'static str, Self); 13] = [
+        ("short_name", Self::ShortName),
+        ("long_name", Self::LongName),
+        ("hw_model", Self::HwModel),
+        ("firmware", Self::Firmware),
+        ("role", Self::Role),
+        ("channel", Self::Channel),
+        ("last_lat", Self::LastLat),
+        ("last_long", Self::LastLong),
+        ("last_altitude", Self::LastAltitude),
+        ("is_mqtt_gateway", Self::IsMqttGateway),
+        ("first_seen_us", Self::FirstSeenUs),
+        ("last_seen_us", Self::LastSeenUs),
+        ("node_id", Self::NodeId),
+    ];
+
+    pub fn column(self) -> &'static str {
+        Self::ALL
+            .iter()
+            .find(|(_, sort)| *sort == self)
+            .map(|(name, _)| *name)
+            .expect("every sort is listed")
+    }
+
+    /// Whether it is text, and so compared ignoring case.
+    pub fn is_text(self) -> bool {
+        matches!(
+            self,
+            Self::ShortName
+                | Self::LongName
+                | Self::HwModel
+                | Self::Firmware
+                | Self::Role
+                | Self::Channel
+        )
+    }
+}
+
+/// What nodes to list, and how.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct NodeQuery {
+    pub filter: NodeFilter,
+    /// The column and whether descending; by short name when none.
+    pub sort: Option<(NodeSort, bool)>,
+    pub limit: Option<i64>,
+    pub offset: i64,
+}
+
+/// The node fields facets are counted for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NodeFacet {
+    Role,
+    Channel,
+    HwModel,
+    Firmware,
+}
+
+impl NodeFacet {
+    pub const ALL: [Self; 4] = [Self::Role, Self::Channel, Self::HwModel, Self::Firmware];
+
+    pub fn column(self) -> &'static str {
+        match self {
+            Self::Role => "role",
+            Self::Channel => "channel",
+            Self::HwModel => "hw_model",
+            Self::Firmware => "firmware",
+        }
+    }
+}
+
+/// A value and how many have it.
+#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
+pub struct Facet {
+    pub value: Option<String>,
+    pub count: i64,
 }
 
 /// A row of `job_run`: one run of a daily job.

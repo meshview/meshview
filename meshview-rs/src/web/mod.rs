@@ -82,6 +82,7 @@ const SCALAR_HTML: &str = r#"<!doctype html>
         (name = "health", description = "Whether the process can serve"),
         (name = "meta", description = "What is answering"),
         (name = "channels", description = "The channels the mesh is heard on"),
+        (name = "nodes", description = "The nodes of the mesh"),
         (name = "packets", description = "The packets, and who heard them"),
         (name = "stats", description = "Figures about the mesh"),
     ),

@@ -71,7 +71,9 @@ for changing in a future version instead.
 | `/health` `cleanup` | From the JSON file the cleanup wrote, with its path as `status_file` | From the cleanup's latest run in `job_run`, with no `status_file`; `last_run` has the same keys. |
 | `/health` `backup` | The scheduled backups' settings and last run | `{"enabled": false, "status": "disabled"}`: meshview-rs does not back up by itself (see [Deployment](deployment.md#backups)). |
 | `/health` `snapshot` | Not reported | The daily snapshot's schedule, status and latest run, as `cleanup`'s. |
-| Empty filters (`?channel=`) | Sometimes a filter on the empty string, sometimes no filter, sometimes a different default | Always no filter: a filter on nothing filters nothing. |
+| Empty filters (`?channel=`) | Sometimes a filter on the empty string, which matches nothing, sometimes no filter, sometimes a different default | Always no filter: a filter on nothing filters nothing. The one exception is `ids=` in `/api/v1/nodes`, a list of no nodes, which still matches none, as the list of favourites needs when there are none. |
 | `/api/v1/stats?node=` | `sent` and `seen` always 0: it read a key its query does not return | The totals it meant: packets the node sent, and packets sent to it, in the window. |
 | `/api/v1/stats` invalid `period_type` | The message lists `{'hour', 'day'}` in an order that changes from one start to the next | Always `{'hour', 'day'}`. |
 | `/api/v1/stats/count` unknown `period_type` | 500, in plain text | 400, `{"error": "period_type must be 'hour' or 'day'"}`. |
+| `/api/v1/nodes` when the database fails | `{"nodes": []}`, as if there were none | 500, `{"error": "Failed to fetch nodes"}`. |
+| `/api/v1/nodes` with a `node_id` or `days_active` too large | An empty list without paging, a 500 with it | No nodes; or, for `days_active`, every node. |

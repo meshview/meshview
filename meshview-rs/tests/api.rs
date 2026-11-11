@@ -489,3 +489,160 @@ async fn the_top_nodes_are_the_most_heard() {
         )
     );
 }
+
+async fn some_nodes(api: &Api) {
+    let now = now_us();
+    for (node_id, short, long, role, channel, lat, gateway, seen_hours_ago) in [
+        (
+            1_i64,
+            "alfa",
+            "Alfa 100%",
+            "CLIENT",
+            "LongFast",
+            423_000_000_i64,
+            true,
+            1_i64,
+        ),
+        (2, "Bravo", "Bravo_two", "ROUTER", "LongFast", 0, false, 2),
+        (
+            3,
+            "charlie",
+            "Charlie",
+            "CLIENT",
+            "MediumFast",
+            400_000_000,
+            false,
+            24 * 40,
+        ),
+    ] {
+        sqlx::query(
+            "INSERT INTO node (id, node_id, short_name, long_name, role, channel, last_lat, \
+             last_long, is_mqtt_gateway, last_seen_us) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(format!("!{node_id:08x}"))
+        .bind(node_id)
+        .bind(short)
+        .bind(long)
+        .bind(role)
+        .bind(channel)
+        .bind(lat)
+        .bind(-80_000_000_i64)
+        .bind(gateway)
+        .bind(now - seen_hours_ago * 3_600_000_000)
+        .execute(&api.pool)
+        .await
+        .unwrap();
+    }
+    // Never seen: never listed.
+    api.exec("INSERT INTO node (id, node_id) VALUES ('!00000004', 4)")
+        .await;
+}
+
+fn ids(body: &Value) -> Vec<i64> {
+    body["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|node| node["node_id"].as_i64().unwrap())
+        .collect()
+}
+
+#[tokio::test]
+async fn nodes_are_filtered_sorted_and_paged() {
+    let api = api().await;
+    some_nodes(&api).await;
+
+    // By short name, exactly, as it always was: uppercase first.
+    assert_eq!(ids(&api.get("/api/v1/nodes").await.1), [2, 1, 3]);
+    assert_eq!(
+        ids(&api.get("/api/v1/nodes?sort=short_name").await.1),
+        [1, 2, 3]
+    );
+    assert_eq!(
+        ids(&api.get("/api/v1/nodes?sort=-last_seen_us").await.1),
+        [1, 2, 3]
+    );
+    assert_eq!(
+        ids(&api.get("/api/v1/nodes?days_active=30").await.1),
+        [2, 1]
+    );
+    assert_eq!(ids(&api.get("/api/v1/nodes?role=client").await.1), [1, 3]);
+    assert_eq!(
+        ids(&api.get("/api/v1/nodes?has_position=false").await.1),
+        [2]
+    );
+    assert_eq!(
+        ids(&api.get("/api/v1/nodes?is_mqtt_gateway=true").await.1),
+        [1]
+    );
+
+    // Searched for literally: % and _ are not wildcards.
+    assert_eq!(ids(&api.get("/api/v1/nodes?search=100%25").await.1), [1]);
+    // As a wildcard, a_f would match "alfa"; literally, nothing has it.
+    assert_eq!(
+        ids(&api.get("/api/v1/nodes?search=a_f").await.1),
+        Vec::<i64>::new()
+    );
+    // And as text it matches, in any case.
+    assert_eq!(ids(&api.get("/api/v1/nodes?search=O_T").await.1), [2]);
+    assert_eq!(ids(&api.get("/api/v1/nodes?search=bravo_").await.1), [2]);
+
+    // An empty filter filters nothing, but no favourites are no nodes.
+    assert_eq!(ids(&api.get("/api/v1/nodes?role=").await.1), [2, 1, 3]);
+    assert_eq!(
+        ids(&api.get("/api/v1/nodes?ids=").await.1),
+        Vec::<i64>::new()
+    );
+    assert_eq!(ids(&api.get("/api/v1/nodes?ids=3,1").await.1), [1, 3]);
+    assert_eq!(
+        ids(&api.get("/api/v1/nodes?node_id=x").await.1),
+        Vec::<i64>::new()
+    );
+
+    let (_, page) = api
+        .get("/api/v1/nodes?sort=node_id&limit=1&offset=1&fields=short_name")
+        .await;
+    assert_eq!(
+        page,
+        json!({"nodes": [{"node_id": 2, "short_name": "Bravo"}], "total": 3, "limit": 1, "offset": 1})
+    );
+    assert_eq!(
+        api.get("/api/v1/nodes?offset=0").await.1["limit"],
+        Value::Null
+    );
+
+    assert_eq!(
+        api.get("/api/v1/nodes?sort=nope").await.0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        api.get("/api/v1/nodes?fields=nope").await.0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        api.get("/api/v1/nodes?ids=1,x").await.1,
+        json!({"error": "ids must be a comma-separated list of integers"})
+    );
+}
+
+#[tokio::test]
+async fn facets_count_the_nodes_by_field() {
+    let api = api().await;
+    some_nodes(&api).await;
+
+    let (status, body) = api.get("/api/v1/nodes/facets").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["total"], 3);
+    assert_eq!(
+        body["facets"]["role"],
+        json!([{"value": "CLIENT", "count": 2}, {"value": "ROUTER", "count": 1}])
+    );
+    assert_eq!(
+        body["facets"]["firmware"],
+        json!([{"value": null, "count": 3}])
+    );
+    assert_eq!(
+        api.get("/api/v1/nodes/facets?channel=MediumFast").await.1["total"],
+        1
+    );
+}
