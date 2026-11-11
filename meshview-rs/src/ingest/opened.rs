@@ -44,7 +44,10 @@ pub struct Opened {
 impl Opened {
     /// Decodes a raw message and opens it with the first key that works.
     pub fn open(raw: &[u8], keyring: &Keyring) -> Result<Self, NotOpened> {
-        let mut envelope = ServiceEnvelope::decode(raw).map_err(|_| NotOpened::NotAnEnvelope)?;
+        // Read as Python's protobuf reads it: a field of the wrong wire type
+        // is one it does not know, not a reason to drop the message.
+        let mut envelope: ServiceEnvelope =
+            wire::decode("meshtastic.ServiceEnvelope", raw).ok_or(NotOpened::NotAnEnvelope)?;
 
         let has_packet = envelope.packet.is_some();
         let packet = envelope.packet.get_or_insert_default();

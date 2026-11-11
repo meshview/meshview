@@ -5,9 +5,21 @@
 //! `protobufs/`. Which upstream revision those are is in `protobufs/UPSTREAM_REV`,
 //! and `scripts/update-protobufs.sh` is how they get replaced.
 
+pub mod text_format;
 pub mod wire;
 
-include!(concat!(env!("OUT_DIR"), "/known_fields.rs"));
+use prost_reflect::DescriptorPool;
+use std::sync::LazyLock;
+
+/// Every message these protobufs describe, for reading and printing them by
+/// their description.
+pub fn descriptors() -> &'static DescriptorPool {
+    static POOL: LazyLock<DescriptorPool> = LazyLock::new(|| {
+        DescriptorPool::decode(&include_bytes!(concat!(env!("OUT_DIR"), "/descriptors.bin"))[..])
+            .expect("the descriptors built with these protobufs decode")
+    });
+    &POOL
+}
 
 /// Everything in the `meshtastic` protobuf package.
 #[allow(clippy::all, clippy::pedantic, missing_docs)]

@@ -96,3 +96,22 @@ fn fields_these_protobufs_do_not_know_are_kept_where_python_keeps_them() {
     // Python's ByteSize() of the decrypted envelope.
     assert_eq!(opened.size, 73);
 }
+
+/// A text message whose Data has its field 4, `dest`, a fixed32, sent as a
+/// varint: Python's protobuf takes it for unknown, keeps it, and stores the
+/// packet; prost alone would have refused the envelope.
+const WRONG_WIRE_TYPE: &str = "0a1c0d0d0c0b0a15ffffffff220b08011204686f6c6120f70a350403020112084c6f6e\
+67466173741a09213132333435363738";
+
+/// What Python stores for it, the odd field kept where it was.
+const WRONG_WIRE_TYPE_STORED: &str = "0d0d0c0b0a15ffffffff220b08011204686f6c6120f70a3504030201";
+
+#[test]
+fn a_field_of_the_wrong_wire_type_is_kept_as_python_keeps_it() {
+    let opened = Opened::open(&hex(WRONG_WIRE_TYPE), &Keyring::new::<&str>(&[])).unwrap();
+
+    assert!(!opened.was_encrypted);
+    assert_eq!(opened.packet_bytes, hex(WRONG_WIRE_TYPE_STORED));
+    // Python's ByteSize() of the envelope.
+    assert_eq!(opened.size, 51);
+}

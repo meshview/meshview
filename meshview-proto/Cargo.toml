@@ -10,10 +10,13 @@ publish = false
 
 [dependencies]
 prost.workspace = true
+# Messages read and printed by their descriptor: the protobuf text format the
+# web pages show packets in.
+prost-reflect = "0.16"
 
 [build-dependencies]
+prost.workspace = true
 prost-build = "0.14"
-prost-types = "0.14"
 # Parses the .proto files in Rust, so neither a developer, the CI runner nor the
 # container build has to have protoc installed, or the right version of it.
 protox = "0.9"

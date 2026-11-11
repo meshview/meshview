@@ -17,7 +17,7 @@ use meshview_proto::meshtastic::mesh_packet::PayloadVariant;
 use meshview_proto::meshtastic::{
     Data, HardwareModel, MapReport, MeshPacket, PortNum, Position, User,
 };
-use prost::Message;
+use meshview_proto::wire;
 use sqlx::{Sqlite, SqlitePool, Transaction};
 use std::collections::HashSet;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -179,7 +179,7 @@ impl Store {
         let mut outcome = Outcome::Stored;
 
         if data.portnum == PortNum::NodeinfoApp as i32
-            && let Ok(user) = User::decode(data.payload.as_slice())
+            && let Some(user) = wire::decode::<User>("meshtastic.User", &data.payload)
             && !user.id.is_empty()
         {
             match parse_node_id(&user.id) {
@@ -195,7 +195,7 @@ impl Store {
         }
 
         if data.portnum == PortNum::PositionApp as i32
-            && let Ok(position) = Position::decode(data.payload.as_slice())
+            && let Some(position) = wire::decode::<Position>("meshtastic.Position", &data.payload)
         {
             let (lat, lon) = (
                 position.latitude_i.unwrap_or(0),
@@ -244,12 +244,9 @@ impl Store {
 
     /// A map report: the node as it describes itself to the broker.
     async fn map_report(&self, packet: &MeshPacket, data: &Data, channel: &str) -> Result<()> {
-        let report = match MapReport::decode(data.payload.as_slice()) {
-            Ok(report) => report,
-            Err(e) => {
-                warn!("Error processing MAP_REPORT_APP: {e}");
-                return Ok(());
-            }
+        let Some(report) = wire::decode::<MapReport>("meshtastic.MapReport", &data.payload) else {
+            warn!("Error processing MAP_REPORT_APP: not a map report");
+            return Ok(());
         };
 
         let node_id = i64::from(packet.from);
