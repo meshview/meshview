@@ -16,7 +16,7 @@ use meshview_rs::state::{AppState, CHECK_DATABASE, Readiness};
 use meshview_rs::web;
 use serde_json::{Value, json};
 use sqlx::SqlitePool;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use tempfile::TempDir;
 use tower::ServiceExt;
 
@@ -31,13 +31,12 @@ async fn api() -> Api {
     let pool = sqlite::open_for_writing(&dir.path().join("packets.db"))
         .await
         .unwrap();
-    let reader = OnceLock::new();
-    reader.set(Reader::new(pool.clone())).unwrap();
-    let state = AppState {
-        readiness: Arc::new(Readiness::new([CHECK_DATABASE])),
-        reader: Arc::new(reader),
-        config: Arc::new(Config::default()),
-    };
+    let reader = Reader::new(pool.clone());
+    let state = AppState::new(
+        Arc::new(Readiness::new([CHECK_DATABASE])),
+        Config::default(),
+    );
+    state.reader.set(reader).unwrap();
     Api {
         app: web::router(Role::Serve, state),
         pool,
@@ -231,15 +230,11 @@ async fn api_with(config: Config) -> Api {
     let dir = TempDir::new().unwrap();
     let database = dir.path().join("packets.db");
     let pool = sqlite::open_for_writing(&database).await.unwrap();
-    let reader = OnceLock::new();
-    reader.set(Reader::new(pool.clone())).unwrap();
+    let reader = Reader::new(pool.clone());
     let mut config = config;
     config.database.connection_string = format!("sqlite:///{}", database.display());
-    let state = AppState {
-        readiness: Arc::new(Readiness::new([CHECK_DATABASE])),
-        reader: Arc::new(reader),
-        config: Arc::new(config),
-    };
+    let state = AppState::new(Arc::new(Readiness::new([CHECK_DATABASE])), config);
+    state.reader.set(reader).unwrap();
     Api {
         app: web::router(Role::Serve, state),
         pool,
@@ -328,11 +323,10 @@ async fn health_reports_the_database_and_the_last_cleanup() {
 
 #[tokio::test]
 async fn health_is_503_while_the_database_is_not_ready() {
-    let state = AppState {
-        readiness: Arc::new(Readiness::new([CHECK_DATABASE])),
-        reader: Arc::new(OnceLock::new()),
-        config: Arc::new(Config::default()),
-    };
+    let state = AppState::new(
+        Arc::new(Readiness::new([CHECK_DATABASE])),
+        Config::default(),
+    );
     let app = web::router(Role::Serve, state);
     let response = app
         .oneshot(Request::get("/health").body(Body::empty()).unwrap())
@@ -720,5 +714,98 @@ async fn a_traceroute_is_assembled_from_what_its_gateways_reported() {
             StatusCode::BAD_REQUEST,
             json!({"error": "packet_id must be an integer"})
         )
+    );
+}
+
+#[tokio::test]
+async fn edges_are_traceroute_hops_and_reported_neighbours() {
+    use meshview_proto::meshtastic::mesh_packet::PayloadVariant;
+    use meshview_proto::meshtastic::{
+        Data, MeshPacket, Neighbor, NeighborInfo, PortNum, RouteDiscovery,
+    };
+    use prost::Message;
+
+    let api = api().await;
+    let now = now_us();
+
+    // A finished traceroute 111 -> 444 -> 222, its answer stored from 222 to 111.
+    api.exec("INSERT INTO packet (id, portnum, from_node_id, to_node_id) VALUES (9, 70, 222, 111)")
+        .await;
+    let route = RouteDiscovery {
+        route: vec![444],
+        ..Default::default()
+    };
+    sqlx::query(
+        "INSERT INTO traceroute (packet_id, gateway_node_id, done, route, import_time_us) \
+         VALUES (9, 333, 1, ?, ?)",
+    )
+    .bind(route.encode_to_vec())
+    .bind(now)
+    .execute(&api.pool)
+    .await
+    .unwrap();
+
+    // Node 500 reports 600 as a neighbour.
+    let report = MeshPacket {
+        from: 500,
+        payload_variant: Some(PayloadVariant::Decoded(Data {
+            portnum: PortNum::NeighborinfoApp as i32,
+            payload: NeighborInfo {
+                node_id: 500,
+                neighbors: vec![Neighbor {
+                    node_id: 600,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }
+            .encode_to_vec(),
+            ..Default::default()
+        })),
+        ..Default::default()
+    };
+    sqlx::query(
+        "INSERT INTO packet (id, portnum, from_node_id, payload, import_time_us) \
+         VALUES (10, 71, 500, ?, ?)",
+    )
+    .bind(report.encode_to_vec())
+    .bind(now)
+    .execute(&api.pool)
+    .await
+    .unwrap();
+
+    let (status, body) = api.get("/api/v1/edges").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["edges"],
+        json!([
+            {"from": 111, "to": 444, "type": "traceroute"},
+            {"from": 444, "to": 222, "type": "traceroute"},
+            {"from": 600, "to": 500, "type": "neighbor"},
+        ])
+    );
+    assert_eq!(
+        api.get("/api/v1/edges?type=neighbor&node_id=500").await.1["edges"],
+        json!([{"from": 600, "to": 500, "type": "neighbor"}])
+    );
+    assert_eq!(
+        api.get("/api/v1/edges?type=bogus").await.1,
+        json!({"edges": []})
+    );
+    assert_eq!(
+        api.get("/api/v1/edges?node_id=x").await,
+        (
+            StatusCode::BAD_REQUEST,
+            json!({"error": "node_id must be integer"})
+        )
+    );
+
+    // Built once a minute: what arrives in between shows up after.
+    api.exec("DELETE FROM traceroute").await;
+    assert_eq!(
+        api.get("/api/v1/edges").await.1["edges"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
     );
 }
