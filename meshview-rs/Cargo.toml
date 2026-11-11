@@ -33,7 +33,7 @@ prost.workspace = true
 # aws-lc, which wants cmake and a C toolchain to cross compile. `ring` is chosen
 # below instead, as tocata does.
 rumqttc = { version = "0.25", default-features = false, features = ["use-rustls-no-provider"] }
-rust-embed = "8"
+rust-embed = { version = "8", features = ["mime-guess"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -41,6 +41,7 @@ serde_json = "1"
 # the same interface, which is why everything SQLite specific lives in db::sqlite.
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "tls-none", "sqlite", "macros", "migrate"] }
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+tera = { version = "2.4", features = ["preserve_order"] }
 toml = "0.9"
 tower-http = { version = "0.7", default-features = false, features = ["compression-gzip"] }
 tracing = "0.1"

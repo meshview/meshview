@@ -13,12 +13,13 @@ do, and in a crate of their own they are built once and left alone.
 | `meshview-rs/src/config.rs` | The configuration: TOML, environment variables, defaults. |
 | `meshview-rs/src/db/` | The database. `mod.rs` is what holds for any backend; `sqlite.rs` everything that knows it is SQLite, so that PostgreSQL can be a sibling module. |
 | `meshview-rs/migrations/sqlite/` | The SQLite migrations, compiled into the binary. |
-| `meshview-rs/assets/` | What the web side serves and is built into the binary: so far the translation catalogs under `lang/`, the Python version's, and the API reference's introduction (`api/intro.md`) and translations (`api-lang/`). |
+| `meshview-rs/templates/` | The web pages' templates: the Python version's, converted to Tera 2 by `scripts/import-web.py`. Not to be edited by hand. |
+| `meshview-rs/assets/` | What the web side serves and is built into the binary: the pages' files under `static/` and the coverage explanations under `docs/`, both imported with the templates (`IMPORTED_FROM` says from which commit); the translation catalogs under `lang/`, the Python version's; and the API reference's introduction (`api/intro.md`) and translations (`api-lang/`). |
 | `meshview-rs/src/ingest/` | MQTT ingestion: the connection (`mod.rs`), keys and decryption (`keys.rs`), opening a message (`opened.rs`) and storing it (`store.rs`). |
 | `meshview-rs/src/traceroute.rs` | Paths out of traceroutes: from the node that started one to the one it traced, and back. |
 | `meshview-rs/src/coverage.rs` | Predicted coverage: where a node is heard, sampled around it with the ITM. |
 | `meshview-rs/src/decode.rs` | What a stored packet says, as the pages show it: decoded, in the protobuf text format, redacted or `Did not decode`. |
-| `meshview-rs/src/web/` | HTTP: the API router, its reference, the redirects and the probes. `web/api/` has the API's endpoints, its errors, and its parameter parsing. |
+| `meshview-rs/src/web/` | HTTP: the pages (`pages.rs`), the API router, its reference, the redirects and the probes. `web/api/` has the API's endpoints, its errors, and its parameter parsing. |
 | `meshview-rs/src/jobs.rs` | The daily cleanup and snapshot, and their schedule. |
 | `meshview-rs/src/app.rs` | The roles, starting and stopping a process, and `backup`. |
 | `meshview-rs/tests/` | Integration tests. |
@@ -214,6 +215,38 @@ A new language is a new `assets/api-lang/<code>.json`, with every piece; the
 reference is then served in it when it is `[site] language`. Scalar has its
 own words in a few languages, `es` and `ru` among them; in one it does not
 have, they are English.
+
+## The web pages
+
+The pages are the Python version's, which keeps developing them: they are not
+written here, but brought over from a checkout of it.
+
+```sh
+scripts/import-web.py ~/devel/mesh/meshview
+```
+
+replaces `meshview-rs/templates/`, `meshview-rs/assets/static/` and
+`meshview-rs/assets/docs/` with what that checkout has, converted, and writes
+which commit it was to `meshview-rs/assets/IMPORTED_FROM`. The conversion:
+
+- Jinja to Tera 2: `{{ tr("…") }}` becomes `{{ "…" | tr }}`, `range(1, 15)`
+  becomes `range(start=1, end=15)`, the `chart_tools` macro of the statistics
+  page becomes a component, and what Tera does not allow is dropped: the `set`s
+  outside any block (meshview-rs passes `dashboard` in the context instead) and
+  blocks no parent template has, which Jinja ignored.
+- The API's addresses, `/api/…`, become `/api/v1/…`, and the link to the old
+  API page, `/api.html`, the reference, `/api/docs`.
+- The old API pages, `api.html` and `api-chat.html`, are left out.
+
+The script stops at anything in a template it does not know how to convert,
+such as a new macro: that is the time to teach it. A test renders every page in
+every language, so a template Tera cannot render fails the build. Change the
+pages in the Python project, not here, so that the next import does not undo
+it.
+
+To see that the pages are the Python version's, run both web servers as in
+[Comparing the API](#comparing-the-api) and compare what each page and file
+answers; once the API's addresses are put back to `/api/…`, they are the same.
 
 ## CI
 

@@ -98,10 +98,6 @@ strings are recognised and refused: it is not supported yet.
 
 ## Reference
 
-Some sections are accepted and checked but not acted on yet, because the parts
-of meshview that use them have not been ported. They are marked as such; a
-configuration written for them now will work unchanged once they are.
-
 ### `[server]`
 
 Where the web server, and the probes, listen. Every role listens.
@@ -114,8 +110,9 @@ Where the web server, and the probes, listen. Every role listens.
 
 ### `[site]`
 
-**Not acted on yet**: used by the web pages and `/api/config`, which are not
-ported yet.
+What the web pages show and how, also given to them, and to anyone, by
+`/api/v1/config`. The pages are rendered when the server starts: a change shows
+once it is restarted.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
@@ -148,8 +145,6 @@ ported yet.
 | `net_tag` | string | `"#BayMeshNet"` | Tag the weekly net page looks for in messages. |
 
 ### `[map_channel_colors]`
-
-**Not acted on yet**: used by the map.
 
 A table of channel names to six digit hex colours, such as
 `LongFast = "#4363d8"`. Names are matched ignoring case, spaces, hyphens and

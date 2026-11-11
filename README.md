@@ -15,8 +15,8 @@ everything it serves inside it.
 
 Early days. It reads its configuration, takes a Python meshview database over or
 creates one, ingests from MQTT (plain or over TLS), runs the daily cleanup and
-snapshot, makes consistent backups, and serves the API. The web pages are being
-ported next, against the behaviour of the Python meshview 4.0.
+snapshot, makes consistent backups, and serves the API and the web pages, those
+of the Python meshview 4.0.
 
 Ingestion stores what the Python version stores, byte for byte: run side by side
 on the same broker, both write identical databases. The API answers what the

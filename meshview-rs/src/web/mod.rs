@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Óscar García Amor <ogarcia@connectical.com>
 
-//! HTTP: the API, its reference, and the probes.
+//! HTTP: the web pages, the API, its reference, and the probes.
 //!
 //! The API lives under `/api/v1`, and every route is declared through utoipa's
 //! router, so the reference at `/api/docs` is built from the same calls that
@@ -18,6 +18,7 @@
 
 pub mod api;
 mod health;
+mod pages;
 mod reference;
 
 use crate::app::Role;
@@ -132,6 +133,10 @@ pub fn router(role: Role, state: AppState) -> Router {
                 }),
             )
             .route("/api/{*rest}", get(legacy_api))
+            .merge(
+                pages::router(&state.config)
+                    .expect("the pages are built in and render with any configuration"),
+            )
             .layer(compression())
     } else {
         router
@@ -159,13 +164,17 @@ fn documents(reference: &utoipa::openapi::OpenApi) -> BTreeMap<String, Bytes> {
 }
 
 /// Gzip for what is worth compressing, as the Python version did: JSON, SVG,
-/// HTML, Markdown and plain text, from a kilobyte up. Unlike it, the client's
+/// HTML, Markdown and plain text, from a kilobyte up, and the pages' scripts
+/// and styles too, which it did not compress. Unlike it, the client's
 /// `Accept-Encoding` is read properly, quality values included.
 fn compression() -> CompressionLayer<impl Predicate> {
     const TYPES: &[&str] = &[
         "application/json",
+        "application/javascript",
         "image/svg+xml",
+        "text/css",
         "text/html",
+        "text/javascript",
         "text/markdown",
         "text/plain",
     ];
