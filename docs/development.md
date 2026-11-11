@@ -282,3 +282,14 @@ git push origin 0.1.0
 CI refuses a tag that does not match `Cargo.toml`, and then publishes the image
 tagged with the version and as `latest`, and a release page with the binaries as
 tarballs and their checksums.
+
+`longley-rice` is released on its own, to crates.io, with a version of its own
+in `longley-rice/Cargo.toml`. Its tags are its name and that version, again with
+no `v` (`longley-rice-0.1.0`), which the release above does not answer to. They
+are plain tags, not annotated: the tag says all there is to say.
+
+```sh
+cargo publish -p longley-rice
+git tag longley-rice-0.1.0
+git push origin longley-rice-0.1.0
+```

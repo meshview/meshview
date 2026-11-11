@@ -204,7 +204,10 @@ again.
 Copyright (C) 2026 Óscar García Amor.
 
 Free software under the GNU General Public License, version 3 or later; see
-[LICENSE](LICENSE). The model is derived from NTIA's ITM, which is public
+[LICENSE][license]. The model is derived from NTIA's ITM, which is public
 domain in the United States and released worldwide for derivative works; the
-pyitm module reproduces pyitm, under the MIT licence. [NOTICE](NOTICE) has
+pyitm module reproduces pyitm, under the MIT licence. [NOTICE][notice] has
 both, with the acknowledgment and the statement of changes NTIA asks for.
+
+[license]: https://github.com/ogarcia/meshview-rs/blob/master/longley-rice/LICENSE
+[notice]: https://github.com/ogarcia/meshview-rs/blob/master/longley-rice/NOTICE

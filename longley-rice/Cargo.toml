@@ -5,6 +5,8 @@ readme = "README.md"
 # Its own version: it is released on its own, not with the application.
 version = "0.1.0"
 edition.workspace = true
+# The oldest Rust that edition 2024 allows, which it is tested with.
+rust-version = "1.85"
 # GPL for the code, MIT for what reproduces pyitm (see NOTICE).
 license = "GPL-3.0-or-later AND MIT"
 authors.workspace = true
