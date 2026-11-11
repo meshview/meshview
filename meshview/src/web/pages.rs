@@ -165,6 +165,13 @@ fn tera(config: &Config) -> anyhow::Result<Tera> {
     globals.insert("ui_language", &config.site.language);
     globals.insert("site_description", config.site.message.trim());
     globals.insert("map_tiles", &map_tiles);
+    let build = super::api::version::current();
+    globals.insert("build_version", build.version);
+    // Nothing to show when it was built from outside a Git checkout.
+    globals.insert(
+        "build_revision",
+        &Some(build.git_revision_short).filter(|revision| *revision != "unknown"),
+    );
     globals.insert("dashboard", &false);
     globals.insert("error_message", "");
     globals.insert("error_details", "");

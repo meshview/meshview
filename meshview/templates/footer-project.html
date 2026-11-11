@@ -1,6 +1,6 @@
-{#- The footer's link to the project. The base template's script writes the
-    version after the name. -#}
+{#- The footer's link to the project, with the version answering and the commit
+    it was built from, which tells one development build from the next. -#}
 <a class="mesh-footer-project" href="https://github.com/meshview/meshview" target="_blank" rel="noopener" title="{{ "Meshview on GitHub" | tr }}">
         <span class="ti ti-brand-github" aria-hidden="true"></span>
-        <span id="site-version">Meshview</span><span class="visually-hidden"> · GitHub</span>
+        <span id="site-version">Meshview {{ build_version }}{% if build_revision %} ({{ build_revision }}){% endif %}</span><span class="visually-hidden"> · GitHub</span>
     </a>

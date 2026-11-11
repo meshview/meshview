@@ -89,7 +89,13 @@ async fn pages_speak_the_api_version_and_the_sites_language() {
     // The footer is Meshview's, not the Python version's.
     assert!(page.contains(r#"href="https://github.com/meshview/meshview""#));
     assert!(page.contains("Meshview en GitHub"));
-    assert!(page.contains(r#"<span id="site-version">Meshview</span>"#));
+    // With the version, and the commit it was built from when that is known.
+    let build = meshview::web::api::version::current();
+    let shown = match build.git_revision_short {
+        "unknown" => format!("Meshview {}<", build.version),
+        revision => format!("Meshview {} ({revision})<", build.version),
+    };
+    assert!(page.contains(&shown), "{shown}");
     assert!(!page.contains("pablorevilla-meshtastic/meshview\""));
 
     // The dashboard is the map with the node explorer beside it.

@@ -506,10 +506,6 @@ async function initializePage() {
             setupSiteMenu(menu, items);
         }
 
-        // Version
-        document.getElementById("site-version").textContent =
-            site.version ? `Meshview ${site.version}` : "Meshview";
-
         // Apply translations
         applyTranslations(dict);
         fillPortnumSelect(dict, "{{ portnum or '' }}");
