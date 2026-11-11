@@ -5,3 +5,4 @@ target/
 *.db-shm
 *.db-wal
 __pycache__/
+.ruff_cache/
