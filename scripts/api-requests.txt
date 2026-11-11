@@ -1,0 +1,28 @@
+# Requests for scripts/compare-api.py: see docs/development.md.
+# Each line: a path with its query string, then optionally ignore=<keys>.
+
+/version ignore=version,release_date,git_revision,git_revision_short
+
+/api/channels
+/api/channels?period_type=day&length=365
+/api/channels?period_type=hour&length=1
+/api/channels?length=0
+/api/channels?length=99999&period_type=day
+/api/channels?length=
+/api/channels?length=abc
+/api/channels?length=1.5
+/api/channels?period_type=week
+/api/channels?period_type=HOUR
+
+/api/snapshots/daily
+/api/snapshots/daily?length=7
+/api/snapshots/daily?length=0
+/api/snapshots/daily?length=99999
+/api/snapshots/daily?length=
+/api/snapshots/daily?length=x
+
+/api/packets_seen/2725269581
+/api/packets_seen/1
+/api/packets_seen/-5
+/api/packets_seen/abc
+/api/packets_seen/99999999999999999999

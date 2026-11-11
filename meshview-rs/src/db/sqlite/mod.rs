@@ -9,6 +9,8 @@
 //! server: a pool of read only connections, which is what lets several of them,
 //! even in separate processes, share the file with the writer under WAL.
 
+pub mod queries;
+
 use super::{Compatibility, Schema};
 use anyhow::{Context, Result, bail};
 use sqlx::migrate::Migrator;
