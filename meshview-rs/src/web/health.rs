@@ -49,8 +49,9 @@ pub async fn livez() -> Json<Status> {
 ///
 /// Answers 200 once every check this process depends on passes, and 503 with
 /// the list of them until then: `database`, once it is open at the schema
-/// this build knows, and for a process that ingests, `mqtt`, while it is
-/// connected to the broker.
+/// this build knows, and for a process that only ingests, `mqtt`, while it is
+/// connected to the broker. One that also serves keeps serving while the
+/// broker is away, so the broker does not count for it.
 #[utoipa::path(
     get,
     path = "/readyz",

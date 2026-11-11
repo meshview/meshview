@@ -60,6 +60,10 @@ MESHVIEW_<SECTION>__<KEY>
   `MESHVIEW_CONFIG`, is not a configuration key and is left alone.
 - One with a section or key that does not exist is an error, as it would be in
   the file.
+- At start, the names of the variables that set keys are logged, without their
+  values, and the database is logged with where its connection string came
+  from: the file, a variable, or the default. A variable left set somewhere
+  wins over the file without anything else saying so.
 
 ```sh
 MESHVIEW_DATABASE__CONNECTION_STRING=sqlite:////data/packets.db

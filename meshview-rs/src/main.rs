@@ -82,6 +82,13 @@ async fn main() -> Result<()> {
         Some(path) => info!("configuration read from {}", path.display()),
         None => info!("no configuration file; using the defaults and the environment"),
     }
+    let from_environment: Vec<&str> = config.environment_variables().collect();
+    if !from_environment.is_empty() {
+        info!(
+            "settings from the environment: {}",
+            from_environment.join(", ")
+        );
+    }
     for warning in config.deprecations() {
         warn!("{warning}");
     }

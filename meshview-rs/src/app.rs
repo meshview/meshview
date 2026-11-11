@@ -72,6 +72,11 @@ pub async fn run_until(
     stopping: watch::Receiver<bool>,
 ) -> Result<()> {
     let DatabaseUrl::Sqlite(database) = config.database()?;
+    info!(
+        "database {} ({})",
+        database.display(),
+        config.database_origin()
+    );
 
     if role == Role::Migrate {
         let pool = db::sqlite::open_for_writing(&database).await?;
