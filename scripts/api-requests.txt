@@ -26,3 +26,23 @@
 /api/packets_seen/-5
 /api/packets_seen/abc
 /api/packets_seen/99999999999999999999
+
+# The configuration: the version differs by nature, and minute = 00 in the
+# Python INI file is 0 in TOML, which has no leading zeros.
+/api/config ignore=site.version,cleanup.minute
+
+/api/lang
+/api/lang?lang=es
+/api/lang?lang=ru
+/api/lang?lang=es&section=top
+/api/lang?lang=es&section=TOP
+/api/lang?section=base
+/api/lang?lang=fr
+/api/lang?lang=fr&section=nothing
+/api/lang?lang=../etc&section=top
+/api/lang?lang=&section=ui
+/api/lang?lang=es&section=
+
+# Health: times, versions and file sizes differ by nature; backup, snapshot and
+# the status files are what docs/api.md says is different.
+/health ignore=timestamp,version,git_revision,seconds_since_last_message,database_size,database_size_bytes,backup,snapshot,cleanup.status_file,cleanup.last_run

@@ -3,6 +3,7 @@
 
 //! What the HTTP handlers share.
 
+use crate::config::Config;
 use crate::db::Reader;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -79,6 +80,9 @@ pub struct AppState {
     /// The read pool, there once the database is at a schema this build knows.
     /// Handlers that need the database answer 503 until then.
     pub reader: Arc<OnceLock<Reader>>,
+    /// The configuration the process started with, for the answers that report
+    /// on it (`/api/v1/config`, `/health`).
+    pub config: Arc<Config>,
 }
 
 /// The readiness check for the database being at the expected schema.

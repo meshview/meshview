@@ -8,9 +8,12 @@ pub mod error;
 pub mod params;
 
 mod channels;
+mod health;
+mod lang;
 mod packets_seen;
+mod site_config;
 mod snapshots;
-mod version;
+pub mod version;
 
 use crate::db::Reader;
 use crate::state::AppState;
@@ -24,11 +27,15 @@ pub fn v1() -> OpenApiRouter<AppState> {
         .routes(routes!(channels::channels))
         .routes(routes!(snapshots::daily))
         .routes(routes!(packets_seen::packets_seen))
+        .routes(routes!(site_config::config))
+        .routes(routes!(lang::lang))
 }
 
 /// The routes outside any version, at their own full paths.
 pub fn unversioned() -> OpenApiRouter<AppState> {
-    OpenApiRouter::new().routes(routes!(version::version))
+    OpenApiRouter::new()
+        .routes(routes!(version::version))
+        .routes(routes!(health::health))
 }
 
 impl AppState {

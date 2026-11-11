@@ -12,6 +12,7 @@ do, and in a crate of their own they are built once and left alone.
 | `meshview-rs/src/config.rs` | The configuration: TOML, environment variables, defaults. |
 | `meshview-rs/src/db/` | The database. `mod.rs` is what holds for any backend; `sqlite.rs` everything that knows it is SQLite, so that PostgreSQL can be a sibling module. |
 | `meshview-rs/migrations/sqlite/` | The SQLite migrations, compiled into the binary. |
+| `meshview-rs/assets/` | What the web side serves and is built into the binary: so far the translation catalogs under `lang/`, the Python version's. |
 | `meshview-rs/src/ingest/` | MQTT ingestion: the connection (`mod.rs`), keys and decryption (`keys.rs`), opening a message (`opened.rs`) and storing it (`store.rs`). |
 | `meshview-rs/src/web/` | HTTP: the API router, its reference, the redirects and the probes. `web/api/` has the API's endpoints, its errors, and its parameter parsing. |
 | `meshview-rs/src/jobs.rs` | The daily cleanup and snapshot, and their schedule. |
