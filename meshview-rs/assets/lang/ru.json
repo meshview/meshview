@@ -1039,6 +1039,25 @@
     "{label}: {heard} ({total}) packets heard": "{label}: принято пакетов {heard} ({total})",
     "{matched} of {sample} sampled packets match main channels": "{matched} из {sample} пакетов выборки соответствуют основным каналам",
     "{value} m": "{value} м",
-    "← Nodes": "← Узлы"
+    "← Nodes": "← Узлы",
+    "Predicted coverage": "Прогноз покрытия",
+    "Meshview can display a predicted coverage boundary for a node. This is a model estimate, not a guarantee of real-world performance.": "Meshview может показывать границу прогнозируемого покрытия узла. Это оценка модели, а не гарантия реальной работы.",
+    "How it works": "Как это работает",
+    "The coverage boundary is computed with the Longley-Rice / ITM propagation model in area mode, from NTIA's reference implementation, built into the server. Area mode estimates average path loss over generic terrain and does not use a terrain profile. This means it captures general distance effects, but does not account for terrain shadows, buildings or foliage.": "Граница покрытия рассчитывается с помощью модели распространения Longley-Rice / ITM в зональном режиме (area mode), по эталонной реализации NTIA, встроенной в сервер. Зональный режим оценивает средние потери на трассе над типовой местностью и не использует профиль рельефа. Поэтому он учитывает общее влияние расстояния, но не учитывает тени от рельефа, здания и растительность.",
+    "What you are seeing": "Что вы видите",
+    "The map draws a perimeter (not a heatmap) that represents the furthest distance where the predicted signal strength is above a threshold, -120 dBm by default. The model is run in many directions around the node, and the last point above the threshold in each one forms the outline.": "Карта рисует периметр (а не тепловую карту) — наибольшее расстояние, на котором прогнозируемый уровень сигнала выше порога, по умолчанию -120 dBm. Модель рассчитывается по множеству направлений от узла, и последняя точка выше порога в каждом направлении образует контур.",
+    "Key parameters": "Основные параметры",
+    "Frequency": "Частота",
+    "default": "по умолчанию",
+    "Transmit power": "Мощность передатчика",
+    "Antenna heights": "Высота антенн",
+    "median": "медиана",
+    "Terrain irregularity": "Неровность рельефа",
+    "average terrain": "средний рельеф",
+    "Limitations": "Ограничения",
+    "No terrain or building data is used (area mode only).": "Данные о рельефе и зданиях не используются (только зональный режим).",
+    "Results are sensitive to power, height and threshold.": "Результаты сильно зависят от мощности, высоты и порога.",
+    "Environmental factors can cause large real-world deviations.": "Условия окружающей среды могут сильно отличать реальность от прогноза.",
+    "meshview-rs on GitHub": "meshview-rs на GitHub"
   }
 }

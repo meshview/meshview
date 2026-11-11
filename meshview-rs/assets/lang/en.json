@@ -1039,6 +1039,25 @@
     "{label}: {heard} ({total}) packets heard": "{label}: {heard} ({total}) packets heard",
     "{matched} of {sample} sampled packets match main channels": "{matched} of {sample} sampled packets match main channels",
     "{value} m": "{value} m",
-    "← Nodes": "← Nodes"
+    "← Nodes": "← Nodes",
+    "Predicted coverage": "Predicted coverage",
+    "Meshview can display a predicted coverage boundary for a node. This is a model estimate, not a guarantee of real-world performance.": "Meshview can display a predicted coverage boundary for a node. This is a model estimate, not a guarantee of real-world performance.",
+    "How it works": "How it works",
+    "The coverage boundary is computed with the Longley-Rice / ITM propagation model in area mode, from NTIA's reference implementation, built into the server. Area mode estimates average path loss over generic terrain and does not use a terrain profile. This means it captures general distance effects, but does not account for terrain shadows, buildings or foliage.": "The coverage boundary is computed with the Longley-Rice / ITM propagation model in area mode, from NTIA's reference implementation, built into the server. Area mode estimates average path loss over generic terrain and does not use a terrain profile. This means it captures general distance effects, but does not account for terrain shadows, buildings or foliage.",
+    "What you are seeing": "What you are seeing",
+    "The map draws a perimeter (not a heatmap) that represents the furthest distance where the predicted signal strength is above a threshold, -120 dBm by default. The model is run in many directions around the node, and the last point above the threshold in each one forms the outline.": "The map draws a perimeter (not a heatmap) that represents the furthest distance where the predicted signal strength is above a threshold, -120 dBm by default. The model is run in many directions around the node, and the last point above the threshold in each one forms the outline.",
+    "Key parameters": "Key parameters",
+    "Frequency": "Frequency",
+    "default": "default",
+    "Transmit power": "Transmit power",
+    "Antenna heights": "Antenna heights",
+    "median": "median",
+    "Terrain irregularity": "Terrain irregularity",
+    "average terrain": "average terrain",
+    "Limitations": "Limitations",
+    "No terrain or building data is used (area mode only).": "No terrain or building data is used (area mode only).",
+    "Results are sensitive to power, height and threshold.": "Results are sensitive to power, height and threshold.",
+    "Environmental factors can cause large real-world deviations.": "Environmental factors can cause large real-world deviations.",
+    "meshview-rs on GitHub": "meshview-rs on GitHub"
   }
 }

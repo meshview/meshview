@@ -13,9 +13,8 @@ do, and in a crate of their own they are built once and left alone.
 | `meshview-rs/src/config.rs` | The configuration: TOML, environment variables, defaults. |
 | `meshview-rs/src/db/` | The database. `mod.rs` is what holds for any backend; `sqlite.rs` everything that knows it is SQLite, so that PostgreSQL can be a sibling module. |
 | `meshview-rs/migrations/sqlite/` | The SQLite migrations, compiled into the binary. |
-| `meshview-rs/templates/` | The web pages' templates: the Python version's, converted to Tera 2 by `scripts/import-web.py`. Not to be edited by hand. |
-| `meshview-rs/local/` | What meshview-rs adds to the imported pages, its own: templates under `templates/` (the node page's coverage help) and the translations of their strings under `lang/`. Edited here. |
-| `meshview-rs/assets/` | What the web side serves and is built into the binary: the pages' files under `static/`, imported with the templates (`IMPORTED_FROM` says from which commit); the translation catalogs under `lang/`, the Python version's; and the API reference's introduction (`api/intro.md`) and translations (`api-lang/`). |
+| `meshview-rs/templates/` | The web pages' templates, Tera 2. See [The web pages](#the-web-pages). |
+| `meshview-rs/assets/` | What the web side serves and is built into the binary: the pages' files under `static/`, the translation catalogs under `lang/`, and the API reference's introduction (`api/intro.md`) and translations (`api-lang/`). |
 | `meshview-rs/src/ingest/` | MQTT ingestion: the connection (`mod.rs`), keys and decryption (`keys.rs`), opening a message (`opened.rs`) and storing it (`store.rs`). |
 | `meshview-rs/src/traceroute.rs` | Paths out of traceroutes: from the node that started one to the one it traced, and back. |
 | `meshview-rs/src/coverage.rs` | Predicted coverage: where a node is heard, sampled around it with the ITM. |
@@ -24,7 +23,7 @@ do, and in a crate of their own they are built once and left alone.
 | `meshview-rs/src/jobs.rs` | The daily cleanup and snapshot, and their schedule. |
 | `meshview-rs/src/app.rs` | The roles, starting and stopping a process, and `backup`. |
 | `meshview-rs/tests/` | Integration tests. |
-| `scripts/` | Updating the protobufs, comparing databases and API answers with the Python version, importing its web pages, converting its configuration, and giving a database back to it. |
+| `scripts/` | Updating the protobufs, comparing databases and API answers with the Python version, converting its configuration, and giving a database back to it. |
 
 ## Building and testing
 
@@ -219,51 +218,27 @@ have, they are English.
 
 ## The web pages
 
-The pages are the Python version's, which keeps developing them: they are not
-written here, but brought over from a checkout of it.
+The pages are Tera 2 templates under `meshview-rs/templates/`, and the files
+they use, scripts, styles, icons and the bundled libraries, under
+`meshview-rs/assets/static/`; all of it is built into the binary, and every page
+is rendered once, at start. They began as the Python version's Jinja templates,
+converted, and are developed here now.
 
-```sh
-scripts/import-web.py ~/devel/mesh/meshview
-```
+A few templates are not pages but parts the pages include: the node page's
+coverage help (`coverage-help.html`), the map's dot borders
+(`marker-stroke.js`) and the footer's link to the project
+(`footer-project.html`).
 
-replaces `meshview-rs/templates/` and `meshview-rs/assets/static/` with what
-that checkout has, converted, and writes which commit it was to
-`meshview-rs/assets/IMPORTED_FROM`. The conversion:
+Templates translate their strings with the `tr` filter, `{{ "Text" | tr }}`,
+from the `ui` section of the catalogs under `meshview-rs/assets/lang/`, keyed by
+the English text; the scripts the pages run use the other sections, by key, through
+`/api/v1/lang`. A test fails while a `tr` string is missing from a catalog's
+`ui`, English included, and another renders every page in every language, so a
+template Tera cannot render fails the build.
 
-- Jinja to Tera 2: `{{ tr("…") }}` becomes `{{ "…" | tr }}`, `range(1, 15)`
-  becomes `range(start=1, end=15)`, the `chart_tools` macro of the statistics
-  page becomes a component, and what Tera does not allow is dropped: the `set`s
-  outside any block (meshview-rs passes `dashboard` in the context instead) and
-  blocks no parent template has, which Jinja ignored.
-- The API's addresses, `/api/…`, become `/api/v1/…`, and the link to the old
-  API page, `/api.html`, the reference, `/api/docs`.
-- The old API pages, `api.html` and `api-chat.html`, are left out.
-- The node page's coverage help, which the Python version fetched from its
-  `docs/COVERAGE*.md` and rendered, includes meshview-rs's own
-  `local/templates/coverage-help.html` instead: it can say what is true of
-  meshview-rs (the model is built in), and it is translated as the rest of the
-  page.
-- The map's node dots get the border that stands out more from their colour,
-  `local/templates/marker-stroke.js`, rather than always a white one.
-- The footer names and links meshview-rs, `local/templates/footer-project.html`,
-  rather than the Python version.
-
-What meshview-rs adds of its own lives in `meshview-rs/local/`, which the
-import leaves alone: templates under `templates/`, included by the converted
-ones, and their strings' translations under `lang/`, one catalog a language
-from the English text to its translation. They only fill in what the Python
-version's catalogs do not have. A test fails while a catalog lacks a string of
-those templates, or has one they no longer use.
-
-The script stops at anything in a template it does not know how to convert,
-such as a new macro: that is the time to teach it. A test renders every page in
-every language, so a template Tera cannot render fails the build. Change the
-pages in the Python project, not here, so that the next import does not undo
-it.
-
-To see that the pages are the Python version's, run both web servers as in
-[Comparing the API](#comparing-the-api) and compare what each page and file
-answers; once the API's addresses are put back to `/api/…`, they are the same.
+The bundled libraries live in folders named after their version
+(`vendor/leaflet-1.9.4/`), which is what lets them be cached for good: a new
+version is a new folder, never new contents in an old one.
 
 ## CI
 

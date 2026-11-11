@@ -25,6 +25,6 @@ each checked against the Python version's behaviour before it is called done.
 | Daily cleanup and snapshot | Done, identical databases side by side with Python |
 | Consistent backups (`meshview-rs backup`) | Done (new in meshview-rs); the Python version's scheduled backups are deprecated |
 | API | Done, answering what the Python version answers |
-| Web pages | Done, the Python version's, converted to Tera 2 by `scripts/import-web.py` |
+| Web pages | Done, the Python version's converted to Tera 2 |
 | Coverage prediction | Done, with NTIA's model, in the [`longley-rice`](../longley-rice) crate |
 | PostgreSQL | Later |

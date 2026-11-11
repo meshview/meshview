@@ -8,12 +8,9 @@
 //! texts and the map's tiles, is known once the configuration is read, so every
 //! page is rendered once, at start, and answered from memory after that.
 //!
-//! The templates are the Python version's Jinja ones converted to Tera 2 by
-//! `scripts/import-web.py`, which brings the static files over too. What
-//! meshview-rs adds of its own, the node page's coverage help, is under
-//! `local/`: its templates, and the translations of their strings, which fill
-//! in what the Python version's catalogs do not have. All of it is built into
-//! the binary.
+//! The templates are Tera 2 ones, under `templates/`, and the files they use
+//! under `assets/static/`; their strings are translated in the `ui` section of
+//! the catalogs under `assets/lang/`. All of it is built into the binary.
 
 use super::api::lang;
 use super::api::site_config;
@@ -40,24 +37,6 @@ struct Templates;
 #[derive(RustEmbed)]
 #[folder = "assets/static/"]
 struct Static;
-
-#[derive(RustEmbed)]
-#[folder = "local/templates/"]
-struct LocalTemplates;
-
-#[derive(RustEmbed)]
-#[folder = "local/lang/"]
-struct LocalCatalogs;
-
-/// meshview-rs's own translations for `code`, English text to translation.
-fn local_catalog(code: &str) -> HashMap<String, String> {
-    LocalCatalogs::get(&format!("{code}.json"))
-        .map(|file| {
-            serde_json::from_slice(&file.data)
-                .unwrap_or_else(|e| panic!("local/lang/{code}.json is not valid: {e}"))
-        })
-        .unwrap_or_default()
-}
 
 /// The templates of an embedded folder, by name.
 fn templates_of<E: RustEmbed>() -> anyhow::Result<Vec<(String, String)>> {
@@ -150,15 +129,13 @@ fn tera(config: &Config) -> anyhow::Result<Tera> {
         .get("ui")
         .cloned()
         .unwrap_or_else(|| json!({}));
-    // The Python version's strings first; ours only where it has none.
-    let mut translations = local_catalog(code);
-    translations.extend(
+    let translations: Arc<HashMap<String, String>> = Arc::new(
         ui.as_object()
             .into_iter()
             .flatten()
-            .filter_map(|(source, text)| Some((source.clone(), text.as_str()?.to_string()))),
+            .filter_map(|(source, text)| Some((source.clone(), text.as_str()?.to_string())))
+            .collect(),
     );
-    let translations = Arc::new(translations);
 
     let site = site_config::build(config).site;
     let map_tiles = json!({
@@ -180,9 +157,7 @@ fn tera(config: &Config) -> anyhow::Result<Tera> {
         tera::Value::safe_string(&to_json(&value))
     });
 
-    let mut templates = templates_of::<Templates>()?;
-    templates.extend(templates_of::<LocalTemplates>()?);
-    tera.add_raw_templates(templates)
+    tera.add_raw_templates(templates_of::<Templates>()?)
         .map_err(|e| anyhow!("{e}"))?;
 
     let globals = tera.global_context();
@@ -388,27 +363,26 @@ mod tests {
             .collect()
     }
 
-    /// meshview-rs's own templates are translated whole into every language
-    /// the Python version's catalogs have, and nothing else is.
+    /// Every string a template translates is in the `ui` section of every
+    /// catalog, English included, so that no page shows a string untranslated.
     #[test]
-    fn local_catalogs_translate_the_local_templates() {
+    fn every_translated_string_is_in_every_catalog() {
         let mut needed = std::collections::BTreeSet::new();
-        for name in LocalTemplates::iter() {
-            let file = LocalTemplates::get(&name).unwrap();
+        for name in Templates::iter() {
+            let file = Templates::get(&name).unwrap();
             let text = std::str::from_utf8(&file.data).unwrap().to_string();
             needed.extend(translated_strings(&text).into_iter().map(str::to_string));
         }
-        assert!(!needed.is_empty());
-        for code in ["es", "ru"] {
-            let catalog = local_catalog(code);
+        assert!(needed.len() > 100);
+        for code in ["en", "es", "ru"] {
+            let ui = lang::merged(code)["ui"].clone();
             let missing: Vec<_> = needed
                 .iter()
-                .filter(|s| !catalog.contains_key(*s))
+                .filter(|s| ui.get(s.as_str()).is_none())
                 .collect();
-            let stale: Vec<_> = catalog.keys().filter(|s| !needed.contains(*s)).collect();
             assert!(
-                missing.is_empty() && stale.is_empty(),
-                "local/lang/{code}.json: missing {missing:#?}, stale {stale:#?}"
+                missing.is_empty(),
+                "assets/lang/{code}.json ui lacks {missing:#?}"
             );
         }
     }

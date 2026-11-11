@@ -1,5 +1,4 @@
-// meshview-rs's own (local/templates/marker-stroke.js), which scripts/import-web.py
-// includes in the map: a node's dot gets the border that stands out more from its
+// Included in the map: a node's dot gets the border that stands out more from its
 // fill, white on dark colours and near-black on light ones (WCAG contrast). That
 // shows it both on the light map and on the inverted one of night mode, without
 // redrawing anything when the theme changes.
