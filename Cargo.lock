@@ -1230,7 +1230,7 @@ version = "0.1.0-dev"
 dependencies = [
  "prost",
  "prost-build",
- "prost-types",
+ "prost-reflect",
  "protox",
 ]
 

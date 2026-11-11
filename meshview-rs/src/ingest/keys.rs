@@ -15,7 +15,6 @@ use base64::engine::general_purpose::STANDARD;
 use ctr::Ctr128BE;
 use ctr::cipher::{KeyIvInit, StreamCipher};
 use meshview_proto::meshtastic::{Data, MeshPacket, mesh_packet::PayloadVariant};
-use prost::Message;
 use tracing::{error, warn};
 
 /// Meshtastic's well known default key: what the single byte PSK 1 stands for,
@@ -129,7 +128,11 @@ pub fn decrypt(packet: &mut MeshPacket, key: &[u8]) -> Option<Option<Vec<u8>>> {
     };
     applied.ok()?;
 
-    let data = Data::decode(plain.as_slice()).ok()?;
+    // Leniently, as Python's protobuf parses it: a field of the wrong wire type
+    // is unknown, not fatal. Noise from a wrong key passes this more often than
+    // it would pass prost alone, and what the Python version took for a packet
+    // is what this has to take for one.
+    let data: Data = meshview_proto::wire::decode("meshtastic.Data", &plain)?;
     // A wrong key can still come out as something that parses, made of nothing
     // but unknown fields. Port 0 is what that looks like, and it must not stop
     // the next key from being tried.

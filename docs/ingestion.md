@@ -81,6 +81,16 @@ such (`is_mqtt_gateway`) the first time this process sees them relay something.
 Enum values the bundled protobufs do not know, from a newer firmware, are stored
 as `unknown(N)` rather than refused.
 
+### Fields of the wrong wire type
+
+A field can arrive encoded as a type other than its own: a `fixed32` as a
+varint, say. That is what garbage looks like, and some real packets carry it.
+Python's protobuf takes such a field for one it does not know and reads the rest
+of the message; prost alone would refuse the whole message. meshview-rs reads
+messages as Python's protobuf does, so it keeps the packets the Python version
+kept, with the odd field stored where it was, and it accepts what the Python
+version accepted when a wrong key's decryption happens to parse.
+
 ### Fields these protobufs do not know
 
 A firmware newer than the bundled protobufs sends fields they do not declare.
