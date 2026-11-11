@@ -18,5 +18,6 @@
   "Limitations": "Ограничения",
   "No terrain or building data is used (area mode only).": "Данные о рельефе и зданиях не используются (только зональный режим).",
   "Results are sensitive to power, height and threshold.": "Результаты сильно зависят от мощности, высоты и порога.",
-  "Environmental factors can cause large real-world deviations.": "Условия окружающей среды могут сильно отличать реальность от прогноза."
+  "Environmental factors can cause large real-world deviations.": "Условия окружающей среды могут сильно отличать реальность от прогноза.",
+  "meshview-rs on GitHub": "meshview-rs на GitHub"
 }

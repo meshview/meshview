@@ -18,5 +18,6 @@
   "Limitations": "Limitaciones",
   "No terrain or building data is used (area mode only).": "No se usan datos de terreno ni de edificios (solo modo área).",
   "Results are sensitive to power, height and threshold.": "Los resultados dependen mucho de la potencia, la altura y el umbral.",
-  "Environmental factors can cause large real-world deviations.": "Los factores del entorno pueden provocar grandes desviaciones en la realidad."
+  "Environmental factors can cause large real-world deviations.": "Los factores del entorno pueden provocar grandes desviaciones en la realidad.",
+  "meshview-rs on GitHub": "meshview-rs en GitHub"
 }

@@ -21,7 +21,9 @@ meshview-rs needs:
   docs/COVERAGE*.md and rendered, is meshview-rs's own template instead,
   local/templates/coverage-help.html, translated as the rest of the page is;
 - the map's node dots get a border that stands out from their fill,
-  local/templates/marker-stroke.js, rather than always a white one.
+  local/templates/marker-stroke.js, rather than always a white one;
+- the footer names and links meshview-rs, local/templates/footer-project.html,
+  rather than the Python version.
 
 Anything in a template it does not know how to convert stops it, rather than
 leaving a page that fails to render. What it copied from is written to
@@ -182,12 +184,32 @@ def local_marker_stroke(path, text):
     return text
 
 
+# The footer's link to the project, and the script that writes the version in it.
+FOOTER_LINK = re.compile(
+    r'<a class="mesh-footer-project" href="[^"]*".*?</a>', re.DOTALL
+)
+FOOTER_VERSION = 'site.version ? `Meshview ${site.version}` : "Meshview";'
+PROJECT_NAME = "Meshview Rust"
+
+
+def local_footer(path, text):
+    text, links = FOOTER_LINK.subn('{% include "footer-project.html" %}', text)
+    if links != 1 or text.count(FOOTER_VERSION) != 1:
+        fail(path, "the footer is not as it was: teach local_footer")
+    return text.replace(
+        FOOTER_VERSION,
+        f'site.version ? `{PROJECT_NAME} ${{site.version}}` : "{PROJECT_NAME}";',
+    )
+
+
 def convert_template(path):
     text = drop_unknown_blocks(path, path.read_text(encoding="utf-8"))
     if path.name == "node.html":
         text = local_coverage_help(path, text)
     if path.name == "map-view.html":
         text = local_marker_stroke(path, text)
+    if path.name == "base.html":
+        text = local_footer(path, text)
 
     top_level = TOP_LEVEL_SETS.get(path.name)
     if top_level:
