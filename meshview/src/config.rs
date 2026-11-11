@@ -251,6 +251,16 @@ pub struct Logging {
     pub db_cleanup_logfile: Option<String>,
 }
 
+/// Where the configuration is looked for when none is named, in order: the
+/// working directory first, then the system's place for it. Both optional:
+/// without either, the defaults and the environment are the configuration.
+pub const SEARCHED: [&str; 2] = ["config.toml", "/etc/meshview/config.toml"];
+
+/// The first of `candidates` that exists.
+pub fn first_existing<'a>(candidates: &[&'a Path]) -> Option<&'a Path> {
+    candidates.iter().copied().find(|path| path.exists())
+}
+
 impl Config {
     /// Reads the file at `path`, if there is one, and applies the environment.
     ///
@@ -689,6 +699,21 @@ mod tests {
         let names: Vec<_> = overridden.environment_variables().collect();
         assert_eq!(names.len(), 2, "{names:?}");
         assert!(names.contains(&"MESHVIEW_MQTT__PASSWORD"));
+    }
+
+    #[test]
+    fn the_working_directory_comes_before_the_system() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let local = dir.path().join("config.toml");
+        let system = dir.path().join("etc-config.toml");
+        let candidates = [local.as_path(), system.as_path()];
+
+        assert_eq!(first_existing(&candidates), None);
+        std::fs::write(&system, "").unwrap();
+        assert_eq!(first_existing(&candidates), Some(system.as_path()));
+        std::fs::write(&local, "").unwrap();
+        assert_eq!(first_existing(&candidates), Some(local.as_path()));
+        assert_eq!(SEARCHED[1], "/etc/meshview/config.toml");
     }
 
     #[test]

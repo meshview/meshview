@@ -11,14 +11,19 @@ topics).
 |---|---|---|
 | `--config <file>` | that file | error |
 | `MESHVIEW_CONFIG=<file>` | that file | error |
-| neither | `./config.toml` | defaults and environment only |
+| neither | `./config.toml`, or else `/etc/meshview/config.toml` | defaults and environment only |
+
+Without a file named, the working directory comes first and the system's place
+second: the first of the two that exists is read, and the log says which.
 
 The file is only ever read, never written, so it can live somewhere Meshview
 cannot write to, which is where it usually belongs: on a read-only mount, owned
-by root, while the database directory is the one place the process writes.
+by root, while the database directory is the one place the process writes. In
+the container image that is `/etc/meshview`, apart from the data in `/data`.
 
-When neither `--config` nor `MESHVIEW_CONFIG` is given and the working
-directory has a `config.ini` but no `config.toml`, Meshview refuses to start.
+When neither `--config` nor `MESHVIEW_CONFIG` is given, neither place has a
+`config.toml` and the working directory has a `config.ini`, Meshview refuses to
+start.
 That is a Python meshview configuration that has not been converted yet, and
 starting on the defaults instead would quietly create a new, empty database
 somewhere else. Naming an `.ini` file explicitly is refused too. See

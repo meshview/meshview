@@ -195,7 +195,7 @@ The x86_64 build runs on any x86_64 CPU, including older ones without AVX.
 ```sh
 podman run -d --name meshview -p 8081:8081 \
   -v meshview-data:/data \
-  -v ./config.toml:/data/config.toml:ro \
+  -v ./config.toml:/etc/meshview/config.toml:ro \
   ghcr.io/meshview/meshview
 ```
 
@@ -204,7 +204,8 @@ podman run -d --name meshview -p 8081:8081 \
 | Image | `ghcr.io/meshview/meshview`: `latest` is the last release, `master` the development branch, and each release has its version as a tag. Both `amd64` and `arm64`. |
 | Command | `run` by default; pass `ingest`, `serve` or `migrate` to choose another role. |
 | User | UID and GID 10001, never root: no user a system already has, and the Python version's image's, so its volumes carry over without a `chown`. |
-| Working directory | `/data`, so a `config.toml` there is found without saying where it is. It only needs to be readable. |
+| Configuration | `/etc/meshview/config.toml`, found without naming it: mount the file, or a directory holding it, read only, apart from the data. A `config.toml` in `/data` would be found first. |
+| Working directory | `/data`. |
 | Database | `/data/packets.db` unless the configuration names another: the default, `packets.db`, is relative to the working directory. |
 | Port | 8081. |
 | Volumes | None declared: where the database lives is yours to decide and to name. Without a volume it lives and dies with the container. |
@@ -260,7 +261,7 @@ spec:
           readinessProbe: {httpGet: {path: /readyz, port: 8081}}
           volumeMounts:
             - {name: data, mountPath: /data}
-            - {name: config, mountPath: /data/config.toml, subPath: config.toml, readOnly: true}
+            - {name: config, mountPath: /etc/meshview, readOnly: true}
       volumes:
         - name: data
           persistentVolumeClaim: {claimName: meshview-data}
@@ -296,7 +297,7 @@ spec:
           readinessProbe: {httpGet: {path: /readyz, port: 8081}}
           volumeMounts:
             - {name: data, mountPath: /data}
-            - {name: config, mountPath: /data/config.toml, subPath: config.toml, readOnly: true}
+            - {name: config, mountPath: /etc/meshview, readOnly: true}
       volumes:
         - name: data
           persistentVolumeClaim: {claimName: meshview-data}
@@ -306,8 +307,11 @@ spec:
 
 The `serve` pods mount the volume read-write even though they only read: SQLite
 readers still need the directory to be writable for the `-shm` file. The
-`meshview-config` secret holds the `config.toml`; a `ConfigMap` does as well if
-nothing in it is secret, and environment variables can replace it altogether.
+`meshview-config` secret holds the `config.toml` and is mounted whole as
+`/etc/meshview`, where Meshview looks for it, with no `subPath`; a `ConfigMap`
+does as well if nothing in it is secret, and environment variables can replace
+it altogether. The configuration is read once, at start: a change to it takes
+a restart of the pods.
 
 ### Backing up from Kubernetes
 
@@ -341,7 +345,7 @@ spec:
               args: ["meshview backup /backups/packets-$(date +%Y%m%d).db"]
               volumeMounts:
                 - {name: data, mountPath: /data}
-                - {name: config, mountPath: /data/config.toml, subPath: config.toml, readOnly: true}
+                - {name: config, mountPath: /etc/meshview, readOnly: true}
                 - {name: backups, mountPath: /backups}
           volumes:
             - name: data
