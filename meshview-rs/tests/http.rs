@@ -9,6 +9,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
 use http_body_util::BodyExt;
 use meshview_rs::app::Role;
+use meshview_rs::config::Config;
 use meshview_rs::state::{AppState, CHECK_DATABASE, Readiness};
 use meshview_rs::web;
 use std::sync::{Arc, OnceLock};
@@ -18,6 +19,7 @@ fn app(role: Role) -> (Router, AppState) {
     let state = AppState {
         readiness: Arc::new(Readiness::new([CHECK_DATABASE])),
         reader: Arc::new(OnceLock::new()),
+        config: Arc::new(Config::default()),
     };
     (web::router(role, state.clone()), state)
 }

@@ -18,8 +18,8 @@ before it is called ported (see [Development](development.md#comparing-the-api))
 | `/api/v1/channels` | Ported |
 | `/api/v1/snapshots/daily` | Ported |
 | `/api/v1/packets_seen/{packet_id}` | Ported |
-| `/health` | Not yet |
-| `/api/v1/config`, `/api/v1/lang` | Not yet |
+| `/health` | Ported |
+| `/api/v1/config`, `/api/v1/lang` | Ported |
 | `/api/v1/nodes`, `/api/v1/nodes/facets` | Not yet |
 | `/api/v1/packets` | Not yet |
 | `/api/v1/stats`, `/api/v1/stats/count`, `/api/v1/stats/top` | Not yet |
@@ -79,6 +79,11 @@ for changing in a future version instead.
 | `/api/v1/channels` window | Computed from the local time taken as UTC: off by the server's offset from UTC | From now. The same answer on a server running in UTC. |
 | `/version` `release_date` | The release's date | The date of the commit the build comes from. |
 | `/version` `git_revision` | Asked of git on every request, from the checkout the server runs from | Recorded at build time. |
+| `/api/v1/config` `cleanup` | The values as written in `config.ini`, so `minute = 00` gave `"00"` | The configured numbers, as strings, as before: `"0"`. TOML numbers have no leading zeros. |
+| `/api/v1/config` `site.version` | The Python version's | meshview-rs's |
+| `/health` `cleanup` | From the JSON file the cleanup wrote, with its path as `status_file` | From the cleanup's latest run in `job_run`, with no `status_file`; `last_run` has the same keys. |
+| `/health` `backup` | The scheduled backups' settings and last run | `{"enabled": false, "status": "disabled"}`: meshview-rs does not back up by itself (see [Deployment](deployment.md#backups)). |
+| `/health` `snapshot` | Not reported | The daily snapshot's schedule, status and latest run, as `cleanup`'s. |
 
 ## Outside the API
 

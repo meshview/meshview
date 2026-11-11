@@ -5,7 +5,7 @@
 //! SQLAlchemy emitted it, so that both answer the same; where an ordering had no
 //! tiebreak, one is added, so that the answer does not depend on the query plan.
 
-use crate::db::{DailySnapshot, PacketSeen};
+use crate::db::{DailySnapshot, JobRun, PacketSeen};
 use anyhow::{Context, Result};
 use sqlx::SqlitePool;
 
@@ -56,4 +56,22 @@ pub async fn packet_sightings(pool: &SqlitePool, packet_id: i64) -> Result<Vec<P
     .fetch_all(pool)
     .await
     .context("listing the sightings of a packet")
+}
+
+pub async fn last_import_us(pool: &SqlitePool) -> Result<Option<i64>> {
+    sqlx::query_scalar("SELECT max(import_time_us) FROM packet")
+        .fetch_one(pool)
+        .await
+        .context("finding the latest import")
+}
+
+pub async fn latest_job_run(pool: &SqlitePool, job: &str) -> Result<Option<JobRun>> {
+    sqlx::query_as(
+        "SELECT job, status, started_us, finished_us, details, error FROM job_run \
+         WHERE job = ? ORDER BY started_us DESC, id DESC LIMIT 1",
+    )
+    .bind(job)
+    .fetch_optional(pool)
+    .await
+    .context("reading the latest job run")
 }

@@ -10,6 +10,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
 use http_body_util::BodyExt;
 use meshview_rs::app::Role;
+use meshview_rs::config::Config;
 use meshview_rs::db::{Reader, sqlite};
 use meshview_rs::state::{AppState, CHECK_DATABASE, Readiness};
 use meshview_rs::web;
@@ -35,6 +36,7 @@ async fn api() -> Api {
     let state = AppState {
         readiness: Arc::new(Readiness::new([CHECK_DATABASE])),
         reader: Arc::new(reader),
+        config: Arc::new(Config::default()),
     };
     Api {
         app: web::router(Role::Serve, state),
@@ -223,4 +225,118 @@ async fn large_answers_are_compressed_for_clients_that_take_it() {
     assert_eq!(gzipped.headers()[header::CONTENT_ENCODING], "gzip");
     let refused = get("gzip;q=0").await.unwrap();
     assert!(refused.headers().get(header::CONTENT_ENCODING).is_none());
+}
+
+async fn api_with(config: Config) -> Api {
+    let dir = TempDir::new().unwrap();
+    let database = dir.path().join("packets.db");
+    let pool = sqlite::open_for_writing(&database).await.unwrap();
+    let reader = OnceLock::new();
+    reader.set(Reader::new(pool.clone())).unwrap();
+    let mut config = config;
+    config.database.connection_string = format!("sqlite:///{}", database.display());
+    let state = AppState {
+        readiness: Arc::new(Readiness::new([CHECK_DATABASE])),
+        reader: Arc::new(reader),
+        config: Arc::new(config),
+    };
+    Api {
+        app: web::router(Role::Serve, state),
+        pool,
+        _dir: dir,
+    }
+}
+
+#[tokio::test]
+async fn the_site_configuration_keeps_the_python_shapes() {
+    let config = Config::parse(include_str!("../../sample.config.toml")).unwrap();
+    let api = api_with(config).await;
+    let (status, body) = api.get("/api/v1/config").await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["site"]["title"], "Bay Area Mesh");
+    // Switches are strings, as the pages expect them.
+    assert_eq!(body["site"]["nodes"], "true");
+    assert_eq!(body["site"]["map_tile_name"], "OpenStreetMap");
+    assert_eq!(body["site"]["map_channel_colors"]["longfast"], "#4363d8");
+    assert_eq!(body["mqtt"]["server"], "mqtt.bayme.sh");
+    assert!(body["mqtt"].get("password").is_none(), "no credentials");
+    assert_eq!(
+        body["cleanup"],
+        json!({"enabled": "false", "days_to_keep": "14", "hour": "2", "minute": "0", "vacuum": "false"})
+    );
+}
+
+#[tokio::test]
+async fn translations_fall_back_to_english() {
+    let api = api().await;
+
+    let (status, spanish) = api.get("/api/v1/lang?lang=es&section=top").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(spanish.is_object());
+
+    let (_, unknown) = api.get("/api/v1/lang?lang=fr&section=top").await;
+    let (_, english) = api.get("/api/v1/lang?lang=en&section=top").await;
+    assert_eq!(unknown, english);
+
+    assert_eq!(
+        api.get("/api/v1/lang?lang=fr&section=nothing").await,
+        (
+            StatusCode::NOT_FOUND,
+            json!({"error": "Section 'nothing' not found in fr"})
+        )
+    );
+}
+
+#[tokio::test]
+async fn health_reports_the_database_and_the_last_cleanup() {
+    let mut config = Config::default();
+    config.cleanup.enabled = true;
+    let api = api_with(config).await;
+    // One packet old enough to go, one recent enough to stay.
+    api.exec("INSERT INTO packet (id, import_time_us) VALUES (1, 1)")
+        .await;
+    sqlx::query("INSERT INTO packet (id, import_time_us) VALUES (2, ?)")
+        .bind(now_us() - 5_000_000)
+        .execute(&api.pool)
+        .await
+        .unwrap();
+    meshview_rs::jobs::cleanup(&api.pool, 14, false)
+        .await
+        .unwrap();
+
+    let (status, body) = api.get("/health").await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["status"], "healthy");
+    assert_eq!(body["database"], "connected");
+    assert!(body["seconds_since_last_message"].as_f64().unwrap() > 0.0);
+    assert!(body["database_size_bytes"].as_u64().unwrap() > 0);
+    assert_eq!(body["cleanup"]["status"], "ok");
+    assert_eq!(body["cleanup"]["last_run"]["rows_deleted"]["packet"], 1);
+    assert!(
+        body["cleanup"]["last_run"]["cutoff_at"]
+            .as_str()
+            .unwrap()
+            .ends_with("+00:00")
+    );
+    assert_eq!(
+        body["backup"],
+        json!({"enabled": false, "status": "disabled"})
+    );
+}
+
+#[tokio::test]
+async fn health_is_503_while_the_database_is_not_ready() {
+    let state = AppState {
+        readiness: Arc::new(Readiness::new([CHECK_DATABASE])),
+        reader: Arc::new(OnceLock::new()),
+        config: Arc::new(Config::default()),
+    };
+    let app = web::router(Role::Serve, state);
+    let response = app
+        .oneshot(Request::get("/health").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
 }

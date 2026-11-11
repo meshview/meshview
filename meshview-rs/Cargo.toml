@@ -31,6 +31,7 @@ prost.workspace = true
 # aws-lc, which wants cmake and a C toolchain to cross compile. `ring` is chosen
 # below instead, as tocata does.
 rumqttc = { version = "0.25", default-features = false, features = ["use-rustls-no-provider"] }
+rust-embed = "8"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

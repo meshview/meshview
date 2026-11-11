@@ -48,6 +48,16 @@ impl Reader {
         sqlite::queries::daily_snapshots(&self.pool, latest).await
     }
 
+    /// When the latest packet was imported, if there is any.
+    pub async fn last_import_us(&self) -> Result<Option<i64>> {
+        sqlite::queries::last_import_us(&self.pool).await
+    }
+
+    /// The latest run of a daily job, if it has run.
+    pub async fn latest_job_run(&self, job: &str) -> Result<Option<JobRun>> {
+        sqlite::queries::latest_job_run(&self.pool, job).await
+    }
+
     /// Every sighting of one packet, latest first.
     pub async fn packet_sightings(&self, packet_id: i64) -> Result<Vec<PacketSeen>> {
         sqlite::queries::packet_sightings(&self.pool, packet_id).await
@@ -62,6 +72,18 @@ pub struct DailySnapshot {
     pub packet_count: i64,
     pub gateway_count: i64,
     pub captured_at_us: i64,
+}
+
+/// A row of `job_run`: one run of a daily job.
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct JobRun {
+    pub job: String,
+    pub status: String,
+    pub started_us: i64,
+    pub finished_us: Option<i64>,
+    /// JSON, the job's own.
+    pub details: Option<String>,
+    pub error: Option<String>,
 }
 
 /// A row of `packet_seen`: one gateway hearing one packet.

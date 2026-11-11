@@ -107,6 +107,7 @@ pub async fn run_until(
     let state = AppState {
         readiness: readiness.clone(),
         reader: Arc::new(OnceLock::new()),
+        config: Arc::new(config.clone()),
     };
 
     // Listening comes first, so that the probes answer while the database is
