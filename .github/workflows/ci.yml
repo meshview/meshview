@@ -1,0 +1,253 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Óscar García Amor <ogarcia@connectical.com>
+
+name: CI
+
+on:
+  push:
+    branches: [master]
+    # A tag is a release, and the tag is the version written the way Cargo writes
+    # it, with no `v` in front. What a release adds to an ordinary push is at the
+    # bottom of this file: the image's own version tag, `latest` moving to it, and
+    # a page carrying the binaries.
+    tags: ['[0-9]+.[0-9]+.[0-9]+']
+  pull_request:
+
+# A newer push makes the run before it beside the point.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: Format, lint and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # First, and only for a tag: a tag saying one thing while Cargo.toml says
+      # another is a release that misreports itself everywhere the version shows.
+      - name: The tag has to be the version
+        if: github.ref_type == 'tag'
+        run: |
+          declared=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
+          echo "the tag is $GITHUB_REF_NAME and Cargo.toml says $declared"
+          test "$declared" = "$GITHUB_REF_NAME"
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-check-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-check-
+
+      # The first two are what the pre-commit hook already refuses to commit
+      # without. The third is the part the hook leaves to CI, so that a local
+      # commit stays quick.
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - run: cargo test --workspace --locked
+
+  binary:
+    name: Static binary (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      # One architecture failing is worth knowing about on its own.
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+    steps:
+      - uses: actions/checkout@v7
+
+      # libsqlite3-sys compiles SQLite itself and the runner's own gcc targets
+      # glibc; musl-gcc is what the cc crate looks for instead. Rust code needs
+      # nothing extra, since the toolchain brings its own musl.
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends musl-tools
+
+      - run: rustup target add ${{ matrix.target }}
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ matrix.target }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ matrix.target }}-
+
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Check that it brought its own libc
+        run: |
+          binary=target/${{ matrix.target }}/release/meshview-rs
+          file "$binary"
+          if readelf -l "$binary" | grep -q INTERP; then
+            echo "meshview-rs is not statically linked" >&2
+            exit 1
+          fi
+
+      # Named for the architecture the way the container build says it, which is
+      # what the Containerfile reads.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: meshview-rs-${{ matrix.arch }}
+          path: target/${{ matrix.target }}/release/meshview-rs
+          if-no-files-found: error
+
+  image:
+    name: Container image
+    needs: binary
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # For pushing to GHCR: the token the run already has is the credential.
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: meshview-rs-amd64
+          path: amd64
+      - uses: actions/download-artifact@v8
+        with:
+          name: meshview-rs-arm64
+          path: arm64
+
+      - name: Lay the binaries out where the Containerfile looks
+        run: |
+          mkdir dist
+          mv amd64/meshview-rs dist/meshview-rs-amd64
+          mv arm64/meshview-rs dist/meshview-rs-arm64
+
+      # Emulation is only for the arm64 image's handful of shell (its user and
+      # its directory). No compiler goes near it.
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+
+      # A branch name may carry a slash; an image tag may not. A release is also
+      # what `latest` means from then on.
+      - name: Work out the tags
+        run: |
+          image="ghcr.io/${{ github.repository }}"
+          tags="$image:${GITHUB_REF_NAME//\//-}"
+
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            tags="$tags $image:latest"
+          fi
+
+          echo "TAGS=$tags" >> "$GITHUB_ENV"
+
+      # Loaded rather than pushed, because a multi-platform image cannot be handed
+      # to the local daemon and there is nothing to publish until this one has
+      # answered.
+      - name: Build for this machine
+        run: |
+          docker buildx build \
+            --build-arg BINARY_SOURCE=prebuilt \
+            --platform linux/amd64 \
+            --load --tag meshview-rs:ci .
+
+      # An image that builds and an image that serves are different claims. This
+      # one starts, creates and migrates its database, reports itself ready, and
+      # sends the old unversioned API on to v1.
+      - name: Start it and ask it something
+        run: |
+          docker run --detach --name meshview-rs --publish 8081:8081 meshview-rs:ci
+          for _ in $(seq 1 30); do
+            curl -sf -o /dev/null http://127.0.0.1:8081/readyz && break
+            sleep 1
+          done
+          docker logs meshview-rs
+          curl -sf http://127.0.0.1:8081/readyz | tee /dev/stderr | grep -q '"status":"ok"'
+          curl -sf http://127.0.0.1:8081/api/openapi.json | grep -q '"/readyz"'
+          test "$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' \
+            'http://127.0.0.1:8081/api/stats?period_type=hour')" \
+            = "308 http://127.0.0.1:8081/api/v1/stats?period_type=hour"
+
+      - uses: docker/login-action@v4
+        if: github.event_name == 'push'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Both architectures under one manifest, and only once the amd64 build of
+      # it has answered. A pull request builds and gets tested; it does not
+      # publish.
+      - name: Publish
+        if: github.event_name == 'push'
+        run: |
+          named=()
+          for tag in $TAGS; do
+            named+=(--tag "$tag")
+          done
+
+          docker buildx build \
+            --build-arg BINARY_SOURCE=prebuilt \
+            --label org.opencontainers.image.revision="$GITHUB_SHA" \
+            --label org.opencontainers.image.version="$GITHUB_REF_NAME" \
+            --platform linux/amd64,linux/arm64 \
+            --push "${named[@]}" .
+
+  release:
+    name: The release page
+    # Everything above runs on every push; this runs when the push was a version,
+    # and only after the checks have passed and the image has answered.
+    if: github.ref_type == 'tag'
+    needs: [check, binary, image]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: meshview-rs-amd64
+          path: amd64
+      - uses: actions/download-artifact@v8
+        with:
+          name: meshview-rs-arm64
+          path: arm64
+
+      # A tarball rather than the bare binary, because an artifact travels as a
+      # zip and a zip does not carry permissions: the executable bit is put back
+      # here, and a tar keeps it.
+      - name: Pack them
+        run: |
+          mkdir dist
+
+          for arch in amd64 arm64; do
+            chmod +x "$arch/meshview-rs"
+            tar -czf "dist/meshview-rs-$GITHUB_REF_NAME-$arch.tar.gz" -C "$arch" meshview-rs
+          done
+
+          (cd dist && sha256sum ./*.tar.gz > sha256sums.txt)
+
+      # The notes are the tag's own message, so what a release says is written
+      # where the release is cut. A tag with no message stops this on purpose.
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "$GITHUB_REF_NAME" \
+            --notes-from-tag \
+            --verify-tag
