@@ -157,6 +157,24 @@ are listed after the request as `ignore=`. A request about a particular packet
 or node needs one that is in the database: the file has those of the database
 it was last run against, and they may need changing for another.
 
+Some answers only cover the latest hours (`/api/v1/edges` the latest 12, the
+statistics by default the latest day), and a copy of an old database has
+nothing in them. Shift both copies by the same amount so that they end now, and
+they stay equal to each other:
+
+```sh
+for db in python.db rust.db; do
+  sqlite3 "$db" "UPDATE packet SET import_time_us = import_time_us + $SHIFT;
+                 UPDATE packet_seen SET import_time_us = import_time_us + $SHIFT;
+                 UPDATE traceroute SET import_time_us = import_time_us + $SHIFT;
+                 UPDATE node SET last_seen_us = last_seen_us + $SHIFT,
+                                 first_seen_us = first_seen_us + $SHIFT;"
+done
+```
+
+The Python version caches `/api/edges` for a minute, as meshview-rs does: wait
+that long after changing the data before comparing it.
+
 The differences that are meant, listed in [API](api.md#differences-from-the-python-version),
 are of values the comparison does not see (the JSON's spacing) or of answers
 the requests do not ask for.

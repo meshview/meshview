@@ -4,10 +4,13 @@
 //! What the HTTP handlers share.
 
 use crate::config::Config;
+use crate::db::Edge;
 use crate::db::Reader;
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::Instant;
 
 /// The things that have to be true before this process is worth sending
 /// traffic to, each of which turns true on its own schedule.
@@ -83,6 +86,30 @@ pub struct AppState {
     /// The configuration the process started with, for the answers that report
     /// on it (`/api/v1/config`, `/health`).
     pub config: Arc<Config>,
+    /// Answers kept for a while because they are costly to build.
+    pub caches: Arc<Caches>,
+}
+
+/// A cached answer, and until when it holds.
+pub type Cached<T> = (Instant, Arc<T>);
+
+/// What is cached, and until when.
+#[derive(Debug, Default)]
+pub struct Caches {
+    /// `/api/v1/edges`, by the type asked for.
+    pub edges: Mutex<HashMap<Option<&'static str>, Cached<Vec<Edge>>>>,
+}
+
+impl AppState {
+    /// A process's state, with nothing read yet and nothing cached.
+    pub fn new(readiness: Arc<Readiness>, config: Config) -> Self {
+        Self {
+            readiness,
+            reader: Arc::new(OnceLock::new()),
+            config: Arc::new(config),
+            caches: Arc::default(),
+        }
+    }
 }
 
 /// The readiness check for the database being at the expected schema.

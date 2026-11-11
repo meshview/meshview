@@ -17,7 +17,7 @@ use crate::web;
 use anyhow::{Context, Result, bail};
 use sqlx::SqlitePool;
 use std::path::PathBuf;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::signal::unix::{SignalKind, signal};
@@ -104,11 +104,7 @@ pub async fn run_until(
         Role::Ingest => Readiness::new([CHECK_DATABASE, CHECK_MQTT]),
         _ => Readiness::new([CHECK_DATABASE]),
     });
-    let state = AppState {
-        readiness: readiness.clone(),
-        reader: Arc::new(OnceLock::new()),
-        config: Arc::new(config.clone()),
-    };
+    let state = AppState::new(readiness.clone(), config.clone());
 
     // Listening comes first, so that the probes answer while the database is
     // migrated or waited for: a process busy migrating is alive, only not ready.

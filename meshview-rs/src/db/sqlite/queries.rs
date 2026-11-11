@@ -9,7 +9,7 @@ use crate::db::{
     DailySnapshot, Facet, JobRun, Node, NodeFacet, NodeFilter, NodeQuery, PacketFilter, PacketSeen,
     Period, PeriodCount, SightingsOf, TopNode, TopQuery,
 };
-use crate::db::{PacketQuery, PacketRow, TracerouteRow};
+use crate::db::{PacketQuery, PacketRow, TracerouteHop, TracerouteRow};
 use anyhow::{Context, Result};
 use sqlx::SqlitePool;
 use sqlx::{QueryBuilder, Sqlite};
@@ -484,4 +484,17 @@ pub async fn traceroutes(
     .fetch_all(pool)
     .await
     .context("listing a packet's traceroutes")
+}
+
+pub async fn traceroutes_since(pool: &SqlitePool, since_us: i64) -> Result<Vec<TracerouteHop>> {
+    sqlx::query_as(
+        "SELECT traceroute.gateway_node_id, traceroute.done, traceroute.route, \
+                packet.id IS NOT NULL AS has_packet, packet.from_node_id, packet.to_node_id \
+         FROM traceroute LEFT OUTER JOIN packet ON packet.id = traceroute.packet_id \
+         WHERE traceroute.import_time_us > ? ORDER BY traceroute.import_time_us, traceroute.id",
+    )
+    .bind(since_us)
+    .fetch_all(pool)
+    .await
+    .context("listing the latest traceroutes")
 }

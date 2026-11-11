@@ -106,6 +106,12 @@ impl Reader {
         sqlite::queries::traceroutes(&self.pool, packet_id, limit).await
     }
 
+    /// The traceroute rows imported since a time, the first imported first,
+    /// with the endpoints of their packet.
+    pub async fn traceroutes_since(&self, since_us: i64) -> Result<Vec<TracerouteHop>> {
+        sqlite::queries::traceroutes_since(&self.pool, since_us).await
+    }
+
     /// One packet, by its row id.
     pub async fn packet(&self, id: i64) -> Result<Option<PacketRow>> {
         sqlite::queries::packet(&self.pool, id).await
@@ -199,6 +205,30 @@ pub struct TopNode {
     pub channel: Option<String>,
     pub sent: i64,
     pub seen: i64,
+}
+
+/// A link between two nodes, and how it is known.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
+pub struct Edge {
+    pub from: i64,
+    pub to: i64,
+    /// `traceroute` when a traceroute went through it, `neighbor` when a node
+    /// reported the other as its neighbour.
+    #[serde(rename = "type")]
+    #[schema(example = "traceroute")]
+    pub kind: &'static str,
+}
+
+/// A traceroute row with its packet's endpoints, for drawing its links.
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct TracerouteHop {
+    pub gateway_node_id: Option<i64>,
+    pub done: Option<bool>,
+    pub route: Option<Vec<u8>>,
+    /// Whether the packet the row belongs to is there.
+    pub has_packet: bool,
+    pub from_node_id: Option<i64>,
+    pub to_node_id: Option<i64>,
 }
 
 /// A row of `traceroute`.
