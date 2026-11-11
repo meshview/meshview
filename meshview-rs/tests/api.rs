@@ -880,3 +880,41 @@ async fn a_node_is_offered_as_the_contact_python_encoded() {
         (StatusCode::BAD_REQUEST, json!({"error": "Invalid node_id"}))
     );
 }
+
+#[tokio::test]
+async fn coverage_is_predicted_around_a_node_with_a_position() {
+    let api = api().await;
+    api.exec(
+        "INSERT INTO node (id, node_id, last_lat, last_long, last_seen_us) VALUES \
+         ('!00000001', 1, 426000000, -84000000, 1), ('!00000002', 2, NULL, NULL, 1)",
+    )
+    .await;
+
+    let (status, body) = api.get("/api/v1/coverage/1").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["mode"], "perimeter");
+    assert_eq!(body["threshold_dbm"], -120.0);
+    let perimeter = body["perimeter"].as_array().unwrap();
+    assert_eq!(perimeter.len(), 72, "a point every 5°");
+    // Around the node, a few kilometres out.
+    let lat = perimeter[0][0].as_f64().unwrap();
+    assert!(lat > 42.6 && lat < 43.0, "{lat}");
+
+    let (_, heatmap) = api
+        .get("/api/v1/coverage/0x1?mode=heatmap&radius_km=3&step_km=1")
+        .await;
+    assert_eq!(heatmap["mode"], "heatmap");
+    assert_eq!(heatmap["points"].as_array().unwrap().len(), 3 * 72);
+
+    assert_eq!(
+        api.get("/api/v1/coverage/2").await,
+        (
+            StatusCode::NOT_FOUND,
+            json!({"error": "Node not found or missing location"})
+        )
+    );
+    assert_eq!(
+        api.get("/api/v1/coverage/1?freq_mhz=0.5").await.1,
+        json!({"error": "freq_mhz must be between 1.0 and 10000.0"})
+    );
+}

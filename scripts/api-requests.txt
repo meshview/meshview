@@ -278,3 +278,19 @@
 /api/node/1/qr
 /api/node/x/qr
 /api/node/010/qr
+
+# Coverage compares equal with MESHVIEW_COVERAGE_MODEL=pyitm only: with NTIA's model,
+# which meshview-rs uses, the reach can be a step shorter (docs/api.md).
+/api/coverage/1125685839
+/api/coverage/1125685839?mode=heatmap&radius_km=10&step_km=1
+/api/coverage/1125685839?freq_mhz=868&tx_dbm=27&tx_height_m=10&rx_height_m=2&reliability=0.9&threshold_dbm=-125.5
+/api/coverage/1125685839?mode=&radius_km=5
+/api/coverage/0x4318924f?radius_km=20&step_km=0.5
+/api/coverage/1125685839?freq_mhz=0.5
+/api/coverage/1125685839?freq_mhz=abc
+/api/coverage/1125685839?freq_mhz=
+/api/coverage/1125685839?reliability=inf
+/api/coverage/1125685839?tx_dbm=1_0
+/api/coverage/1125685839?radius_km=200&step_km=0.05
+/api/coverage/1
+/api/coverage/x

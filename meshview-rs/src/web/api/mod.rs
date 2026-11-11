@@ -8,6 +8,7 @@ pub mod error;
 pub mod params;
 
 mod channels;
+mod coverage;
 mod edges;
 mod health;
 mod lang;
@@ -44,6 +45,7 @@ pub fn v1() -> OpenApiRouter<AppState> {
         .routes(routes!(traceroute::traceroute))
         .routes(routes!(edges::edges))
         .routes(routes!(qr::qr))
+        .routes(routes!(coverage::coverage))
 }
 
 /// The routes outside any version, at their own full paths.
