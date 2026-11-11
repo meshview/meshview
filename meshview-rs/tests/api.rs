@@ -646,3 +646,79 @@ async fn facets_count_the_nodes_by_field() {
         1
     );
 }
+
+#[tokio::test]
+async fn a_traceroute_is_assembled_from_what_its_gateways_reported() {
+    use meshview_proto::meshtastic::RouteDiscovery;
+    use prost::Message;
+
+    let api = api().await;
+    // The answer: from the traced node, 222, back to 111, which started it.
+    api.exec(
+        "INSERT INTO packet (id, portnum, from_node_id, to_node_id, channel) \
+         VALUES (9, 70, 222, 111, 'LongFast')",
+    )
+    .await;
+    let finished = RouteDiscovery {
+        route: vec![444, 555],
+        route_back: vec![555, 444],
+        snr_back: vec![1, 2, 3],
+        ..Default::default()
+    };
+    let partial = RouteDiscovery {
+        route: vec![444],
+        ..Default::default()
+    };
+    for (gateway, done, route, at) in [
+        (333, true, finished.encode_to_vec(), 1),
+        (334, false, partial.encode_to_vec(), 2),
+        // Not a route at all: left out, but counted in the indexes.
+        (335, false, vec![0xff], 3),
+    ] {
+        sqlx::query(
+            "INSERT INTO traceroute (packet_id, gateway_node_id, done, route, import_time_us) \
+             VALUES (9, ?, ?, ?, ?)",
+        )
+        .bind(gateway)
+        .bind(done)
+        .bind(route)
+        .bind(at)
+        .execute(&api.pool)
+        .await
+        .unwrap();
+    }
+
+    let (status, body) = api.get("/api/v1/traceroute/9").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["packet"],
+        json!({"id": 9, "from": 222, "to": 111, "initiator": 111, "target": 222, "channel": "LongFast"})
+    );
+    assert_eq!(body["traceroute_packets"].as_array().unwrap().len(), 2);
+    assert_eq!(body["traceroute_packets"][1]["index"], 1);
+    assert_eq!(body["traceroute_packets"][0]["reverse_complete"], true);
+    assert_eq!(
+        body["unique_forward_paths"],
+        json!([
+            {"path": [444], "count": 1, "complete": false},
+            {"path": [444, 555], "count": 1, "complete": true},
+        ])
+    );
+    assert_eq!(body["unique_reverse_paths"], json!([[555, 444]]));
+    assert_eq!(
+        body["winning_paths"],
+        json!({"forward": [[111, 444, 555, 222]], "reverse": [[222, 555, 444, 111]]})
+    );
+
+    assert_eq!(
+        api.get("/api/v1/traceroute/10").await,
+        (StatusCode::NOT_FOUND, json!({"error": "Packet not found"}))
+    );
+    assert_eq!(
+        api.get("/api/v1/traceroute/x").await,
+        (
+            StatusCode::BAD_REQUEST,
+            json!({"error": "packet_id must be an integer"})
+        )
+    );
+}

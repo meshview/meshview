@@ -86,16 +86,18 @@ fn decode_payload(portnum: i32, bytes: &[u8]) -> Option<Payload> {
             "meshtastic.MapReport",
             wire::decode::<MapReport>("meshtastic.MapReport", bytes).is_some(),
         ),
-        PortNum::TracerouteApp => {
-            let route: RouteDiscovery = wire::decode("meshtastic.RouteDiscovery", bytes)?;
-            let real = route.route.len().max(route.route_back.len()) <= MAX_ROUTE_HOPS;
-            message("meshtastic.RouteDiscovery", real)
-        }
+        PortNum::TracerouteApp => message("meshtastic.RouteDiscovery", route(bytes).is_some()),
         PortNum::RoutingApp => wire::decode::<Routing>("meshtastic.Routing", bytes)
             .map(|routing| Payload::Routing(routing, bytes.to_vec())),
         PortNum::TextMessageApp => String::from_utf8(bytes.to_vec()).ok().map(Payload::Text),
         _ => None,
     }
+}
+
+/// A traceroute's route, or `None` when it cannot be read or cannot be real.
+pub fn route(bytes: &[u8]) -> Option<RouteDiscovery> {
+    let route: RouteDiscovery = wire::decode("meshtastic.RouteDiscovery", bytes)?;
+    (route.route.len().max(route.route_back.len()) <= MAX_ROUTE_HOPS).then_some(route)
 }
 
 /// An enum value's name, or `unknown(N)`.
