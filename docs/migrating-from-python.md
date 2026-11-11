@@ -124,8 +124,11 @@ lines indented, becomes a TOML multi-line string (`"""..."""`).
 | Configuration | `config.ini` | `config.toml`, plus `MESHVIEW_<SECTION>__<KEY>` environment variables |
 | Link to a map of every instance | to MeshviewWorld, unless `meshviewworld = False` | to the Meshview Planet in `planet_url`, none by default |
 | API addresses | `/api/...` | `/api/v1/...`; the old ones redirect. See [API](api.md). |
-| API reference | `static/api.html` | `/api/docs`, generated from the code |
-| Probes | `/health` | `/livez` and `/readyz`, for orchestrators; `/health` comes back with the API |
+| API reference | `static/api.html` | `/api/docs`, generated from the code; `/api.html` and `/api-chat.html` redirect to it |
+| Web pages | rendered on every request | the same pages, rendered once at start, and their files built into the binary |
+| Traceroute graph | `/graph/traceroute/{id}`, an SVG drawn by Graphviz | redirects to the traceroute's page, `/traceroute/{id}`, which draws it |
+| Scripts and styles | sent as they are | compressed for browsers that take it |
+| Probes | `/health` | `/livez` and `/readyz`, for orchestrators, beside `/health` |
 | MQTT over TLS | no | yes |
 | Coverage prediction | pyitm, installed apart | NTIA's model, built in (see [API](api.md#differences-from-the-python-version)) |
 | Stopping | the database's side files can be left behind | stops in order and leaves only the database file |
@@ -136,6 +139,3 @@ lines indented, becomes a TOML multi-line string (`"""..."""`).
 
 The port, 8081, and the database file, `packets.db`, are the same.
 
-Not ported yet, so missing for now: the web pages. Their settings
-are already accepted, so the configuration does not need to change when they
-arrive.

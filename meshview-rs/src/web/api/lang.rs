@@ -28,7 +28,7 @@ static MERGED: LazyLock<Mutex<HashMap<String, Value>>> =
 
 /// Two or three letters, then optionally a region or script, as `es`, `pt_BR` or
 /// `zh-Hant`. Anything else is taken as English.
-fn is_language_code(code: &str) -> bool {
+pub(crate) fn is_language_code(code: &str) -> bool {
     // A single trailing newline passes too, as with the Python version's regex.
     let code = code.strip_suffix('\n').unwrap_or(code);
     let (language, rest) = match code.find(['-', '_']) {
@@ -52,7 +52,7 @@ fn read(code: &str) -> Option<Map<String, Value>> {
 
 /// English, with `code`'s strings laid over it, section by section; sections
 /// only `code` has are added as they are.
-fn merged(code: &str) -> Value {
+pub(crate) fn merged(code: &str) -> Value {
     if let Some(catalog) = MERGED.lock().expect("never poisoned").get(code) {
         return catalog.clone();
     }
