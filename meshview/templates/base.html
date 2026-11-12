@@ -8,9 +8,9 @@
 
     <!-- Link previews, for the apps that show a card when a link is shared. -->
     <meta property="og:type" content="website">
-    <meta property="og:site_name" content="Meshview">
-    <meta property="og:title" content="{% if site_title %}{{ site_title }}{% else %}Meshview{% endif %}">
-    {% if site_description %}<meta property="og:description" content="{{ site_description }}">{% endif %}
+    <meta property="og:site_name" content="{{ preview_site }}">
+    <meta property="og:title" content="{{ preview_title }}">
+    {% if preview_description %}<meta property="og:description" content="{{ preview_description }}">{% endif %}
     <meta property="og:image" content="{{ preview_image }}">
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:width" content="1200">

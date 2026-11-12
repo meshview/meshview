@@ -125,7 +125,7 @@ once it is restarted.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `domain` | string | `""` | The address Meshview is reached at, such as `mesh.example.org` (HTTPS is assumed unless it starts with `http://`). Link previews take their picture from it, `/static/og.png`; without it, the same picture from the project's website. Also exposed by `/api/config`; it does not configure binding or TLS. |
+| `domain` | string | `""` | The address Meshview is reached at, such as `mesh.example.org` (HTTPS is assumed unless it starts with `http://`). Link previews take their pictures from it, `/static/og.png` and, for a node, `/static/og-node.png`; without it, the same pictures from the project's website. Also exposed by `/api/config`; it does not configure binding or TLS. |
 | `language` | string | `"en"` | Language of the pages and of the API reference: `en`, `es` or `ru`. |
 | `title` | string | `""` | Site title, in the browser title bar, headers and link previews. |
 | `message` | string | `""` | Tagline, shown in the footer and used as the page description, link previews included. |
