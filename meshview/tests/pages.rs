@@ -105,6 +105,23 @@ async fn pages_speak_the_api_version_and_the_sites_language() {
 }
 
 #[tokio::test]
+async fn a_planet_is_linked_only_when_its_address_is_set() {
+    const LINK: &str = r#"<a href="https://planet.example.org" target="_blank""#;
+    let page = text(get(&app(Config::default()), "/nodelist", &[]).await).await;
+    assert!(!page.contains("Meshview Planet</a>"));
+
+    let mut config = Config::default();
+    config.site.planet_url = " https://planet.example.org ".into();
+    let page = text(get(&app(config.clone()), "/nodelist", &[]).await).await;
+    assert!(page.contains(LINK));
+
+    // Not an address on the web, it is not linked either.
+    config.site.planet_url = "javascript:alert(1)".into();
+    let page = text(get(&app(config), "/nodelist", &[]).await).await;
+    assert!(!page.contains("Meshview Planet</a>"));
+}
+
+#[tokio::test]
 async fn old_addresses_lead_to_their_new_places() {
     let app = app(Config::default());
     for (path, status, location) in [
