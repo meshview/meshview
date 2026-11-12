@@ -43,9 +43,22 @@ pub async fn database(sql: Option<&str>) -> Option<TestDatabase> {
     )))
     .await
     .unwrap();
-    conn.execute(sqlx::AssertSqlSafe(format!("CREATE DATABASE {name}")))
+    // Text sorted by language, as on most servers, rather than by its bytes as
+    // in the C locale a test server may well have: an ORDER BY that forgets
+    // to sort by bytes then shows. Where ICU is not there, the server's own.
+    let by_language = format!(
+        "CREATE DATABASE {name} LOCALE_PROVIDER icu ICU_LOCALE 'es' LOCALE 'C.UTF-8' \
+         TEMPLATE template0"
+    );
+    if conn
+        .execute(sqlx::AssertSqlSafe(by_language))
         .await
-        .unwrap();
+        .is_err()
+    {
+        conn.execute(sqlx::AssertSqlSafe(format!("CREATE DATABASE {name}")))
+            .await
+            .unwrap();
+    }
     conn.close().await.unwrap();
 
     let url = with_database(&admin, &name);

@@ -438,7 +438,7 @@ async fn rows(pool: &Pool) -> Vec<String> {
     let mut out = Vec::new();
     for (table, columns) in tables {
         let sql = format!(
-            "SELECT '{table}', {} AS line FROM {table} ORDER BY line",
+            "SELECT '{table}', {} AS line FROM {table}",
             columns.join(" || '|' || "),
         );
         let lines: Vec<(String, String)> = match pool {
@@ -451,11 +451,13 @@ async fn rows(pool: &Pool) -> Vec<String> {
                 .await
                 .unwrap(),
         };
-        out.extend(
-            lines
-                .into_iter()
-                .map(|(table, line)| format!("{table}: {line}")),
-        );
+        // Sorted here, by bytes: in SQL each database sorts text its own way.
+        let mut lines: Vec<String> = lines
+            .into_iter()
+            .map(|(table, line)| format!("{table}: {line}"))
+            .collect();
+        lines.sort();
+        out.extend(lines);
     }
     out
 }
