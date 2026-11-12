@@ -314,6 +314,10 @@ button.map-filter-dot:focus-visible { outline:2px solid var(--mesh-primary); out
 .map-color-actions .ti { font-size:15px; color:var(--mesh-primary); }
 .map-color-input { position:absolute; left:8px; bottom:0; width:1px; height:1px; padding:0; border:0; opacity:0; pointer-events:none; }
 @media (prefers-reduced-motion: reduce) { .map-color-swatch { transition:none; } }
+/* An option of the layer above it in the layer picker. */
+.leaflet-control-layers .map-layer-suboption { display:flex; align-items:center; gap:3px; margin:0 0 0 18px; color:var(--mesh-muted); }
+.leaflet-control-layers .map-layer-suboption[hidden] { display:none; }
+.map-layer-suboption input { margin:0; }
 .node-picker-dot { width:10px; height:10px; border-radius:50%; background:var(--node-color); box-shadow:0 0 0 1px #fff, 0 0 0 2px rgba(0,0,0,.18); }
 .node-picker-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .node-picker-name strong { font-weight:600; margin-right:6px; }
@@ -639,6 +643,43 @@ function saveMapLayers() {
     });
 })();
 map.on("baselayerchange overlayadd overlayremove", saveMapLayers);
+
+// Under the precision layer in the picker, and only while it is on: whether to
+// leave the map without areas until a node is selected. Leaflet rebuilds the
+// list whenever a layer comes or goes, so it goes back in after every rebuild.
+const PRECISION_SELECTED_KEY = "mapPrecisionSelectedOnly";
+let precisionSelectedOnly = false;
+try { precisionSelectedOnly = localStorage.getItem(PRECISION_SELECTED_KEY) === "true"; } catch (_) { /* storage unavailable */ }
+const precisionOption = document.createElement("label");
+precisionOption.className = "map-layer-suboption";
+const precisionOnlyInput = document.createElement("input");
+precisionOnlyInput.type = "checkbox";
+precisionOnlyInput.checked = precisionSelectedOnly;
+const precisionOnlyText = document.createElement("span");
+precisionOnlyText.textContent = MeshI18n.t("Only the selected node");
+precisionOption.append(precisionOnlyInput, precisionOnlyText);
+precisionOnlyInput.addEventListener("change", () => {
+    precisionSelectedOnly = precisionOnlyInput.checked;
+    try { localStorage.setItem(PRECISION_SELECTED_KEY, String(precisionSelectedOnly)); } catch (_) { /* storage unavailable */ }
+    drawPrecision();
+});
+function placePrecisionOption(){
+    precisionOption.hidden = !map.hasLayer(precisionLayer);
+    const id = L.Util.stamp(precisionLayer);
+    const input = [...mapLayerControl.getContainer().querySelectorAll(".leaflet-control-layers-selector")]
+        .find(el => el.layerId === id);
+    input?.closest("label")?.after(precisionOption);
+}
+{
+    const update = mapLayerControl._update;
+    mapLayerControl._update = function(){
+        const result = update.apply(this, arguments);
+        placePrecisionOption();
+        return result;
+    };
+}
+placePrecisionOption();
+map.on("overlayadd overlayremove", e => { if(e.layer === precisionLayer) placePrecisionOption(); });
 var nodes = [], markers = {}, markerById = {}, nodeMap = new Map();
 var selectedNodeId = null;
 var activeBlinks = new Map(), lastImportTime = null;
@@ -1865,8 +1906,9 @@ function passesFilters(n){
 // A node that shares its position with fewer than 32 bits is somewhere in a
 // cell around it: a circle in its channel's color, of the radius Meshtastic's
 // apps draw, half the cell's height (about 2.9 km at 13 bits). With a node
-// selected, only its own, which is otherwise hard to tell where nodes crowd.
-// Read when the layer is first turned on.
+// selected, only its own, which is otherwise hard to tell where nodes crowd;
+// with "only the selected node", none until one is. Read when the layer is
+// first turned on.
 const precisionByNode = new Map();
 let precisionLoaded = null;
 function loadPrecision(){
@@ -1885,6 +1927,7 @@ function loadPrecision(){
 function drawPrecision(){
     precisionLayer.clearLayers();
     if(!map.hasLayer(precisionLayer) || !precisionByNode.size) return;
+    if(precisionSelectedOnly && !selectedMarker) return;
     nodes.forEach(n => {
         const bits = precisionByNode.get(n.node_id);
         if(!bits || isInvalidCoord(n) || !passesFilters(n)) return;
