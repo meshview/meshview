@@ -37,13 +37,27 @@
 .mesh-data-page .net-table.card-table.is-cards .c-channel { grid-area:chan; font-size:12px; color:var(--mesh-muted); text-align:right; }
 .mesh-data-page .net-table.card-table.is-cards .c-message { grid-area:msg; }
 .mesh-data-page .net-table.card-table.is-cards .c-num::before { content:"#"; }
+/* Each net under a heading row: its week, its days and its check-ins. */
+.net-table tr.net-week-head th { padding:10px 14px; background:var(--mesh-soft); border-top:2px solid var(--mesh-primary); color:var(--mesh-text); font-size:13px; font-weight:600; text-align:left; }
+.net-table tbody:first-of-type tr.net-week-head th { border-top:0; }
+/* The heading of the net in view stays under the column headings as the page scrolls. */
+.mesh-data-page .data-table-wrap > .net-table tr.net-week-head th { top:calc(var(--header-offset,0px) + 40px); z-index:1; height:auto; }
+.mesh-data-page .data-table-wrap.is-wide > .net-table tr.net-week-head th { top:40px; }
+.net-week-title { margin-right:10px; }
+.net-week-dates { color:var(--mesh-muted); font-weight:400; }
+.net-week-count { float:right; padding:0 8px; border-radius:10px; background:var(--mesh-surface); border:1px solid var(--mesh-border); color:var(--mesh-primary); font-size:12px; font-variant-numeric:tabular-nums; }
+.mesh-data-page .net-table.card-table.is-cards tbody tr.net-week-head { grid-column:1 / -1; display:block; padding:0; border:0; background:none; }
+.mesh-data-page .data-table-wrap > .net-table.card-table.is-cards tbody tr.net-week-head th { position:static; display:block; padding:8px 2px 2px; border:0; background:none; }
+.mesh-data-page .net-table.card-table.is-cards tbody + tbody { margin-top:22px; padding-top:12px; border-top:2px solid var(--mesh-primary); }
+.net-more { margin:14px 0 0; min-height:1.5em; color:var(--mesh-muted); font-size:13px; text-align:center; }
+.net-more:empty::before { content:"\00a0"; }
 </style>
 {% endblock %}
 
 {% block body %}
-<header class="data-heading is-compact"><div class="data-title"><h1><span data-translate-lang="net_title">Weekly Net</span></h1><span id="net-count" class="data-count" title="{{ "Check-ins" | tr }}" aria-live="polite">—</span></div><div class="data-actions"><a class="mesh-secondary-button" href="/map">{{ "View map ↗" | tr }}</a></div></header>
+<header class="data-heading is-compact"><div class="data-title"><h1><span data-translate-lang="net_title">Weekly Net</span></h1></div><div class="data-actions"><a class="mesh-secondary-button" href="/map">{{ "View map ↗" | tr }}</a></div></header>
 
-<div id="weekly-message" role="note"><span class="ti ti-info-circle" aria-hidden="true"></span><div><p id="weekly-message-text" hidden></p><p class="weekly-rules">{{ "Last six days · only the earliest report from each device is listed." | tr }}</p></div></div>
+<div id="weekly-message" role="note"><span class="ti ti-info-circle" aria-hidden="true"></span><div><p id="weekly-message-text" hidden></p><p class="weekly-rules">{{ "One net a week, the latest first · only the earliest report from each device in each is listed." | tr }}</p></div></div>
 
 <div class="data-table-wrap" role="region" aria-label="{{ "Check-ins" | tr }}" tabindex="0">
 <table class="net-table card-table" data-cards-below="760">
@@ -51,12 +65,12 @@
     <tbody id="net-list"><tr><td colspan="6" class="data-empty"><span class="is-loading">{{ "Loading..." | tr }}</span></td></tr></tbody>
 </table>
 </div>
+<p id="net-more" class="net-more" aria-live="polite"></p>
 
 
 <script>
 document.addEventListener("DOMContentLoaded", async () => {
     const list = document.getElementById("net-list");
-    const countEl = document.getElementById("net-count");
     let netTranslations = {};
     let netTag = "";
 
@@ -109,44 +123,134 @@ document.addEventListener("DOMContentLoaded", async () => {
         return td;
     }
 
-    function render(packets, tag) {
-        // One check-in per device: its earliest report, listed in arrival order.
+    const SIX_DAYS_US = 6 * 24 * 60 * 60 * 1e6;
+    const table = document.querySelector(".net-table");
+    const more = document.getElementById("net-more");
+
+    // The tagged text messages, newest first, read backwards a page at a time.
+    // The API looks for the tag among the messages it reads, so a page can hold
+    // none of them while older ones exist: reading goes on until it is known.
+    const feed = {buffer: [], before: null, reached: Infinity, done: false};
+    async function readMore() {
+        const url = new URL("/api/v1/packets", location.origin);
+        url.searchParams.set("portnum", "1");
+        url.searchParams.set("contains", netTag);
+        url.searchParams.set("limit", "1000");
+        if (feed.before !== null) url.searchParams.set("before", feed.before);
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const packets = Array.isArray(data.packets) ? data.packets : [];
+        feed.buffer.push(...packets);
+        feed.buffer.sort((a, b) => b.import_time_us - a.import_time_us);
+        if (data.next_before == null) {
+            feed.done = true;
+            feed.reached = -Infinity;
+        } else {
+            feed.before = data.next_before;
+            feed.reached = data.next_before;
+        }
+    }
+
+    // One net: the six days up to `end`, or, without one, up to the latest
+    // check-in not shown yet, so that weeks without a net are skipped. Null
+    // when there are no more.
+    async function nextNet(end) {
+        if (end === undefined) {
+            while (!feed.buffer.length && !feed.done) await readMore();
+            if (!feed.buffer.length) return null;
+            end = feed.buffer[0].import_time_us;
+        }
+        const start = end - SIX_DAYS_US;
+        while (!feed.done && feed.reached > start) await readMore();
+        const taken = feed.buffer.filter(packet => packet.import_time_us > start);
+        feed.buffer = feed.buffer.filter(packet => packet.import_time_us <= start);
+        return {start, end, packets: taken};
+    }
+
+    // One check-in per device in a net: its earliest report, in arrival order.
+    function checkInsOf(packets, tag) {
         const earliest = new Map();
         for (const packet of packets) {
             const known = earliest.get(packet.from_node_id);
             if (!known || packet.import_time_us < known.import_time_us) earliest.set(packet.from_node_id, packet);
         }
-        const checkIns = [...earliest.values()].sort((a, b) => a.import_time_us - b.import_time_us);
-        countEl.textContent = checkIns.length.toLocaleString(MeshI18n.language);
-        if (!checkIns.length) {
-            showMessage(MeshI18n.t("No check-ins received in the last six days."));
-            return;
-        }
-        // The number keeps the arrival order whatever the table is sorted by.
-        netRows = checkIns.map((packet, index) => ({
-            packet, num: index + 1,
-            name: (packet.long_name || "").trim() || MeshI18n.t("Node {id}", {id: packet.from_node_id}),
-            location: locationFrom(packet.payload, tag),
-            channel: packet.channel || ""
-        }));
-        drawSorted();
+        return [...earliest.values()].sort((a, b) => a.import_time_us - b.import_time_us)
+            .map((packet, index) => ({
+                packet, num: index + 1,
+                name: (packet.long_name || "").trim() || MeshI18n.t("Node {id}", {id: packet.from_node_id}),
+                location: locationFrom(packet.payload, tag),
+                channel: packet.channel || ""
+            }));
     }
 
-    // Header sorting (table view; cards keep the chosen order). Text sorts
-    // ascending first; rows without a value go last; ties keep arrival order.
-    let netRows = [];
+    // The ISO week of a date, as calendars number them.
+    function isoWeek(date) {
+        const day = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+        day.setUTCDate(day.getUTCDate() + 4 - (day.getUTCDay() || 7));
+        const yearStart = new Date(Date.UTC(day.getUTCFullYear(), 0, 1));
+        return Math.ceil(((day - yearStart) / 864e5 + 1) / 7);
+    }
+
+    // Each net is a group of rows under a heading row: its week, the days its
+    // check-ins span and how many there are.
+    const nets = [];
+    const dayFormat = new Intl.DateTimeFormat(MeshI18n.language, {day: "numeric", month: "short", year: "numeric"});
+    function addNet(net, tag) {
+        const rows = checkInsOf(net.packets, tag);
+        const body = table.createTBody();
+        body.className = "net-week";
+        const head = body.insertRow();
+        head.className = "net-week-head";
+        const th = document.createElement("th");
+        th.colSpan = 6;
+        th.scope = "rowgroup";
+        const title = document.createElement("span");
+        title.className = "net-week-title";
+        const dates = document.createElement("span");
+        dates.className = "net-week-dates";
+        if (rows.length) {
+            const from = new Date(rows[0].packet.import_time_us / 1000);
+            const to = new Date(rows[rows.length - 1].packet.import_time_us / 1000);
+            title.textContent = MeshI18n.t("Week {week}", {week: isoWeek(from)});
+            dates.textContent = dayFormat.formatRange(from, to);
+        } else {
+            title.textContent = MeshI18n.t("Last six days");
+        }
+        const count = document.createElement("span");
+        count.className = "net-week-count";
+        count.title = MeshI18n.t("Check-ins");
+        count.textContent = rows.length.toLocaleString(MeshI18n.language);
+        th.append(title, dates, count);
+        head.append(th);
+        const entry = {body, head, rows};
+        nets.push(entry);
+        if (!rows.length) {
+            const row = body.insertRow(), cell = row.insertCell();
+            cell.colSpan = 6; cell.className = "data-empty";
+            cell.textContent = MeshI18n.t("No check-ins received in the last six days.");
+        } else {
+            draw(entry);
+        }
+    }
+
+    // Header sorting (table view; cards keep the chosen order), within each net:
+    // its heading stays on top. Text sorts ascending first; rows without a value
+    // go last; ties keep arrival order.
     const netSort = {key: "time", asc: true};
     const collator = new Intl.Collator(MeshI18n.language, {sensitivity: "base", numeric: true});
     const sortValue = {time: row => row.num, node: row => row.name, location: row => row.location, channel: row => row.channel};
-    function drawSorted() {
+    function sorted(rows) {
         const value = sortValue[netSort.key];
-        const rows = [...netRows].sort((a, b) => {
+        return [...rows].sort((a, b) => {
             const A = value(a), B = value(b);
             if (A === "" || B === "") return (A === "") - (B === "") || a.num - b.num;
             const order = typeof A === "number" ? A - B : collator.compare(A, B);
             return (netSort.asc ? order : -order) || a.num - b.num;
         });
-        draw(rows);
+    }
+    function drawSorted() {
+        nets.filter(net => net.rows.length).forEach(draw);
         document.querySelectorAll(".net-table th[data-sort]").forEach(th => {
             const active = th.dataset.sort === netSort.key;
             if (active) th.setAttribute("aria-sort", netSort.asc ? "ascending" : "descending");
@@ -156,16 +260,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     document.querySelector(".net-table thead").addEventListener("click", event => {
         const th = event.target.closest("th[data-sort]");
-        if (!th || !netRows.length) return;
+        if (!th || !nets.some(net => net.rows.length)) return;
         netSort.asc = netSort.key === th.dataset.sort ? !netSort.asc : true;
         netSort.key = th.dataset.sort;
         drawSorted();
     });
 
-    function draw(rows) {
-        list.replaceChildren();
-        rows.forEach(({packet, num, name, location}) => {
-            const row = list.insertRow();
+    function draw(net) {
+        net.body.replaceChildren(net.head);
+        sorted(net.rows).forEach(({packet, num, name, location}) => {
+            const row = net.body.insertRow();
             const date = new Date(packet.import_time_us / 1000);
             cell(row, "c-num", String(num));
             const time = cell(row, "c-time", date.toLocaleString(MeshI18n.language, {
@@ -186,6 +290,36 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
 
+    // Older nets load as the end of the list comes into view, until there are
+    // none left.
+    let loading = false, finished = false;
+    function moreInView() {
+        const box = more.getBoundingClientRect();
+        return box.top < window.innerHeight + 400 && box.bottom > -400;
+    }
+    async function loadOlder() {
+        if (loading || finished) return;
+        loading = true;
+        more.textContent = MeshI18n.t("Loading...");
+        try {
+            const net = await nextNet();
+            if (net) {
+                addNet(net, netTag);
+                more.textContent = "";
+            } else {
+                finished = true;
+                more.textContent = MeshI18n.t("No earlier check-ins.");
+            }
+        } catch (error) {
+            console.error("Weekly net:", error);
+            finished = true;
+            more.textContent = MeshI18n.t("Unable to load check-ins. Reload to try again.");
+        } finally {
+            loading = false;
+        }
+        if (!finished && moreInView()) loadOlder();
+    }
+
     try {
         const site = (await window._siteConfigPromise)?.site || {};
         try {
@@ -203,18 +337,18 @@ document.addEventListener("DOMContentLoaded", async () => {
         weeklyText.hidden = !weekly;
 
         if (!tag) {
-            countEl.textContent = "0";
             showMessage(MeshI18n.t("No network check-in tag configured."));
             return;
         }
-        const sinceUs = Math.floor((Date.now() - 6 * 24 * 60 * 60 * 1000) * 1000);
-        const res = await fetch(`/api/v1/packets?portnum=1&contains=${encodeURIComponent(tag)}&since=${sinceUs}&limit=1000`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        render(Array.isArray(data.packets) ? data.packets : [], tag);
+        // This week's: the last six days, whether they hold a net or not.
+        const net = await nextNet(Date.now() * 1000);
+        list.remove();
+        addNet(net, tag);
+        new IntersectionObserver(entries => {
+            if (entries.some(entry => entry.isIntersecting)) loadOlder();
+        }, {rootMargin: "400px 0px"}).observe(more);
     } catch (error) {
         console.error("Weekly net:", error);
-        countEl.textContent = "—";
         showMessage(MeshI18n.t("Unable to load check-ins. Reload to try again."));
     }
 });
