@@ -115,3 +115,75 @@ fn a_field_of_the_wrong_wire_type_is_kept_as_python_keeps_it() {
     // Python's ByteSize() of the envelope.
     assert_eq!(opened.size, 51);
 }
+
+/// A node info from `from` to `to`, sent in the clear on `channel`.
+fn node_info(id: u32, from: u32, to: u32, channel: &str) -> Opened {
+    use meshview_proto::meshtastic::mesh_packet::PayloadVariant;
+    use meshview_proto::meshtastic::{Data, MeshPacket, PortNum, ServiceEnvelope, User};
+    use prost::Message;
+
+    let envelope = ServiceEnvelope {
+        packet: Some(MeshPacket {
+            id,
+            from,
+            to,
+            payload_variant: Some(PayloadVariant::Decoded(Data {
+                portnum: PortNum::NodeinfoApp as i32,
+                payload: User {
+                    id: format!("!{from:08x}"),
+                    long_name: "Gateway".into(),
+                    short_name: "GW".into(),
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+                ..Default::default()
+            })),
+            ..Default::default()
+        }),
+        channel_id: channel.into(),
+        gateway_id: "!12345678".into(),
+    };
+    Opened::open(&envelope.encode_to_vec(), &Keyring::new::<&str>(&[])).unwrap()
+}
+
+// A node broadcasts its node info only on its primary channel, but answers a
+// node it has just found with one sent to that node alone, on whichever
+// channel reaches it (pablorevilla-meshtastic/meshview#155): only the
+// broadcasts tell the node's channel, unless nothing else has yet.
+#[tokio::test]
+async fn a_node_info_to_one_node_does_not_move_the_node_to_its_channel() {
+    let dir = TempDir::new().unwrap();
+    let pool = sqlite::open_for_writing(&dir.path().join("packets.db"))
+        .await
+        .unwrap();
+    let mut store = Store::new(pool.clone()).await.unwrap();
+    let channel = async || {
+        sqlx::query_scalar::<_, String>("SELECT channel FROM node WHERE node_id = 3735928559")
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+    };
+    let gateway = 0xdead_beef;
+
+    // Heard first through one sent to a single node: its channel is all there is.
+    let to_one = node_info(1, gateway, 0x0102_0304, "Secondary");
+    store
+        .process("msh/EU_868/2/e/Secondary/!12345678", &to_one)
+        .await
+        .unwrap();
+    assert_eq!(channel().await, "Secondary");
+
+    let broadcast = node_info(2, gateway, 0xffff_ffff, "LongFast");
+    store
+        .process("msh/EU_868/2/e/LongFast/!12345678", &broadcast)
+        .await
+        .unwrap();
+    assert_eq!(channel().await, "LongFast");
+
+    let to_one = node_info(3, gateway, 0x0102_0304, "Secondary");
+    store
+        .process("msh/EU_868/2/e/Secondary/!12345678", &to_one)
+        .await
+        .unwrap();
+    assert_eq!(channel().await, "LongFast");
+}

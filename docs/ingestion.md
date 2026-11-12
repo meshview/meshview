@@ -71,7 +71,7 @@ Times are microseconds since the epoch, UTC.
 
 | Port | What it does to the node |
 |---|---|
-| `NODEINFO_APP` | Names, hardware model, role and channel, from the node's own description. Names are trimmed, and an empty one or one with control characters becomes `unknown name`. The node is found by its id as spelt (`!00abcd`), or failing that by number, since the same node may be stored under another spelling. |
+| `NODEINFO_APP` | Names, hardware model, role and channel, from the node's own description. Names are trimmed, and an empty one or one with control characters becomes `unknown name`. The node is found by its id as spelt (`!00abcd`), or failing that by number, since the same node may be stored under another spelling. The channel comes from a broadcast one, which a node sends on its primary channel only: one sent to a single node goes on whichever channel reaches it, and gives the channel only to a node that has none yet. |
 | `POSITION_APP` | Latitude, longitude, and altitude when given. A node not seen before is created with its number as its long name and the last four hex digits as its short name. Positions within one degree of (0, 0), where devices without a fix say they are, are ignored. |
 | `MAP_REPORT_APP` | Names, hardware model, role, firmware, and position, as the node reports itself to the broker. Applied before, and whatever becomes of, the packet. |
 
