@@ -160,6 +160,11 @@ A table of channel names to six digit hex colours, such as
 underscores; channels without one get a generated colour. Its keys are the
 channel names, so there is no fixed list of them.
 
+These are the colours every visitor starts with. On the map page each visitor
+can pick another for a channel, from its dot among the filters, and put the
+channel's own back from there; the choice is kept in that browser and the map
+on the home page follows it.
+
 The channels of Meshtastic's presets, named as the firmware names them, have
 colours built in, which a colour here replaces. They go by family, a hue each,
 with the slow presets darker and the turbo ones lighter, and LongFast in the
