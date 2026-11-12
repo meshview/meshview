@@ -110,6 +110,7 @@
     "legend_neighbor": "Сосед",
     "layer_nodes": "Ноды",
     "layer_packets_reach": "Достижимость пакетов",
+    "layer_position_precision": "Точность позиции",
     "layer_traffic_heatmap": "Тепловая карта трафика",
     "map_layers": "Слои карты"
   },
@@ -740,6 +741,7 @@
     "Port Name": "Имя порта",
     "Port {port}": "Порт {port}",
     "Position": "Позиция",
+    "Position Precision": "Точность позиции",
     "Power": "Питание",
     "Power Stress": "Тест мощности",
     "Predicted coverage is not available on this server.": "Прогноз покрытия недоступен на этом сервере.",

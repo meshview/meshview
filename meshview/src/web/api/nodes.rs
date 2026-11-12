@@ -7,13 +7,14 @@
 use super::error::{ApiError, ErrorBody};
 use super::now_us;
 use super::params::{Params, parse_db_int, parse_python_int};
-use crate::db::{Node, NodeFacet, NodeFilter, NodeQuery, NodeSort};
+use crate::db::{Node, NodeFacet, NodeFilter, NodeQuery, NodeSort, Reader};
+use crate::decode;
 use crate::state::AppState;
 use axum::Json;
 use axum::extract::State;
 use serde::Serialize;
 use serde_json::{Map, Value, json};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use utoipa::ToSchema;
 
 /// The fields a node has, in the order they are answered in.
@@ -33,6 +34,10 @@ const FIELDS: [&str; 14] = [
     "first_seen_us",
     "last_seen_us",
 ];
+
+/// A field worked out from the node's latest position packets, so only
+/// answered when `fields` asks for it.
+const PRECISION: &str = "position_precision";
 
 const PAGE_MAX: i64 = 1000;
 const IDS_MAX: usize = 500;
@@ -179,6 +184,13 @@ pub struct NodeDoc {
     /// When it was last heard, in microseconds.
     #[schema(example = 1736370123456789_i64)]
     last_seen_us: Option<i64>,
+    /// Only when `fields` asks for it: the bits of latitude and longitude its
+    /// latest position packet or map report keeps, the latest of the two, up to
+    /// 32, the exact position. Below that, the node is somewhere in a cell
+    /// around its position: 13 bits, a common choice, is about 2.9 km either
+    /// way. Null when neither is stored, or it does not say.
+    #[schema(example = 13)]
+    position_precision: Option<u32>,
 }
 
 /// A page of nodes, or all of them.
@@ -234,7 +246,7 @@ pub struct Nodes {
         ("sort" = Option<String>, Query, description = "The field to sort by, `-` in front for descending: `short_name`, `long_name`, `hw_model`, `firmware`, `role`, `channel`, `last_lat`, `last_long`, `last_altitude`, `is_mqtt_gateway`, `first_seen_us`, `last_seen_us` or `node_id`. Default: by short name."),
         ("limit" = Option<i64>, Query, description = "Page size, 1 to 1000; beyond those, the nearest. Default: every node."),
         ("offset" = Option<i64>, Query, description = "Nodes to skip. Default 0."),
-        ("fields" = Option<String>, Query, description = "Only these fields, comma separated; `node_id` always comes."),
+        ("fields" = Option<String>, Query, description = "Only these fields, comma separated; `node_id` always comes. `position_precision` comes only when asked for here."),
     ),
     responses(
         (status = 200, description = "The nodes", body = Nodes, example = json!({
@@ -275,9 +287,12 @@ pub async fn nodes(State(state): State<AppState>, params: Params) -> Result<Json
     let fields = match list(&params, "fields", None)? {
         None => None,
         Some(items) => {
-            if items.iter().any(|item| !FIELDS.contains(item)) {
+            if items
+                .iter()
+                .any(|item| !FIELDS.contains(item) && *item != PRECISION)
+            {
                 return Err(ApiError::bad_request(format!(
-                    "fields must be a comma-separated list of: {}",
+                    "fields must be a comma-separated list of: {}, {PRECISION}",
                     FIELDS.join(", ")
                 )));
             }
@@ -302,22 +317,37 @@ pub async fn nodes(State(state): State<AppState>, params: Params) -> Result<Json
         None
     };
 
+    let precision = if fields
+        .as_ref()
+        .is_some_and(|fields| fields.iter().any(|f| f == PRECISION))
+    {
+        Some(precisions(db, &rows).await.map_err(failed)?)
+    } else {
+        None
+    };
+
     let nodes = rows
         .into_iter()
         .map(|node| {
+            let node_id = node.node_id;
             let wanted = |key: &str| {
                 key == "node_id"
                     || fields
                         .as_ref()
                         .is_none_or(|fields| fields.iter().any(|f| f == key))
             };
-            Value::Object(
-                node_fields(node)
-                    .into_iter()
-                    .filter(|(key, _)| wanted(key))
-                    .map(|(key, value)| (key.to_string(), value))
-                    .collect::<Map<_, _>>(),
-            )
+            let mut fields = node_fields(node)
+                .into_iter()
+                .filter(|(key, _)| wanted(key))
+                .map(|(key, value)| (key.to_string(), value))
+                .collect::<Map<_, _>>();
+            if let Some(precision) = &precision {
+                fields.insert(
+                    PRECISION.to_string(),
+                    json!(node_id.and_then(|id| precision.get(&id))),
+                );
+            }
+            Value::Object(fields)
         })
         .collect();
 
@@ -327,6 +357,29 @@ pub async fn nodes(State(state): State<AppState>, params: Params) -> Result<Json
         limit: paged.then_some(limit),
         offset: paged.then_some(offset),
     }))
+}
+
+/// The position precision of the nodes with a position, from the latest of
+/// their position packets and map reports.
+async fn precisions(db: &Reader, nodes: &[Node]) -> anyhow::Result<HashMap<i64, u32>> {
+    let located: Vec<i64> = nodes
+        .iter()
+        .filter(|node| node.last_lat.is_some_and(|lat| lat != 0))
+        .filter_map(|node| node.node_id)
+        .collect();
+    let mut latest: HashMap<i64, (Option<i64>, Option<Vec<u8>>)> = HashMap::new();
+    for (node_id, _, time, payload) in db.latest_positions(&located).await? {
+        let newer = latest.get(&node_id).is_none_or(|(seen, _)| time > *seen);
+        if newer {
+            latest.insert(node_id, (time, payload));
+        }
+    }
+    Ok(latest
+        .into_iter()
+        .filter_map(|(node_id, (_, payload))| {
+            Some((node_id, decode::position_precision(&payload?)?))
+        })
+        .collect())
 }
 
 #[derive(Debug, Serialize, ToSchema)]

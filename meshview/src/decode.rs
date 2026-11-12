@@ -127,6 +127,26 @@ pub fn route(bytes: &[u8]) -> Option<RouteDiscovery> {
     (route.route.len().max(route.route_back.len()) <= MAX_ROUTE_HOPS).then_some(route)
 }
 
+/// The bits of latitude and longitude a stored position packet or map report
+/// keeps, or `None` when it is neither or does not say (0, as older firmware
+/// sends). 32 is the exact position.
+pub fn position_precision(payload: &[u8]) -> Option<u32> {
+    let packet: MeshPacket = wire::decode("meshtastic.MeshPacket", payload)?;
+    let Some(PayloadVariant::Decoded(data)) = packet.payload_variant else {
+        return None;
+    };
+    let bits = match PortNum::try_from(data.portnum).ok()? {
+        PortNum::PositionApp => {
+            wire::decode::<Position>("meshtastic.Position", &data.payload)?.precision_bits
+        }
+        PortNum::MapReportApp => {
+            wire::decode::<MapReport>("meshtastic.MapReport", &data.payload)?.position_precision
+        }
+        _ => return None,
+    };
+    (bits > 0).then_some(bits.min(32))
+}
+
 /// An enum value's name, or `unknown(N)`.
 fn routing_error_name(value: i32) -> String {
     routing::Error::try_from(value)
