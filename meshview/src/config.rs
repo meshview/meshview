@@ -120,6 +120,36 @@ pub struct Site {
     pub firehose_interval: i64,
     pub weekly_net_message: String,
     pub net_tag: String,
+    /// The day the weekly net's weeks start on. New in Meshview.
+    pub net_week_start: Weekday,
+}
+
+/// A day of the week, as the configuration names it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Weekday {
+    #[default]
+    Monday,
+    Tuesday,
+    Wednesday,
+    Thursday,
+    Friday,
+    Saturday,
+    Sunday,
+}
+
+impl Weekday {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Monday => "monday",
+            Self::Tuesday => "tuesday",
+            Self::Wednesday => "wednesday",
+            Self::Thursday => "thursday",
+            Self::Friday => "friday",
+            Self::Saturday => "saturday",
+            Self::Sunday => "sunday",
+        }
+    }
 }
 
 impl Default for Site {
@@ -155,6 +185,7 @@ impl Default for Site {
             // visitor's language.
             weekly_net_message: String::new(),
             net_tag: "#BayMeshNet".into(),
+            net_week_start: Weekday::Monday,
         }
     }
 }

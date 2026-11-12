@@ -123,7 +123,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         return td;
     }
 
-    const SIX_DAYS_US = 6 * 24 * 60 * 60 * 1e6;
+    // The day weeks start on, as Date.getDay() numbers it; Monday unless the
+    // site says otherwise.
+    const WEEKDAYS = {sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6};
+    let weekStartDay = 1;
     const table = document.querySelector(".net-table");
     const more = document.getElementById("net-more");
 
@@ -152,19 +155,31 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     }
 
-    // One net: the six days up to `end`, or, without one, up to the latest
-    // check-in not shown yet, so that weeks without a net are skipped. Null
-    // when there are no more.
-    async function nextNet(end) {
-        if (end === undefined) {
+    // The calendar week a moment, in microseconds, falls in: from midnight of
+    // its first day to midnight seven days later, in local time, so that a
+    // change of clocks inside it moves nothing.
+    function weekOf(us) {
+        const start = new Date(us / 1000);
+        start.setHours(0, 0, 0, 0);
+        start.setDate(start.getDate() - (start.getDay() - weekStartDay + 7) % 7);
+        const end = new Date(start);
+        end.setDate(end.getDate() + 7);
+        return {start: start.getTime() * 1000, end: end.getTime() * 1000};
+    }
+
+    // One net: the week a moment falls in, or, without one, the week of the
+    // latest check-in not shown yet, so that weeks without any are skipped.
+    // Null when there are no more.
+    async function nextNet(at) {
+        if (at === undefined) {
             while (!feed.buffer.length && !feed.done) await readMore();
             if (!feed.buffer.length) return null;
-            end = feed.buffer[0].import_time_us;
+            at = feed.buffer[0].import_time_us;
         }
-        const start = end - SIX_DAYS_US;
+        const {start, end} = weekOf(at);
         while (!feed.done && feed.reached > start) await readMore();
-        const taken = feed.buffer.filter(packet => packet.import_time_us > start);
-        feed.buffer = feed.buffer.filter(packet => packet.import_time_us <= start);
+        const taken = feed.buffer.filter(packet => packet.import_time_us >= start && packet.import_time_us < end);
+        feed.buffer = feed.buffer.filter(packet => packet.import_time_us < start);
         return {start, end, packets: taken};
     }
 
@@ -210,14 +225,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         title.className = "net-week-title";
         const dates = document.createElement("span");
         dates.className = "net-week-dates";
-        if (rows.length) {
-            const from = new Date(rows[0].packet.import_time_us / 1000);
-            const to = new Date(rows[rows.length - 1].packet.import_time_us / 1000);
-            title.textContent = MeshI18n.t("Week {week}", {week: isoWeek(from)});
-            dates.textContent = dayFormat.formatRange(from, to);
-        } else {
-            title.textContent = MeshI18n.t("Last six days");
-        }
+        // Its first and last days; the one under way is this week.
+        const from = new Date(net.start / 1000);
+        const to = new Date(net.end / 1000 - 1);
+        const current = Date.now() * 1000 < net.end;
+        title.textContent = current
+            ? MeshI18n.t("This week")
+            : MeshI18n.t("Week {week}", {week: isoWeek(from)});
+        dates.textContent = dayFormat.formatRange(from, to);
         const count = document.createElement("span");
         count.className = "net-week-count";
         count.title = MeshI18n.t("Check-ins");
@@ -229,7 +244,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!rows.length) {
             const row = body.insertRow(), cell = row.insertCell();
             cell.colSpan = 5; cell.className = "data-empty";
-            cell.textContent = MeshI18n.t("No check-ins received in the last six days.");
+            cell.textContent = MeshI18n.t("No check-ins yet this week.");
         } else {
             draw(entry);
         }
@@ -378,7 +393,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             showMessage(MeshI18n.t("No network check-in tag configured."));
             return;
         }
-        // This week's: the last six days, whether they hold a net or not.
+        weekStartDay = WEEKDAYS[site.net_week_start] ?? 1;
+        // This week's, whether it holds any check-ins yet or not.
         const net = await nextNet(Date.now() * 1000);
         list.remove();
         addNet(net, tag);

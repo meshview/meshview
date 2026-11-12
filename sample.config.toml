@@ -66,11 +66,13 @@ map_interval = 3
 firehose_interval = 3
 
 # Weekly net: the tag that makes a text message a check-in, wherever it is in
-# it. The page lists them a week at a time, the earliest from each node, as they
+# it. The page lists them a week at a time, the latest from each node, as they
 # were sent; there is no schedule, a week is a week. Its page explains this
 # itself, in each visitor's language, unless a text of your own is set here:
 # weekly_net_message = "Weekly mesh check-in. Send a text message with #BayMeshNet in it, any day of the week."
 net_tag = "#BayMeshNet"
+# The day weeks start on, monday to sunday; monday unless set.
+# net_week_start = "monday"
 
 # Map channel colours, as six digit hex colours. Names ignore case, spaces,
 # hyphens and underscores. The channels of Meshtastic's presets (LongFast,

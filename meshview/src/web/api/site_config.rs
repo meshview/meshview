@@ -167,6 +167,10 @@ pub struct Site {
     /// The tag the weekly net page looks for in messages.
     #[schema(example = "#BayMeshNet")]
     pub net_tag: String,
+    /// The day the weekly net page's weeks start on, in English and lower
+    /// case: `monday` unless configured.
+    #[schema(example = "monday")]
+    pub net_week_start: &'static str,
     /// Meshview's version.
     #[schema(example = "5.0.0")]
     pub version: &'static str,
@@ -289,6 +293,7 @@ pub fn build(config: &Config) -> SiteConfig {
             firehose_interval: site.firehose_interval,
             weekly_net_message: site.weekly_net_message.clone(),
             net_tag: site.net_tag.clone(),
+            net_week_start: site.net_week_start.as_str(),
             version: env!("CARGO_PKG_VERSION"),
         },
         mqtt: Mqtt {

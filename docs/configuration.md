@@ -166,6 +166,7 @@ once it is restarted.
 | `firehose_interval` | whole number | `3` | Seconds between firehose refreshes. Zero or less disables polling. |
 | `weekly_net_message` | string | `""` | Text at the top of the weekly net page: what the net is and how to take part. Empty, the page explains it itself, in the visitor's language. There is no schedule: any check-in in the week counts. |
 | `net_tag` | string | `"#BayMeshNet"` | Tag that makes a text message a check-in, anywhere in it and in any case. The weekly net page lists them a week at a time, the earliest from each node, as they were sent, the tag marked. |
+| `net_week_start` | string | `"monday"` | The day the weekly net's weeks start on, from `monday` to `sunday`: each runs seven days from midnight of that day, in the visitor's local time. New in Meshview. |
 
 ### `[map_channel_colors]`
 
