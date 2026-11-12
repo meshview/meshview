@@ -19,6 +19,7 @@ pub enum Arg<'a> {
     Int(i64),
     OptInt(Option<i64>),
     Text(&'a str),
+    OptText(Option<&'a str>),
     Bytes(&'a [u8]),
     OptReal(Option<f64>),
     Bool(bool),
@@ -40,6 +41,7 @@ macro_rules! bind {
                 Arg::Int(value) => query.bind(value),
                 Arg::OptInt(value) => query.bind(value),
                 Arg::Text(value) => query.bind(value),
+                Arg::OptText(value) => query.bind(value),
                 Arg::Bytes(value) => query.bind(value),
                 Arg::OptReal(value) => query.bind(value),
                 Arg::Bool(value) => query.bind(value),
@@ -93,6 +95,29 @@ impl Tx<'_> {
         })
     }
 
+    /// Runs a statement that has to be written differently for each database,
+    /// with the same values, and answers how many rows it changed.
+    pub async fn execute_either(
+        &mut self,
+        sqlite: &'static str,
+        postgres: &'static str,
+        args: &[Arg<'_>],
+    ) -> Result<u64> {
+        #[cfg(not(feature = "postgres"))]
+        let _ = postgres;
+        Ok(match self {
+            Self::Sqlite(tx) => bind!(sqlx::query(sqlite), args)
+                .execute(&mut **tx)
+                .await?
+                .rows_affected(),
+            #[cfg(feature = "postgres")]
+            Self::Postgres(tx) => bind!(sqlx::query(sqlx::AssertSqlSafe(numbered(postgres))), args)
+                .execute(&mut **tx)
+                .await?
+                .rows_affected(),
+        })
+    }
+
     pub async fn commit(self) -> Result<()> {
         match self {
             Self::Sqlite(tx) => tx.commit().await?,
@@ -101,6 +126,29 @@ impl Tx<'_> {
         }
         Ok(())
     }
+}
+
+/// Runs one statement on its own, in a transaction of its own.
+pub async fn execute(pool: &Pool, sql: &'static str, args: &[Arg<'_>]) -> Result<u64> {
+    let mut tx = begin(pool).await?;
+    let changed = tx.execute(sql, args).await?;
+    tx.commit().await?;
+    Ok(changed)
+}
+
+/// Runs a statement that takes no values and cannot run in a transaction,
+/// such as VACUUM, as it is.
+pub async fn run(pool: &Pool, sql: &'static str) -> Result<()> {
+    match pool {
+        Pool::Sqlite(pool) => {
+            sqlx::raw_sql(sql).execute(pool).await?;
+        }
+        #[cfg(feature = "postgres")]
+        Pool::Postgres(pool) => {
+            sqlx::raw_sql(sql).execute(pool).await?;
+        }
+    }
+    Ok(())
 }
 
 /// The first column of every row a query answers, as integers, outside any
