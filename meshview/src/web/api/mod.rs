@@ -38,6 +38,7 @@ pub fn v1() -> OpenApiRouter<AppState> {
         .routes(routes!(lang::lang))
         .routes(routes!(stats::stats))
         .routes(routes!(stats::count))
+        .routes(routes!(stats::channels))
         .routes(routes!(stats::top))
         .routes(routes!(nodes::nodes))
         .routes(routes!(nodes::facets))

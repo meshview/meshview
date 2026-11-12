@@ -41,6 +41,18 @@ pub const PRESET_COLOURS: [(&str, &str); 17] = [
     ("custom", "#6e6e6e"),
 ];
 
+/// Whether a channel is one the official presets name, compared as the map
+/// compares them: without case, spaces, hyphens or underscores. `Custom`, the
+/// channel of a radio set up without a preset, is not.
+pub fn is_preset_channel(channel: &str) -> bool {
+    let name: String = channel
+        .chars()
+        .filter(|c| !matches!(c, ' ' | '_' | '-'))
+        .flat_map(char::to_lowercase)
+        .collect();
+    name != "custom" && PRESET_COLOURS.iter().any(|(preset, _)| *preset == name)
+}
+
 const DEFAULT_TILE_URL: &str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const DEFAULT_TILE_ATTRIBUTION: &str =
     "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors";

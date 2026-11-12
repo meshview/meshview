@@ -172,6 +172,22 @@
 
     <section class="card-section">
         <div class="chart-head">
+            <h2 class="section-header" data-translate-lang="packets_by_channel">Packets by Channel - Last 24 Hours</h2>
+            <div class="chart-tools">{{<chart_tools chart="chart_packets_channel" export_label={export_csv} />}}</div>
+        </div>
+        <div id="chart_packets_channel" class="chart"></div>
+    </section>
+
+    <section class="card-section">
+        <div class="chart-head">
+            <h2 class="section-header" data-translate-lang="packets_by_destination">Packets by Destination - Last 24 Hours</h2>
+            <div class="chart-tools">{{<chart_tools chart="chart_packets_destination" export_label={export_csv} />}}</div>
+        </div>
+        <div id="chart_packets_destination" class="chart"></div>
+    </section>
+
+    <section class="card-section">
+        <div class="chart-head">
             <h2 class="section-header" data-translate-lang="hardware_breakdown">Hardware Breakdown</h2>
             <div class="chart-tools">{{<chart_tools chart="chart_hw_model" export_label={export_csv} />}}</div>
         </div>
@@ -853,6 +869,7 @@ let chartDailyAll, chartDailyPortnum1;
 let chartDailySnapshotPackets, chartDailySnapshotNodesGateways;
 let chartHwModel, chartRole, chartChannel;
 let chartGatewayChannel, chartGatewayRole, chartGatewayFirmware;
+let chartPacketsChannel, chartPacketsDestination;
 let chartPacketTypes;
 let defaultPacketTypesData = [];
 let dailySnapshots = [];
@@ -905,6 +922,28 @@ async function init(){
     for(let i=0;i<portnums.length;i++){
         updateTotalCount(totalIds[i],allData[i]);
         window['chartPortnum'+portnums[i]]=renderChart(domIds[i],allData[i],'bar',colors[i]);
+    }
+
+    // The latest day's packets, by channel and grouped by where they went:
+    // to everyone on a channel a preset names (whose key is commonly known),
+    // to everyone on any other, or to a single node.
+    try {
+        const res = await fetch("/api/v1/stats/channels?period_type=hour&length=24");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const {channels = []} = await res.json();
+        chartPacketsChannel = renderPieChart(
+            "chart_packets_channel",
+            channels.map(c => ({name: c.channel || MeshI18n.t("Unknown"), value: c.broadcast + c.direct})),
+            MeshI18n.t("Channel")
+        );
+        const sum = pick => channels.reduce((total, c) => total + pick(c), 0);
+        chartPacketsDestination = renderPieChart("chart_packets_destination", [
+            {name: MeshI18n.t("Preset channel broadcast"), value: sum(c => c.preset ? c.broadcast : 0)},
+            {name: MeshI18n.t("Non-preset broadcast"), value: sum(c => c.preset ? 0 : c.broadcast)},
+            {name: MeshI18n.t("Direct to a node"), value: sum(c => c.direct)},
+        ].filter(d => d.value > 0), MeshI18n.t("Destination"));
+    } catch (error) {
+        console.error("Packets by channel:", error);
     }
 
     // Nodes for breakdown + summary node count
