@@ -1,10 +1,22 @@
 <!doctype html>
 <html lang="{{ ui_language }}" data-bs-theme="{% block theme %}dark{% endblock %}">
 <head>
-    <title>Meshview</title>
+    <title>Meshview{% if site_title %} - {{ site_title }}{% endif %}</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     {% if site_description %}<meta name="description" content="{{ site_description }}">{% endif %}
+
+    <!-- Link previews, for the apps that show a card when a link is shared. -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Meshview">
+    <meta property="og:title" content="{% if site_title %}{{ site_title }}{% else %}Meshview{% endif %}">
+    {% if site_description %}<meta property="og:description" content="{{ site_description }}">{% endif %}
+    <meta property="og:image" content="{{ preview_image }}">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Meshview">
+    <meta name="twitter:card" content="summary_large_image">
 
     <link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48 64x64 256x256" href="/static/favicon.ico">
     <link rel="icon" type="image/svg+xml" sizes="any" href="/static/meshview-icon.svg">
@@ -519,7 +531,7 @@ async function initializePage() {
         const site = cfg.site || {};
 
         // Title
-        document.title = "Meshview - " + (site.title || "");
+        document.title = site.title ? "Meshview - " + site.title : "Meshview";
 
         // Header & Message
         document.getElementById("site-header").textContent = site.title || "Meshview";
