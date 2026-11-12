@@ -158,8 +158,11 @@ pub struct Site {
     /// Seconds between the firehose's refreshes; 0 or less, none.
     #[schema(example = 3)]
     pub firehose_interval: i64,
-    /// The text of the weekly net page.
-    #[schema(example = "Weekly Mesh check-in message.")]
+    /// The text of the weekly net page; empty when not configured, and the
+    /// page explains the net itself.
+    #[schema(
+        example = "Weekly mesh check-in. Send a text message with #BayMeshNet in it, any day of the week."
+    )]
     pub weekly_net_message: String,
     /// The tag the weekly net page looks for in messages.
     #[schema(example = "#BayMeshNet")]

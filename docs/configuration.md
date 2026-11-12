@@ -164,8 +164,8 @@ once it is restarted.
 | `map_tile_name` | string | `""` | Name of the tile layer in the layer picker. |
 | `map_interval` | whole number | `3` | Seconds between map refreshes. Zero or less disables polling. |
 | `firehose_interval` | whole number | `3` | Seconds between firehose refreshes. Zero or less disables polling. |
-| `weekly_net_message` | string | `"Weekly Mesh check-in message."` | Text of the weekly net page. |
-| `net_tag` | string | `"#BayMeshNet"` | Tag the weekly net page looks for in messages. |
+| `weekly_net_message` | string | `""` | Text at the top of the weekly net page: what the net is and how to take part. Empty, the page explains it itself, in the visitor's language. There is no schedule: any check-in in the week counts. |
+| `net_tag` | string | `"#BayMeshNet"` | Tag that makes a text message a check-in, anywhere in it and in any case. The weekly net page lists them a week at a time, the earliest from each node, as they were sent, the tag marked. |
 
 ### `[map_channel_colors]`
 

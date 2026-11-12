@@ -143,6 +143,13 @@ PYTHON_SAMPLE_COLOURS = {
     "shortturbo": "#f032e6",
 }
 
+# The Python sample's weekly net text, which asks for a format and a schedule
+# the page has never held anyone to. Left out, the page explains itself instead.
+PYTHON_SAMPLE_NET_MESSAGE = (
+    "Weekly Mesh check-in. We will keep it open on every Wednesday from 5:00pm for "
+    "checkins. The message format should be (LONG NAME) - (CITY YOU ARE IN) #BayMeshNet."
+)
+
 
 class Conversion:
     def __init__(self):
@@ -244,6 +251,15 @@ def convert(parser, source_name):
                     out[key] = toml_string(colour)
                 continue
 
+            if (section, key) == ("site", "weekly_net_message") and (
+                raw.strip() == PYTHON_SAMPLE_NET_MESSAGE
+            ):
+                conversion.note(
+                    section,
+                    key,
+                    "the Python sample's text: left out, the page explains the net itself",
+                )
+                continue
             if (section, key) in LEFT_OUT:
                 conversion.note(section, key, LEFT_OUT[(section, key)] + ": left out")
                 continue

@@ -276,7 +276,7 @@
   "The tagline, for the page footer and description; empty when unset.": "Слоган для подвала страницы и описания; пусто, если не задан.",
   "The template of the tiles' addresses: the configured one, or OpenStreetMap's.": "Шаблон адресов тайлов: настроенный или OpenStreetMap.",
   "The text of the banner every page shows until a visitor dismisses it; empty when unset.": "Текст баннера, который показывает каждая страница, пока посетитель его не закроет; пусто, если не задан.",
-  "The text of the weekly net page.": "Текст страницы еженедельной сети.",
+  "The text of the weekly net page; empty when not configured, and the page explains the net itself.": "Текст страницы еженедельной переклички; пустой, если не задан, и тогда страница сама объясняет, что это.",
   "The threshold asked for.": "Запрошенный порог.",
   "The tiles' attribution, in HTML.": "Атрибуция тайлов в HTML.",
   "The topics read.": "Читаемые темы.",

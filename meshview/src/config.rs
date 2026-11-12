@@ -151,7 +151,9 @@ impl Default for Site {
             map_tile_max_zoom: 19,
             map_tile_name: String::new(),
             firehose_interval: 3,
-            weekly_net_message: "Weekly Mesh check-in message.".into(),
+            // Empty, the weekly net page explains the net itself, in the
+            // visitor's language.
+            weekly_net_message: String::new(),
             net_tag: "#BayMeshNet".into(),
         }
     }
@@ -658,10 +660,9 @@ mod tests {
             config.listen_addr().unwrap(),
             "0.0.0.0:8081".parse().unwrap()
         );
-        assert_eq!(
-            config.site.weekly_net_message,
-            "Weekly Mesh check-in message."
-        );
+        // The one default that is not Python's: its text said nothing, and the
+        // weekly net page explains the net itself when there is none.
+        assert_eq!(config.site.weekly_net_message, "");
         assert_eq!(config.snapshot.hour, 1);
     }
 
