@@ -129,7 +129,10 @@ The pages are Tera 2 templates under `meshview/templates/`, and the files
 they use, scripts, styles, icons and the bundled libraries, under
 `meshview/assets/static/`; all of it is built into the binary, and every page
 is rendered once, at start. They began as the Python version's Jinja templates,
-converted, and are developed here now.
+converted, and are developed here now. The node page is the one exception, and
+only in its link preview: the apps that show one do not run scripts, so the
+node's name and details go into its `og:` tags as the page is answered, in the
+places a second rendering at start finds for them.
 
 A few templates are not pages but parts the pages include: the node page's
 coverage help (`coverage-help.html`), the map's dot borders

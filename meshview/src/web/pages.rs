@@ -6,7 +6,10 @@
 //! Its templates take nothing from the request: everything a page shows it
 //! fetches from the API itself. What they do take, the site's language and
 //! texts and the map's tiles, is known once the configuration is read, so every
-//! page is rendered once, at start, and answered from memory after that.
+//! page is rendered once, at start, and answered from memory after that. The
+//! one exception is the node page's link preview: the apps that show one do not
+//! run the page's script, so the node's name and details go into the page as it
+//! is answered, in the places left for them at start.
 //!
 //! The templates are Tera 2 ones, under `templates/`, and the files they use
 //! under `assets/static/`; their strings are translated in the `ui` section of
@@ -15,9 +18,11 @@
 use super::api::lang;
 use super::api::site_config;
 use crate::config::Config;
+use crate::db::Node;
+use crate::state::AppState;
 use anyhow::{Context as _, anyhow};
 use axum::Router;
-use axum::extract::{Path, Request};
+use axum::extract::{Path, Request, State as AxumState};
 use axum::http::StatusCode;
 use axum::http::header::{
     CACHE_CONTROL, CONTENT_TYPE, ETAG, HeaderMap, HeaderValue, IF_NONE_MATCH, LOCATION,
@@ -68,8 +73,9 @@ const PAGES: [(&str, bool); 13] = [
     ("traceroute.html", false),
 ];
 
-/// Where each page is served, as in the Python version.
-const ROUTES: [(&str, &str); 16] = [
+/// Where each page is served, as in the Python version; the node page,
+/// `/node/{id}`, is [`node_page`].
+const ROUTES: [(&str, &str); 15] = [
     ("/", "index.html"),
     ("/index", "index.html"),
     ("/index.html", "index.html"),
@@ -84,7 +90,6 @@ const ROUTES: [(&str, &str); 16] = [
     ("/top", "top.html"),
     ("/stats", "stats.html"),
     ("/packet/{id}", "packet.html"),
-    ("/node/{id}", "node.html"),
     ("/traceroute/{id}", "traceroute.html"),
 ];
 
@@ -116,18 +121,29 @@ fn to_json(value: &tera::Value) -> String {
         .replace('\'', "\\u0027")
 }
 
-/// Where link previews take their picture from: the server's own, at the
+/// The pictures of link previews: the site's, on every page, and a node's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Preview {
+    Site,
+    Node,
+}
+
+/// Where link previews take a picture from: the server's own, at the
 /// configured domain (over HTTPS unless the domain names its scheme), or,
 /// without a domain, the same picture from the project's website, as previews
 /// need an absolute address.
-fn preview_image(domain: &str) -> String {
+fn preview_image(domain: &str, preview: Preview) -> String {
+    let (own, project) = match preview {
+        Preview::Site => ("og.png", "og-instance.png"),
+        Preview::Node => ("og-node.png", "og-instance-node.png"),
+    };
     let domain = domain.trim().trim_end_matches('/');
     if domain.is_empty() {
-        "https://meshview.github.io/og-instance.png".to_string()
+        format!("https://meshview.github.io/{project}")
     } else if domain.starts_with("https://") || domain.starts_with("http://") {
-        format!("{domain}/static/og.png")
+        format!("{domain}/static/{own}")
     } else {
-        format!("https://{domain}/static/og.png")
+        format!("https://{domain}/static/{own}")
     }
 }
 
@@ -180,7 +196,17 @@ fn tera(config: &Config) -> anyhow::Result<Tera> {
     globals.insert("ui_language", &config.site.language);
     globals.insert("site_description", config.site.message.trim());
     globals.insert("site_title", config.site.title.trim());
-    globals.insert("preview_image", &preview_image(&config.site.domain));
+    // What a link to a page shows where it is pasted: the site, by default.
+    let site_name = Some(config.site.title.trim())
+        .filter(|title| !title.is_empty())
+        .unwrap_or("Meshview");
+    globals.insert("preview_site", site_name);
+    globals.insert("preview_title", site_name);
+    globals.insert("preview_description", config.site.message.trim());
+    globals.insert(
+        "preview_image",
+        &preview_image(&config.site.domain, Preview::Site),
+    );
     globals.insert("map_tiles", &map_tiles);
     let build = super::api::version::current();
     globals.insert("build_version", build.version);
@@ -198,7 +224,116 @@ fn tera(config: &Config) -> anyhow::Result<Tera> {
 /// Every page, rendered, by template.
 struct Rendered {
     pages: HashMap<&'static str, Arc<str>>,
+    node: NodePage,
     not_found: Arc<str>,
+}
+
+/// Stand-ins for a node's preview, which the node page is rendered with once
+/// more to learn where the node's own goes. No site text can hold them.
+const TITLE_MARK: &str = "\u{1}preview-title\u{1}";
+const DESCRIPTION_MARK: &str = "\u{1}preview-description\u{1}";
+
+/// The node page, as rendered for any node, and in the pieces that go around
+/// one node's preview title and description.
+struct NodePage {
+    plain: Arc<str>,
+    around: [String; 3],
+}
+
+impl NodePage {
+    fn new(plain: Arc<str>, marked: &str) -> anyhow::Result<Self> {
+        let (head, rest) = marked
+            .split_once(TITLE_MARK)
+            .context("the node page has no place for its preview title")?;
+        let (middle, tail) = rest
+            .split_once(DESCRIPTION_MARK)
+            .context("the node page has no place for its preview description")?;
+        anyhow::ensure!(
+            !tail.contains(TITLE_MARK) && !tail.contains(DESCRIPTION_MARK),
+            "the node page has more than one place for its preview"
+        );
+        Ok(Self {
+            plain,
+            around: [head.into(), middle.into(), tail.into()],
+        })
+    }
+
+    /// The page, with this preview in it.
+    fn with(&self, title: &str, description: &str) -> String {
+        let [head, middle, tail] = &self.around;
+        [
+            head.as_str(),
+            &escape(title),
+            middle,
+            &escape(description),
+            tail,
+        ]
+        .concat()
+    }
+}
+
+/// Text made safe for an HTML attribute.
+fn escape(text: &str) -> String {
+    let mut escaped = String::with_capacity(text.len());
+    for c in text.chars() {
+        match c {
+            '&' => escaped.push_str("&amp;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            '"' => escaped.push_str("&quot;"),
+            '\'' => escaped.push_str("&#39;"),
+            c => escaped.push(c),
+        }
+    }
+    escaped
+}
+
+/// What a link to a node shows: its names, and its id in hex with its role,
+/// hardware and channel, whichever it has told. A node with no name yet is its
+/// hex id, as everywhere else.
+fn node_preview(node: &Node) -> (String, String) {
+    let told = |field: &Option<String>| {
+        field
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+    };
+    let hex = node.node_id.map(|id| format!("!{:08x}", id as u32));
+    let title = match (told(&node.long_name), told(&node.short_name)) {
+        (Some(long), Some(short)) if long != short => format!("{long} ({short})"),
+        (Some(name), _) | (None, Some(name)) => name,
+        (None, None) => hex.clone().unwrap_or_else(|| node.id.clone()),
+    };
+    let description = [
+        hex,
+        told(&node.role),
+        told(&node.hw_model),
+        told(&node.channel),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>()
+    .join(" · ");
+    (title, description)
+}
+
+/// `/node/{id}`: the node page, with the node's preview when it is known.
+async fn node_page(state: &AppState, page: &NodePage, id: &str) -> String {
+    let (Ok(node_id), Some(reader)) = (id.parse::<i64>(), state.reader.get()) else {
+        return page.plain.to_string();
+    };
+    match reader.node(node_id).await {
+        Ok(Some(node)) => {
+            let (title, description) = node_preview(&node);
+            page.with(&title, &description)
+        }
+        Ok(None) => page.plain.to_string(),
+        Err(error) => {
+            tracing::warn!("looking up node {node_id} for its page's preview: {error:#}");
+            page.plain.to_string()
+        }
+    }
 }
 
 fn render(config: &Config) -> anyhow::Result<Rendered> {
@@ -214,6 +349,18 @@ fn render(config: &Config) -> anyhow::Result<Rendered> {
         pages.insert(template, Arc::from(html));
     }
     let mut context = Context::new();
+    context.insert("preview_title", TITLE_MARK);
+    context.insert(
+        "preview_image",
+        &preview_image(&config.site.domain, Preview::Node),
+    );
+    context.insert("preview_description", DESCRIPTION_MARK);
+    let marked = tera
+        .render("node.html", &context)
+        .map_err(|e| anyhow!("{e}"))
+        .context("rendering node.html for a node's preview")?;
+    let node = NodePage::new(Arc::clone(&pages["node.html"]), &marked)?;
+    let mut context = Context::new();
     context.insert("error_message", "Page not found");
     let not_found = tera
         .render("error.html", &context)
@@ -221,6 +368,7 @@ fn render(config: &Config) -> anyhow::Result<Rendered> {
         .context("rendering error.html")?;
     Ok(Rendered {
         pages,
+        node,
         not_found: Arc::from(not_found),
     })
 }
@@ -289,7 +437,7 @@ fn static_file(path: &str, headers: &HeaderMap, not_found_page: &Arc<str>) -> Re
 }
 
 /// The routes of the pages and their files.
-pub fn router<S: Clone + Send + Sync + 'static>(config: &Config) -> anyhow::Result<Router<S>> {
+pub fn router(config: &Config) -> anyhow::Result<Router<AppState>> {
     let rendered = Arc::new(render(config)?);
     let mut router = Router::new();
 
@@ -297,6 +445,15 @@ pub fn router<S: Clone + Send + Sync + 'static>(config: &Config) -> anyhow::Resu
         let page = Arc::clone(&rendered.pages[template]);
         router = router.route(route, get(move || async move { Html(page.to_string()) }));
     }
+    let pages = Arc::clone(&rendered);
+    router = router.route(
+        "/node/{id}",
+        get(
+            move |AxumState(state): AxumState<AppState>, Path(id): Path<String>| async move {
+                Html(node_page(&state, &pages.node, &id).await)
+            },
+        ),
+    );
 
     // An old address of the node page.
     router =
@@ -379,20 +536,20 @@ mod tests {
     #[test]
     fn link_previews_take_the_picture_from_the_domain_or_the_project() {
         assert_eq!(
-            preview_image(""),
+            preview_image("", Preview::Site),
             "https://meshview.github.io/og-instance.png"
         );
         assert_eq!(
-            preview_image("  "),
-            "https://meshview.github.io/og-instance.png"
+            preview_image("  ", Preview::Node),
+            "https://meshview.github.io/og-instance-node.png"
         );
         assert_eq!(
-            preview_image("mesh.example.org"),
+            preview_image("mesh.example.org", Preview::Site),
             "https://mesh.example.org/static/og.png"
         );
         assert_eq!(
-            preview_image("http://mesh.example.org/"),
-            "http://mesh.example.org/static/og.png"
+            preview_image("http://mesh.example.org/", Preview::Node),
+            "http://mesh.example.org/static/og-node.png"
         );
     }
 
@@ -439,6 +596,58 @@ mod tests {
         let node = &rendered.pages["node.html"];
         assert!(node.contains("<h4>Cómo funciona</h4>"));
         assert!(!node.contains("/docs/COVERAGE"));
+    }
+
+    fn node(long: Option<&str>, short: Option<&str>) -> Node {
+        Node {
+            id: "!02ec7b48".into(),
+            node_id: Some(0x02ec7b48),
+            long_name: long.map(Into::into),
+            short_name: short.map(Into::into),
+            hw_model: Some("HELTEC_V3".into()),
+            firmware: None,
+            role: Some("ROUTER".into()),
+            last_lat: None,
+            last_long: None,
+            last_altitude: None,
+            channel: Some("".into()),
+            is_mqtt_gateway: None,
+            first_seen_us: None,
+            last_seen_us: None,
+        }
+    }
+
+    #[test]
+    fn a_node_previews_with_its_names_and_details() {
+        let (title, description) = node_preview(&node(Some("Refugio 103"), Some("R103")));
+        assert_eq!(title, "Refugio 103 (R103)");
+        assert_eq!(description, "!02ec7b48 · ROUTER · HELTEC_V3");
+        assert_eq!(node_preview(&node(Some("R103"), Some("R103"))).0, "R103");
+        assert_eq!(node_preview(&node(None, Some(" R103 "))).0, "R103");
+        assert_eq!(node_preview(&node(None, Some(" "))).0, "!02ec7b48");
+    }
+
+    #[test]
+    fn the_node_page_takes_a_node_preview_in_place_of_the_site_one() {
+        let mut config = Config::default();
+        config.site.title = "Galicia Mesh".into();
+        config.site.message = "Live data".into();
+        let rendered = render(&config).unwrap();
+        let plain = &rendered.node.plain;
+        assert!(plain.contains(r#"<meta property="og:title" content="Galicia Mesh">"#));
+        assert!(plain.contains(r#"<meta property="og:description" content="Live data">"#));
+        let page = rendered
+            .node
+            .with("<Refugio> \"103\"", "!02ec7b48 · ROUTER");
+        assert!(
+            page.contains(
+                r#"<meta property="og:title" content="&lt;Refugio&gt; &quot;103&quot;">"#
+            )
+        );
+        assert!(page.contains(r#"<meta property="og:description" content="!02ec7b48 · ROUTER">"#));
+        assert!(page.contains(r#"<meta property="og:site_name" content="Galicia Mesh">"#));
+        assert!(plain.contains("/og-instance.png"));
+        assert!(page.contains("/og-instance-node.png"));
     }
 
     #[test]
