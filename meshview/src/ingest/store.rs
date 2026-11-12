@@ -11,6 +11,7 @@
 //! than by accident now.
 
 use super::opened::Opened;
+use crate::decode::BROADCAST;
 use anyhow::{Context, Result};
 use meshview_proto::meshtastic::config::device_config::Role;
 use meshview_proto::meshtastic::mesh_packet::PayloadVariant;
@@ -183,7 +184,10 @@ impl Store {
             && !user.id.is_empty()
         {
             match parse_node_id(&user.id) {
-                Some(node_id) => node_info(&mut tx, &user, node_id, &envelope.channel_id).await?,
+                Some(node_id) => {
+                    let broadcast = i64::from(packet.to) == BROADCAST;
+                    node_info(&mut tx, &user, node_id, &envelope.channel_id, broadcast).await?
+                }
                 None => {
                     warn!(
                         "Skipping NODEINFO_APP packet {}: unable to determine node_id",
@@ -324,11 +328,16 @@ impl Store {
 }
 
 /// Node info: the node as it describes itself on the mesh.
+///
+/// A node broadcasts it on its primary channel only, but sends it as well to a
+/// node it has just found, on whichever channel reaches that one: such a node
+/// info only gives the node a channel when it has none yet.
 async fn node_info(
     tx: &mut Transaction<'_, Sqlite>,
     user: &User,
     node_id: i64,
     channel: &str,
+    broadcast: bool,
 ) -> Result<()> {
     let now = now_us();
     let long_name = normalize_node_name(&user.long_name);
@@ -343,13 +352,17 @@ async fn node_info(
         let sql = match column {
             "id" => {
                 "UPDATE node SET node_id = ?, long_name = ?, short_name = ?, hw_model = ?, \
-                 role = ?, channel = ?, last_seen_us = ?, \
-                 first_seen_us = COALESCE(first_seen_us, ?) WHERE id = ?"
+                 role = ?, \
+                 channel = CASE WHEN ? OR channel IS NULL OR channel = '' THEN ? \
+                                ELSE channel END, \
+                 last_seen_us = ?, first_seen_us = COALESCE(first_seen_us, ?) WHERE id = ?"
             }
             _ => {
                 "UPDATE node SET node_id = ?, long_name = ?, short_name = ?, hw_model = ?, \
-                 role = ?, channel = ?, last_seen_us = ?, \
-                 first_seen_us = COALESCE(first_seen_us, ?) WHERE node_id = ?"
+                 role = ?, \
+                 channel = CASE WHEN ? OR channel IS NULL OR channel = '' THEN ? \
+                                ELSE channel END, \
+                 last_seen_us = ?, first_seen_us = COALESCE(first_seen_us, ?) WHERE node_id = ?"
             }
         };
         let query = sqlx::query(sql)
@@ -358,6 +371,7 @@ async fn node_info(
             .bind(&short_name)
             .bind(&hw_model)
             .bind(&role)
+            .bind(broadcast)
             .bind(channel)
             .bind(now)
             .bind(now);
