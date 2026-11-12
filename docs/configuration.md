@@ -99,11 +99,25 @@ so existing values carry over unchanged:
 | `sqlite:///packets.db` | `packets.db`, relative to the working directory |
 | `sqlite:////var/lib/meshview/packets.db` | `/var/lib/meshview/packets.db` |
 | `sqlite+aiosqlite:///packets.db` | the same as the first: the driver is ignored |
+| `postgresql://meshview:secret@db.example:5432/meshview` | the `meshview` database on that PostgreSQL server |
+| `postgresql+asyncpg://meshview:secret@localhost/meshview` | the same form, with the Python version's driver, which is ignored |
 
 Three slashes and then the path: a relative path leaves three, an absolute one,
 starting with its own slash, makes four. A query string (`?mode=ro`) is ignored.
-`sqlite://packets.db`, with two, is refused rather than guessed at. PostgreSQL
-strings are recognised and refused: it is not supported yet.
+`sqlite://packets.db`, with two, is refused rather than guessed at.
+
+PostgreSQL takes `postgresql://` or `postgres://`, with or without a driver
+after a `+`. The server, the role and the database are yours to create:
+Meshview creates its tables in the database it is given, in the schema the
+role works in (`public` unless its search path says otherwise), so all the
+role needs is to be allowed to create tables there. The query string goes to the driver as it is, so
+`sslmode=require` and the like work; asyncpg's `ssl=`, as a Python
+configuration may have it, is taken as `sslmode=`. The password never reaches
+the log: the database is logged without it.
+
+PostgreSQL is in every published build. One compiled with
+`--no-default-features` leaves it out, about 2 MB smaller, and refuses a
+PostgreSQL connection string saying so.
 
 ## Reference
 
@@ -216,7 +230,7 @@ The broker the ingester reads the mesh from. Needed by `run` and `ingest`.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `connection_string` | string | `"sqlite:///packets.db"` | The database, in SQLAlchemy's form. See [connection strings](#database-connection-strings). |
+| `connection_string` | string | `"sqlite:///packets.db"` | The database, SQLite or PostgreSQL, in SQLAlchemy's form. See [connection strings](#database-connection-strings). |
 
 ### `[cleanup]`
 

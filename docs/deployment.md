@@ -34,8 +34,35 @@ SQLite in WAL mode shares memory between the processes using a database, which
 only works when they run **on the same machine**. Several `serve` processes and
 one `ingest` sharing a file on local disk is fine; the same file on a network
 filesystem is not, and will end up corrupted: never NFS, CephFS, SMB or any
-`ReadWriteMany` volume. Web servers spread over several machines will need
-PostgreSQL, which is planned but not supported yet.
+`ReadWriteMany` volume. Web servers spread over several machines need
+PostgreSQL.
+
+### PostgreSQL
+
+With PostgreSQL the roles are the same, and nothing ties them to one machine:
+the ingester and any number of web servers connect to the server wherever they
+run. The server, the role and an empty database are for you to create; the
+writer creates and migrates the tables, as with SQLite:
+
+```sh
+createuser meshview
+createdb -O meshview meshview
+```
+
+```toml
+[database]
+connection_string = "postgresql://meshview:secret@db.example/meshview?sslmode=require"
+```
+
+Each process keeps a few connections open: up to eight for reading, the web
+server's, and up to four for writing, the ingester's and the daily jobs'. A
+`run` takes both.
+
+What is said below about SQLite's files does not apply: there is no file to
+keep on one machine, nor any to leave tidy on stopping, and backing up is
+PostgreSQL's own business (see [Backups](#backups)). The daily cleanup's
+VACUUM, if asked for, leaves the space it frees for PostgreSQL to reuse rather
+than giving it back to the disk, as autovacuum does anyway.
 
 ## HTTPS
 
@@ -130,6 +157,10 @@ if it is the last to close and cannot remove them: the `sqlite3` shell, a script
 reading it, even read only. They are as harmless as the ones above.
 
 ## Backups
+
+With PostgreSQL, back the database up as any other, with `pg_dump` or the
+server's own continuous archiving: `meshview backup` is for SQLite, and says so.
+What follows is about SQLite.
 
 Meshview does not schedule backups: when, where to, how many to keep and how
 to get them off the machine are a backup system's job, and there are good ones.
