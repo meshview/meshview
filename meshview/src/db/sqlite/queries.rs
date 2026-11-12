@@ -521,3 +521,38 @@ pub async fn nodeinfo_payloads(pool: &SqlitePool, node_id: i64) -> Result<Vec<Op
     .await
     .context("reading a node's node info")
 }
+
+/// For each of these nodes, its latest position packet and its latest map
+/// report, each a lookup on the sender, port and time index: the node, the
+/// port, the time and the stored packet.
+pub async fn latest_positions(
+    pool: &SqlitePool,
+    node_ids: &[i64],
+) -> Result<Vec<(i64, i64, Option<i64>, Option<Vec<u8>>)>> {
+    let mut rows = Vec::new();
+    // Well under SQLite's limit on bound values.
+    for chunk in node_ids.chunks(500) {
+        let mut query = QueryBuilder::<Sqlite>::new(
+            "SELECT node.node_id, packet.portnum, packet.import_time_us, packet.payload \
+             FROM node JOIN packet ON packet.id IN (\
+               (SELECT id FROM packet WHERE from_node_id = node.node_id AND portnum = 3 \
+                ORDER BY import_time_us DESC LIMIT 1), \
+               (SELECT id FROM packet WHERE from_node_id = node.node_id AND portnum = 73 \
+                ORDER BY import_time_us DESC LIMIT 1)) \
+             WHERE node.node_id IN (",
+        );
+        let mut ids = query.separated(", ");
+        for id in chunk {
+            ids.push_bind(id);
+        }
+        query.push(")");
+        rows.extend(
+            query
+                .build_query_as::<(i64, i64, Option<i64>, Option<Vec<u8>>)>()
+                .fetch_all(pool)
+                .await
+                .context("reading the nodes' latest positions")?,
+        );
+    }
+    Ok(rows)
+}

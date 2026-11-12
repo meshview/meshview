@@ -618,6 +618,84 @@ async fn nodes_are_filtered_sorted_and_paged() {
     );
 }
 
+/// A position packet (port 3) or a map report (port 73) from a node, keeping
+/// so many bits of its position.
+async fn position(api: &Api, id: i64, node_id: i64, portnum: i32, bits: u32, at: i64) {
+    use meshview_proto::meshtastic::mesh_packet::PayloadVariant;
+    use meshview_proto::meshtastic::{Data, MapReport, MeshPacket, Position};
+    use prost::Message;
+
+    let payload = if portnum == 3 {
+        Position {
+            latitude_i: Some(423_000_000),
+            longitude_i: Some(-80_000_000),
+            precision_bits: bits,
+            ..Default::default()
+        }
+        .encode_to_vec()
+    } else {
+        MapReport {
+            latitude_i: 423_000_000,
+            longitude_i: -80_000_000,
+            position_precision: bits,
+            ..Default::default()
+        }
+        .encode_to_vec()
+    };
+    let packet = MeshPacket {
+        from: node_id as u32,
+        payload_variant: Some(PayloadVariant::Decoded(Data {
+            portnum,
+            payload,
+            ..Default::default()
+        })),
+        ..Default::default()
+    };
+    sqlx::query(
+        "INSERT INTO packet (id, portnum, from_node_id, payload, import_time_us) \
+         VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(id)
+    .bind(portnum)
+    .bind(node_id)
+    .bind(packet.encode_to_vec())
+    .bind(at)
+    .execute(&api.pool)
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn the_position_precision_comes_from_the_latest_position_only_when_asked() {
+    let api = api().await;
+    some_nodes(&api).await;
+    let now = now_us();
+    // Alfa: an older exact map report, then a position packet keeping 13 bits.
+    position(&api, 10, 1, 73, 32, now - 2_000_000).await;
+    position(&api, 11, 1, 3, 13, now - 1_000_000).await;
+    // Charlie: an older position at 16 bits, then a map report not saying.
+    position(&api, 12, 3, 3, 16, now - 2_000_000).await;
+    position(&api, 13, 3, 73, 0, now - 1_000_000).await;
+    // Bravo has no position, so none of its packets count.
+    position(&api, 14, 2, 3, 10, now).await;
+
+    let (status, body) = api
+        .get("/api/v1/nodes?sort=node_id&fields=position_precision")
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["nodes"],
+        json!([
+            {"node_id": 1, "position_precision": 13},
+            {"node_id": 2, "position_precision": null},
+            {"node_id": 3, "position_precision": null},
+        ])
+    );
+    // Not among every field: it takes reading the packets.
+    let (_, all) = api.get("/api/v1/nodes?node_id=1").await;
+    assert!(all["nodes"][0].get("position_precision").is_none());
+}
+
 #[tokio::test]
 async fn facets_count_the_nodes_by_field() {
     let api = api().await;

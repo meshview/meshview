@@ -113,6 +113,7 @@
     "legend_neighbor": "Vínculo de vecinos",
     "layer_nodes": "Nodos",
     "layer_packets_reach": "Alcance de paquetes",
+    "layer_position_precision": "Precisión de posición",
     "layer_traffic_heatmap": "Mapa de calor del tráfico",
     "map_layers": "Capas del mapa"
   },
@@ -748,6 +749,7 @@
     "Port Name": "Nombre del puerto",
     "Port {port}": "Puerto {port}",
     "Position": "Posición",
+    "Position Precision": "Precisión de posición",
     "Power": "Alimentación",
     "Power Stress": "Prueba de potencia",
     "Predicted coverage is not available on this server.": "La cobertura predicha no está disponible en este servidor.",

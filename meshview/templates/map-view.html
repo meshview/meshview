@@ -535,6 +535,9 @@ L.control.scale({
 var nodeLayer = L.layerGroup().addTo(map);
 var edgeLayer = L.layerGroup().addTo(map);
 var packetSeenLayer = L.layerGroup();
+// Under the nodes, so the dots stay on top of the areas around them.
+map.createPane("precisionPane").style.zIndex = 350;
+var precisionLayer = L.layerGroup();
 var trafficHeatLayer = L.heatLayer([], {
     radius: 34,
     blur: 18,
@@ -550,6 +553,7 @@ var trafficHeatLayer = L.heatLayer([], {
 var overlayLayers = {
     [MeshI18n.h("Nodes")]: nodeLayer,
     [MeshI18n.h("Packets Reach")]: packetSeenLayer,
+    [MeshI18n.h("Position Precision")]: precisionLayer,
     [MeshI18n.h("Traffic HeatMap")]: trafficHeatLayer
 };
 // Always folded: the choices are remembered, so it only needs opening to change them.
@@ -563,6 +567,7 @@ function updateMapLayerTranslations() {
     const layers = [
         [nodeLayer, mapTranslations.layer_nodes || MeshI18n.t("Nodes")],
         [packetSeenLayer, mapTranslations.layer_packets_reach || MeshI18n.t("Packets Reach")],
+        [precisionLayer, mapTranslations.layer_position_precision || MeshI18n.t("Position Precision")],
         [trafficHeatLayer, mapTranslations.layer_traffic_heatmap || MeshI18n.t("Traffic HeatMap")]
     ];
     layers.forEach(([layer, label]) => {
@@ -614,7 +619,7 @@ if (mapTools) {
 }
 // Remember the base map and overlay choices in this browser, like the filters.
 const MAP_LAYERS_KEY = "mapLayers";
-const mapLayerIds = new Map([[nodeLayer, "nodes"], [packetSeenLayer, "reach"], [trafficHeatLayer, "heat"]]);
+const mapLayerIds = new Map([[nodeLayer, "nodes"], [packetSeenLayer, "reach"], [precisionLayer, "precision"], [trafficHeatLayer, "heat"]]);
 function saveMapLayers() {
     const state = { base: Object.keys(baseLayers).find(name => map.hasLayer(baseLayers[name])) };
     mapLayerIds.forEach((id, layer) => { state[id] = map.hasLayer(layer); });
@@ -858,6 +863,7 @@ window.addEventListener("pageshow", event => {
 map.on("overlayadd", e => {
     if(e.layer === nodeLayer) updateNodeVisibility();
     if(e.layer === trafficHeatLayer) loadTrafficHeat();
+    if(e.layer === precisionLayer) loadPrecision();
 });
 
 map.on("overlayremove", e => {
@@ -982,6 +988,7 @@ fetch('/api/v1/nodes?days_active=3')
         if(map.hasLayer(trafficHeatLayer)){
             loadTrafficHeat();
         }
+        if(map.hasLayer(precisionLayer)) loadPrecision();
     })
     .catch(error => {
         console.error(error);
@@ -1168,9 +1175,10 @@ function highlightSelectedNode(id){
     selectedHalo?.remove();
     selectedMarker = selectedHalo = null;
     const marker = id == null ? null : markerById[id];
+    selectedMarker = marker || null;
+    drawPrecision();
     if(!marker) return;
     const primary = getComputedStyle(document.documentElement).getPropertyValue("--mesh-primary").trim() || "#1f5fae";
-    selectedMarker = marker;
     marker.setRadius(9);
     marker.setStyle({ color: primary, weight: 3 });
     marker.bringToFront();
@@ -1697,6 +1705,7 @@ function setChannelColor(channel, color){
         marker.originalColor = c;
         marker.setStyle(marker === selectedMarker ? { fillColor: c } : { fillColor: c, color: markerStroke(c) });
     });
+    drawPrecision();
 }
 
 // The color picker for a channel, under its dot: the palette's colors, any
@@ -1823,21 +1832,13 @@ function saveFiltersToLocalStorage(){
 
 function updateNodeVisibility(){
     clearPacketSeenHighlights();
+    drawPrecision();
     if(!map.hasLayer(nodeLayer)) return;
-
-    const routerOnly = document.getElementById("filter-routers-only").checked;
-    const mqttOnly = document.getElementById("filter-mqtt-only").checked;
-    const activeChannels = [...channelSet].filter(ch =>
-        document.getElementById(`filter-channel-${ch}`).checked
-    );
 
     nodes.forEach(n=>{
         const marker = markerById[n.key];
         if(marker){
-            const visible =
-                (!routerOnly || n.isRouter) &&
-                (!mqttOnly || n.is_mqtt_gateway) &&
-                activeChannels.includes(n.channel);
+            const visible = passesFilters(n);
 
             if(visible){
                 nodeLayer.addLayer(marker);
@@ -1846,6 +1847,59 @@ function updateNodeVisibility(){
                 nodeLayer.removeLayer(marker);
             }
         }
+    });
+}
+
+// Whether the filters let a node show.
+function passesFilters(n){
+    const routerOnly = document.getElementById("filter-routers-only").checked;
+    const mqttOnly = document.getElementById("filter-mqtt-only").checked;
+    const channel = n.channel && document.getElementById(`filter-channel-${n.channel}`);
+    return (!routerOnly || n.isRouter) && (!mqttOnly || n.is_mqtt_gateway) && !!channel?.checked;
+}
+
+/* ======================================================
+   POSITION PRECISION
+   ====================================================== */
+
+// A node that shares its position with fewer than 32 bits is somewhere in a
+// cell around it: a circle in its channel's color, of the radius Meshtastic's
+// apps draw, half the cell's height (about 2.9 km at 13 bits). With a node
+// selected, only its own, which is otherwise hard to tell where nodes crowd.
+// Read when the layer is first turned on.
+const precisionByNode = new Map();
+let precisionLoaded = null;
+function loadPrecision(){
+    precisionLoaded ??= fetch('/api/v1/nodes?days_active=3&has_position=true&fields=position_precision')
+        .then(r => { if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+        .then(data => {
+            precisionByNode.clear();
+            for(const n of data.nodes || []){
+                if(n.position_precision > 0 && n.position_precision < 32) precisionByNode.set(n.node_id, n.position_precision);
+            }
+            drawPrecision();
+        })
+        .catch(err => { precisionLoaded = null; console.error("Failed to load position precision:", err); });
+}
+
+function drawPrecision(){
+    precisionLayer.clearLayers();
+    if(!map.hasLayer(precisionLayer) || !precisionByNode.size) return;
+    nodes.forEach(n => {
+        const bits = precisionByNode.get(n.node_id);
+        if(!bits || isInvalidCoord(n) || !passesFilters(n)) return;
+        if(selectedMarker && markerById[n.key] !== selectedMarker) return;
+        const color = hashToColor(n.channel);
+        L.circle([n.lat, n.long], {
+            pane: "precisionPane",
+            radius: 2 ** (32 - bits) * 1e-7 * 111320 / 2,
+            color,
+            weight: 1,
+            opacity: .6,
+            fillColor: color,
+            fillOpacity: .1,
+            interactive: false
+        }).addTo(precisionLayer);
     });
 }
 

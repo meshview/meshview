@@ -99,6 +99,15 @@ impl Reader {
         sqlite::queries::nodeinfo_payloads(&self.pool, node_id).await
     }
 
+    /// The latest position packet and map report of each of these nodes: the
+    /// node, the port, the time and the stored packet, two rows at most for each.
+    pub async fn latest_positions(
+        &self,
+        node_ids: &[i64],
+    ) -> Result<Vec<(i64, i64, Option<i64>, Option<Vec<u8>>)>> {
+        sqlite::queries::latest_positions(&self.pool, node_ids).await
+    }
+
     /// How many nodes match a filter.
     pub async fn count_nodes(&self, filter: &NodeFilter) -> Result<i64> {
         sqlite::queries::count_nodes(&self.pool, filter).await
