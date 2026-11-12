@@ -114,6 +114,7 @@
     "layer_nodes": "Nodos",
     "layer_packets_reach": "Alcance de paquetes",
     "layer_position_precision": "Precisión de posición",
+    "layer_channel_utilization": "Utilización del canal",
     "layer_traffic_heatmap": "Mapa de calor del tráfico",
     "map_layers": "Capas del mapa"
   },

@@ -12,7 +12,7 @@
 use meshview_proto::meshtastic::mesh_packet::PayloadVariant;
 use meshview_proto::meshtastic::{
     MapReport, MeshPacket, NeighborInfo, PortNum, Position, RouteDiscovery, Routing, StatusMessage,
-    StoreAndForward, Telemetry, User, Waypoint, routing, store_and_forward,
+    StoreAndForward, Telemetry, User, Waypoint, routing, store_and_forward, telemetry,
 };
 use meshview_proto::{text_format, wire};
 
@@ -145,6 +145,24 @@ pub fn position_precision(payload: &[u8]) -> Option<u32> {
         _ => return None,
     };
     (bits > 0).then_some(bits.min(32))
+}
+
+/// The channel utilization and the transmit air utilization, in percent, that a
+/// stored telemetry packet reports, or `None` when it is not device telemetry
+/// with the channel utilization.
+pub fn channel_utilization(payload: &[u8]) -> Option<(f32, Option<f32>)> {
+    let packet: MeshPacket = wire::decode("meshtastic.MeshPacket", payload)?;
+    let Some(PayloadVariant::Decoded(data)) = packet.payload_variant else {
+        return None;
+    };
+    if data.portnum != PortNum::TelemetryApp as i32 {
+        return None;
+    }
+    let telemetry: Telemetry = wire::decode("meshtastic.Telemetry", &data.payload)?;
+    let Some(telemetry::Variant::DeviceMetrics(metrics)) = telemetry.variant else {
+        return None;
+    };
+    Some((metrics.channel_utilization?, metrics.air_util_tx))
 }
 
 /// An enum value's name, or `unknown(N)`.

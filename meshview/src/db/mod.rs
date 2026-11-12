@@ -108,6 +108,15 @@ impl Reader {
         sqlite::queries::latest_positions(&self.pool, node_ids).await
     }
 
+    /// The telemetry packets heard since a time, the latest first: the sender
+    /// and the stored packet.
+    pub async fn telemetry_since(
+        &self,
+        since_us: i64,
+    ) -> Result<Vec<(Option<i64>, Option<Vec<u8>>)>> {
+        sqlite::queries::telemetry_since(&self.pool, since_us).await
+    }
+
     /// How many nodes match a filter.
     pub async fn count_nodes(&self, filter: &NodeFilter) -> Result<i64> {
         sqlite::queries::count_nodes(&self.pool, filter).await

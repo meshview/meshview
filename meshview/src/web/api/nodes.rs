@@ -35,9 +35,16 @@ const FIELDS: [&str; 14] = [
     "last_seen_us",
 ];
 
-/// A field worked out from the node's latest position packets, so only
-/// answered when `fields` asks for it.
+/// Fields worked out from the node's packets rather than kept with it, so only
+/// answered when `fields` asks for them.
 const PRECISION: &str = "position_precision";
+const CHANNEL_UTILIZATION: &str = "channel_utilization";
+const AIR_UTIL_TX: &str = "air_util_tx";
+const WORKED_OUT: [&str; 3] = [PRECISION, CHANNEL_UTILIZATION, AIR_UTIL_TX];
+
+/// How far back the utilization is looked for: nodes send their device
+/// telemetry every half hour unless set otherwise.
+const UTILIZATION_WINDOW_US: i64 = 2 * 3_600 * 1_000_000;
 
 const PAGE_MAX: i64 = 1000;
 const IDS_MAX: usize = 500;
@@ -191,6 +198,15 @@ pub struct NodeDoc {
     /// way. Null when neither is stored, or it does not say.
     #[schema(example = 13)]
     position_precision: Option<u32>,
+    /// Only when `fields` asks for it: the share of time the node heard the
+    /// channel busy, in percent, from its latest device telemetry in the latest
+    /// two hours. Null without one.
+    #[schema(example = 18.5)]
+    channel_utilization: Option<f32>,
+    /// Only when `fields` asks for it: the share of time the node transmitted,
+    /// in percent, from the same telemetry. Null without it.
+    #[schema(example = 2.1)]
+    air_util_tx: Option<f32>,
 }
 
 /// A page of nodes, or all of them.
@@ -246,7 +262,7 @@ pub struct Nodes {
         ("sort" = Option<String>, Query, description = "The field to sort by, `-` in front for descending: `short_name`, `long_name`, `hw_model`, `firmware`, `role`, `channel`, `last_lat`, `last_long`, `last_altitude`, `is_mqtt_gateway`, `first_seen_us`, `last_seen_us` or `node_id`. Default: by short name."),
         ("limit" = Option<i64>, Query, description = "Page size, 1 to 1000; beyond those, the nearest. Default: every node."),
         ("offset" = Option<i64>, Query, description = "Nodes to skip. Default 0."),
-        ("fields" = Option<String>, Query, description = "Only these fields, comma separated; `node_id` always comes. `position_precision` comes only when asked for here."),
+        ("fields" = Option<String>, Query, description = "Only these fields, comma separated; `node_id` always comes. `position_precision`, `channel_utilization` and `air_util_tx` come only when asked for here."),
     ),
     responses(
         (status = 200, description = "The nodes", body = Nodes, example = json!({
@@ -289,11 +305,12 @@ pub async fn nodes(State(state): State<AppState>, params: Params) -> Result<Json
         Some(items) => {
             if items
                 .iter()
-                .any(|item| !FIELDS.contains(item) && *item != PRECISION)
+                .any(|item| !FIELDS.contains(item) && !WORKED_OUT.contains(item))
             {
                 return Err(ApiError::bad_request(format!(
-                    "fields must be a comma-separated list of: {}, {PRECISION}",
-                    FIELDS.join(", ")
+                    "fields must be a comma-separated list of: {}, {}",
+                    FIELDS.join(", "),
+                    WORKED_OUT.join(", ")
                 )));
             }
             Some(items.into_iter().map(str::to_string).collect::<Vec<_>>())
@@ -317,11 +334,18 @@ pub async fn nodes(State(state): State<AppState>, params: Params) -> Result<Json
         None
     };
 
-    let precision = if fields
-        .as_ref()
-        .is_some_and(|fields| fields.iter().any(|f| f == PRECISION))
-    {
+    let asked = |key: &str| {
+        fields
+            .as_ref()
+            .is_some_and(|fields| fields.iter().any(|f| f == key))
+    };
+    let precision = if asked(PRECISION) {
         Some(precisions(db, &rows).await.map_err(failed)?)
+    } else {
+        None
+    };
+    let utilization = if asked(CHANNEL_UTILIZATION) || asked(AIR_UTIL_TX) {
+        Some(utilizations(db).await.map_err(failed)?)
     } else {
         None
     };
@@ -346,6 +370,21 @@ pub async fn nodes(State(state): State<AppState>, params: Params) -> Result<Json
                     PRECISION.to_string(),
                     json!(node_id.and_then(|id| precision.get(&id))),
                 );
+            }
+            if let Some(utilization) = &utilization {
+                let latest = node_id.and_then(|id| utilization.get(&id));
+                if asked(CHANNEL_UTILIZATION) {
+                    fields.insert(
+                        CHANNEL_UTILIZATION.to_string(),
+                        json!(latest.map(|(channel, _)| percent(*channel))),
+                    );
+                }
+                if asked(AIR_UTIL_TX) {
+                    fields.insert(
+                        AIR_UTIL_TX.to_string(),
+                        json!(latest.and_then(|(_, air)| air.map(percent))),
+                    );
+                }
             }
             Value::Object(fields)
         })
@@ -380,6 +419,30 @@ async fn precisions(db: &Reader, nodes: &[Node]) -> anyhow::Result<HashMap<i64, 
             Some((node_id, decode::position_precision(&payload?)?))
         })
         .collect())
+}
+
+/// A percentage as the node sent it, to two decimals: a float32 of 18.3 would
+/// otherwise come out as 18.299999237060547.
+fn percent(value: f32) -> f64 {
+    (f64::from(value) * 100.0).round() / 100.0
+}
+
+/// Each node's latest channel and transmit air utilization, from the device
+/// telemetry it sent in the window.
+async fn utilizations(db: &Reader) -> anyhow::Result<HashMap<i64, (f32, Option<f32>)>> {
+    let mut latest = HashMap::new();
+    for (node_id, payload) in db.telemetry_since(now_us() - UTILIZATION_WINDOW_US).await? {
+        let (Some(node_id), Some(payload)) = (node_id, payload) else {
+            continue;
+        };
+        if latest.contains_key(&node_id) {
+            continue;
+        }
+        if let Some(utilization) = decode::channel_utilization(&payload) {
+            latest.insert(node_id, utilization);
+        }
+    }
+    Ok(latest)
 }
 
 #[derive(Debug, Serialize, ToSchema)]

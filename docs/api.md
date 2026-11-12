@@ -84,6 +84,7 @@ for changing in a future version instead.
 | `/api/v1/nodes` when the database fails | `{"nodes": []}`, as if there were none | 500, `{"error": "Failed to fetch nodes"}`. |
 | `/api/v1/nodes` with a `node_id` or `days_active` too large | An empty list without paging, a 500 with it | No nodes; or, for `days_active`, every node. |
 | `/api/v1/nodes` `position_precision` | Not there | The bits its latest position keeps, for the map's position precision layer. Only when `fields` asks for it, as it takes reading the node's latest position packets. |
+| `/api/v1/nodes` `channel_utilization` and `air_util_tx` | Not there | From the node's latest device telemetry in the latest two hours, for the map's channel utilization layer. Only when `fields` asks for them, as they take reading the telemetry packets. |
 | `/api/v1/packets?contains=` outside text messages | `%` and `_` are wildcards: `contains=%` matches every packet | Taken literally, as the parameter is documented: a substring. Text messages (`portnum=1`) were searched literally already. |
 | `/api/v1/packets` with a packet whose port or payload is null | 500 for the whole page | The packet, with a null `portnum`, or `Did not decode`. |
 | `/api/v1/packets` `payload` of waypoints (port 8), node statuses (36) and store and forward (65) | `Did not decode` | Decoded, in the protobuf text format. A waypoint sent to one node, and store and forward replaying a message from history, which can be a direct one, are `<redacted>`, as a direct text message is. |
