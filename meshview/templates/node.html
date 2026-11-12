@@ -363,40 +363,26 @@ function applyTranslationsNode(dict, root=document) {
    ====================================================== */
 
 function makeNodePopup(node) {
+    const id = Number(node.node_id);
+    const hex = Number.isInteger(id) ? ` (!${id.toString(16).padStart(8, "0")})` : "";
+    // A row only for what the node has told us; firmware, above all, seldom comes.
+    const rows = [
+        ["node_id", "Node ID", `${escapeHtml(node.node_id)}${hex}`],
+        ["hw_model", "HW Model", node.hw_model && escapeHtml(node.hw_model)],
+        ["channel", "Channel", node.channel && escapeHtml(node.channel)],
+        ["role", "Role", node.role && escapeHtml(node.role)],
+        ["firmware", "Firmware", node.firmware && escapeHtml(node.firmware)],
+        ["last_update", "Last Update", node.last_seen_us && formatLastSeen(node.last_seen_us)],
+        ["first_update", "First Update", node.first_seen_us && formatLastSeen(node.first_seen_us)],
+    ].filter(([, , value]) => value).map(([key, fallback, value]) =>
+        `<b><span data-translate-lang="${key}">${nodeTranslations[key] || MeshI18n.t(fallback)}:</span></b> ${value}`);
     return `
         <div style="font-size:0.9em">
             <a href="/node/${node.node_id}" style="color:inherit; text-decoration:underline;">
                 <b>${escapeHtml(node.long_name || node.short_name || node.node_id)}</b>
             </a>
             ${node.short_name ? ` (${escapeHtml(node.short_name)})` : ""}<br>
-
-            <b><span data-translate-lang="node_id">
-                ${nodeTranslations.node_id || MeshI18n.t("Node ID")}:
-            </span></b> ${node.node_id}<br>
-
-            <b><span data-translate-lang="hw_model">
-                ${nodeTranslations.hw_model || MeshI18n.t("HW Model")}:
-            </span></b> ${escapeHtml(node.hw_model ?? "—")}<br>
-
-            <b><span data-translate-lang="channel">
-                ${nodeTranslations.channel || MeshI18n.t("Channel")}:
-            </span></b> ${escapeHtml(node.channel ?? "—")}<br>
-
-            <b><span data-translate-lang="role">
-                ${nodeTranslations.role || MeshI18n.t("Role")}:
-            </span></b> ${escapeHtml(node.role ?? "—")}<br>
-
-            <b><span data-translate-lang="firmware">
-                ${nodeTranslations.firmware || MeshI18n.t("Firmware")}:
-            </span></b> ${escapeHtml(node.firmware ?? "—")}<br>
-
-            <b><span data-translate-lang="last_update">
-                ${nodeTranslations.last_update || MeshI18n.t("Last Update")}:
-            </span></b> ${formatLastSeen(node.last_seen_us)}
-            <br>
-            <b><span data-translate-lang="first_update">
-                ${nodeTranslations.first_update || MeshI18n.t("First Update")}:
-            </span></b> ${formatLastSeen(node.first_seen_us)}
+            ${rows.join("<br>")}
         </div>
     `;
 }
