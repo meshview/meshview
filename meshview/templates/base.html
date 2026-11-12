@@ -218,7 +218,7 @@ body { min-height:100dvh; display:flex; flex-direction:column; }
 .mesh-about { width:min(480px, calc(100vw - 32px)); }
 .mesh-about .mesh-dialog-close { position:absolute; top:10px; right:10px; }
 .mesh-about-body { overflow:auto; padding:28px 28px 24px; text-align:center; font-size:14px; line-height:1.55; }
-.mesh-about-body img { display:block; margin:0 auto 10px; }
+.mesh-about-body > img { display:block; margin:0 auto 10px; }
 .mesh-about-body h2 { margin:0; font-size:22px; font-weight:650; }
 .mesh-about-body p { margin:0 0 14px; }
 .mesh-about-body .mesh-about-version { margin-bottom:16px; color:var(--mesh-muted); font-size:13px; }
@@ -231,6 +231,8 @@ body { min-height:100dvh; display:flex; flex-direction:column; }
 .mesh-about-small a:hover { color:var(--mesh-primary); text-decoration:underline; }
 .mesh-about-heart { color:#d93848; }
 .mesh-about-name { white-space:nowrap; }
+/* Flags as pictures: emoji flags do not show on Windows. */
+.mesh-about-flag { display:inline; height:.95em; width:auto; vertical-align:-.12em; border-radius:1.5px; }
 @media(max-width:420px) { .mesh-about-links { grid-template-columns:1fr; } }
 .mesh-page-heading { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:10px; }
 .mesh-eyebrow { font-size:10px; letter-spacing:1.6px; font-weight:700; color:var(--mesh-primary); }
