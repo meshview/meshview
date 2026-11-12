@@ -207,6 +207,8 @@ fn tera(config: &Config) -> anyhow::Result<Tera> {
         "preview_image",
         &preview_image(&config.site.domain, Preview::Site),
     );
+    // The site's picture, wide; a node's, small beside its details.
+    globals.insert("preview_small", &false);
     globals.insert("map_tiles", &map_tiles);
     let build = super::api::version::current();
     globals.insert("build_version", build.version);
@@ -354,6 +356,7 @@ fn render(config: &Config) -> anyhow::Result<Rendered> {
         "preview_image",
         &preview_image(&config.site.domain, Preview::Node),
     );
+    context.insert("preview_small", &true);
     context.insert("preview_description", DESCRIPTION_MARK);
     let marked = tera
         .render("node.html", &context)
@@ -648,6 +651,11 @@ mod tests {
         assert!(page.contains(r#"<meta property="og:site_name" content="Galicia Mesh">"#));
         assert!(plain.contains("/og-instance.png"));
         assert!(page.contains("/og-instance-node.png"));
+        // The site's picture wide, a node's small beside its details.
+        assert!(plain.contains(r#"<meta name="twitter:card" content="summary_large_image">"#));
+        assert!(plain.contains(r#"<meta property="og:image:width" content="1200">"#));
+        assert!(page.contains(r#"<meta name="twitter:card" content="summary">"#));
+        assert!(page.contains(r#"<meta property="og:image:width" content="600">"#));
     }
 
     #[test]

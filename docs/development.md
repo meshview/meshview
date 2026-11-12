@@ -153,7 +153,9 @@ is rendered once, at start. They began as the Python version's Jinja templates,
 converted, and are developed here now. The node page is the one exception, and
 only in its link preview: the apps that show one do not run scripts, so the
 node's name and details go into its `og:` tags as the page is answered, in the
-places a second rendering at start finds for them.
+places a second rendering at start finds for them. Its picture is a small
+square, 600×600, with a `summary` card, so that the apps show it beside the
+node's details rather than above them, as they do the site's, 1200×630.
 
 A few templates are not pages but parts the pages include: the node page's
 coverage help (`coverage-help.html`), the map's dot borders

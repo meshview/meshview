@@ -13,10 +13,16 @@
     {% if preview_description %}<meta property="og:description" content="{{ preview_description }}">{% endif %}
     <meta property="og:image" content="{{ preview_image }}">
     <meta property="og:image:type" content="image/png">
+    {% if preview_small %}
+    <meta property="og:image:width" content="600">
+    <meta property="og:image:height" content="600">
+    {% else %}
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
+    {% endif %}
     <meta property="og:image:alt" content="Meshview">
-    <meta name="twitter:card" content="summary_large_image">
+    <!-- A small picture beside the words where they are what matters, a node's. -->
+    <meta name="twitter:card" content="{% if preview_small %}summary{% else %}summary_large_image{% endif %}">
 
     <link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48 64x64 256x256" href="/static/favicon.ico">
     <link rel="icon" type="image/svg+xml" sizes="any" href="/static/meshview-icon.svg">
