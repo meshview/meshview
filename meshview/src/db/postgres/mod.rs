@@ -11,6 +11,8 @@
 //! only its tables: the server, the role and the database are the
 //! administrator's.
 
+pub mod queries;
+
 use super::{Compatibility, Schema};
 use anyhow::{Context, Result, bail};
 use sqlx::migrate::Migrator;

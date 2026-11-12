@@ -453,10 +453,12 @@ pub async fn packets(pool: &SqlitePool, packets: &PacketQuery) -> Result<Vec<Pac
             .push_bind(before);
     }
     if let Some(contains) = &packets.contains {
+        // instr() goes through every byte; LIKE would stop at the first zero,
+        // which in a protobuf is usually a few bytes in.
         query
-            .push(" AND lower(CAST(packet.payload AS TEXT)) LIKE '%' || ")
-            .push_bind(like_literal(&contains.to_lowercase()))
-            .push(" || '%' ESCAPE '/' AND (packet.portnum != 1 OR packet.to_node_id = ")
+            .push(" AND instr(lower(CAST(packet.payload AS TEXT)), ")
+            .push_bind(contains.to_lowercase())
+            .push(") > 0 AND (packet.portnum != 1 OR packet.to_node_id = ")
             .push_bind(crate::decode::BROADCAST)
             .push(")");
     }
@@ -581,7 +583,7 @@ pub async fn packets_by_channel(
     since_us: i64,
 ) -> Result<Vec<(Option<String>, bool, i64)>> {
     sqlx::query_as(
-        "SELECT channel, to_node_id = ? AS broadcast, count(id) FROM packet \
+        "SELECT channel, coalesce(to_node_id = ?, 0) AS broadcast, count(id) FROM packet \
          WHERE import_time_us >= ? AND portnum IS NOT 73 \
          GROUP BY channel, broadcast ORDER BY channel, broadcast",
     )
