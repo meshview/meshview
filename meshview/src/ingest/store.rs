@@ -70,7 +70,16 @@ pub struct Store {
 
 impl Store {
     /// Takes the writer pool, and loads the gateways already marked.
-    pub async fn new(pool: SqlitePool) -> Result<Self> {
+    pub async fn new(pool: impl Into<crate::db::Pool>) -> Result<Self> {
+        // Only until PostgreSQL has its own; without it there is only SQLite.
+        #[allow(clippy::infallible_destructuring_match)]
+        let pool = match pool.into() {
+            crate::db::Pool::Sqlite(pool) => pool,
+            #[cfg(feature = "postgres")]
+            crate::db::Pool::Postgres(_) => {
+                anyhow::bail!("storing packets in PostgreSQL is not written yet")
+            }
+        };
         let gateways: Vec<i64> =
             sqlx::query_scalar("SELECT node_id FROM node WHERE is_mqtt_gateway = 1")
                 .fetch_all(&pool)

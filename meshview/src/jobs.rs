@@ -106,7 +106,21 @@ impl Settings {
 /// A job interrupted by the stop is abandoned where it was, which rolls its
 /// transaction back: its run stays recorded as running, and the next start marks
 /// it interrupted.
-pub async fn run(settings: Settings, pool: SqlitePool, mut stopping: watch::Receiver<bool>) {
+pub async fn run(
+    settings: Settings,
+    pool: impl Into<crate::db::Pool>,
+    mut stopping: watch::Receiver<bool>,
+) {
+    // Only until PostgreSQL has its own; without it there is only SQLite.
+    #[allow(clippy::infallible_destructuring_match)]
+    let pool = match pool.into() {
+        crate::db::Pool::Sqlite(pool) => pool,
+        #[cfg(feature = "postgres")]
+        crate::db::Pool::Postgres(_) => {
+            tracing::warn!("the daily jobs on PostgreSQL are not written yet");
+            return;
+        }
+    };
     if let Err(e) = mark_interrupted(&pool).await {
         error!("could not tidy up the job runs of a previous start: {e:#}");
     }

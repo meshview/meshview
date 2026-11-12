@@ -7,6 +7,9 @@
 // Each test crate uses its own part of this.
 #![allow(dead_code)]
 
+#[cfg(feature = "postgres")]
+pub mod postgres;
+
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::{Connection, Row, SqliteConnection};
 use std::path::Path;

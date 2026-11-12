@@ -37,8 +37,8 @@ rust-embed = { version = "8", features = ["mime-guess"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# SQLite only for now. PostgreSQL is meant to arrive as a second backend behind
-# the same interface, which is why everything SQLite specific lives in db::sqlite.
+# SQLite always; PostgreSQL with the `postgres` feature below, which adds its
+# driver and TLS for it.
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "tls-none", "sqlite", "macros", "migrate"] }
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 tera = { version = "2.4", features = ["preserve_order"] }
@@ -52,6 +52,14 @@ utoipa-scalar = { version = "0.4", features = ["axum"] }
 # The roots are compiled in rather than read from the system, which is what lets
 # the image ship without ca-certificates.
 webpki-roots = "1"
+
+[features]
+default = ["postgres"]
+# PostgreSQL, as a second database beside SQLite: its own module, db::postgres,
+# and sqlx's driver for it, with TLS through rustls and the same compiled in
+# roots as MQTT. Without it the binary is about 2 MB smaller and refuses a
+# postgresql:// connection string, saying this build has no PostgreSQL.
+postgres = ["sqlx/postgres", "sqlx/tls-rustls-ring-webpki"]
 
 [dev-dependencies]
 tempfile = "3"

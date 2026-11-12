@@ -20,6 +20,7 @@
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 use toml::{Table, Value};
@@ -499,10 +500,43 @@ fn coerce(raw: &str, expected: Option<&Value>) -> Result<Value> {
 }
 
 /// Which database, and where.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum DatabaseUrl {
     /// A SQLite file.
     Sqlite(PathBuf),
+    /// A PostgreSQL database, as a `postgresql://` URL the driver takes.
+    Postgres(String),
+}
+
+impl fmt::Debug for DatabaseUrl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Sqlite(path) => f.debug_tuple("Sqlite").field(path).finish(),
+            Self::Postgres(_) => f.debug_tuple("Postgres").field(&self.to_string()).finish(),
+        }
+    }
+}
+
+/// The database as it can be logged: a SQLite path, or a PostgreSQL URL with
+/// its password left out.
+impl fmt::Display for DatabaseUrl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Sqlite(path) => write!(f, "{}", path.display()),
+            Self::Postgres(url) => {
+                let Some((scheme, rest)) = url.split_once("://") else {
+                    return f.write_str(url);
+                };
+                match rest.split_once('@') {
+                    Some((user, host)) => {
+                        let user = user.split(':').next().unwrap_or(user);
+                        write!(f, "{scheme}://{user}@{host}")
+                    }
+                    None => f.write_str(url),
+                }
+            }
+        }
+    }
 }
 
 impl DatabaseUrl {
@@ -513,6 +547,12 @@ impl DatabaseUrl {
     /// three slashes and then the path. The driver name after a `+`, such as the
     /// `aiosqlite` in `sqlite+aiosqlite:///packets.db`, means nothing here and is
     /// accepted and ignored, and so is a query string.
+    ///
+    /// PostgreSQL comes as `postgresql://user:password@host:port/database`,
+    /// with or without a driver (`postgresql+asyncpg://`, the Python version's),
+    /// and is handed to the driver as `postgresql://`. asyncpg's `ssl=` is the
+    /// driver's `sslmode=`, and is renamed; anything else in the query string
+    /// goes through as it is.
     pub fn parse(value: &str) -> Result<Self> {
         let Some((scheme, rest)) = value.split_once("://") else {
             bail!("[database] connection_string is not a URL: {value}");
@@ -534,10 +574,42 @@ impl DatabaseUrl {
                 Ok(Self::Sqlite(PathBuf::from(path)))
             }
             "postgresql" | "postgres" => {
-                bail!("PostgreSQL is not supported yet; use a SQLite connection string")
+                let (location, query) = match rest.split_once('?') {
+                    Some((location, query)) => (location, Some(query)),
+                    None => (rest, None),
+                };
+                if location.is_empty() {
+                    bail!("[database] connection_string has to name a PostgreSQL server: {value}");
+                }
+                let mut url = format!("postgresql://{location}");
+                if let Some(query) = query {
+                    let params: Vec<String> = query
+                        .split('&')
+                        .filter(|param| !param.is_empty())
+                        .map(|param| match param.split_once('=') {
+                            Some(("ssl", mode)) => format!("sslmode={}", ssl_mode(mode)),
+                            _ => param.to_string(),
+                        })
+                        .collect();
+                    if !params.is_empty() {
+                        url.push('?');
+                        url.push_str(&params.join("&"));
+                    }
+                }
+                Ok(Self::Postgres(url))
             }
             _ => bail!("[database] connection_string names an unknown database: {value}"),
         }
+    }
+}
+
+/// asyncpg's `ssl` values as the driver's `sslmode`: its booleans, and the
+/// modes, which are the same words.
+fn ssl_mode(value: &str) -> &str {
+    match value {
+        "true" | "True" => "require",
+        "false" | "False" => "disable",
+        mode => mode,
     }
 }
 
@@ -803,7 +875,28 @@ mod tests {
         );
         assert!(DatabaseUrl::parse("sqlite://packets.db").is_err());
         assert!(DatabaseUrl::parse("sqlite:///:memory:").is_err());
-        assert!(DatabaseUrl::parse("postgresql+asyncpg://u:p@h/db").is_err());
+        let postgres = |value| match DatabaseUrl::parse(value).unwrap() {
+            DatabaseUrl::Postgres(url) => url,
+            other => panic!("{other:?}"),
+        };
+        assert_eq!(
+            postgres("postgresql+asyncpg://u:p@h:5432/db"),
+            "postgresql://u:p@h:5432/db"
+        );
+        assert_eq!(postgres("postgres://u@h/db"), "postgresql://u@h/db");
+        assert_eq!(
+            postgres("postgresql+asyncpg://u:p@h/db?ssl=require&application_name=mv"),
+            "postgresql://u:p@h/db?sslmode=require&application_name=mv"
+        );
+        assert_eq!(
+            postgres("postgresql://h/db?ssl=true"),
+            "postgresql://h/db?sslmode=require"
+        );
+        assert!(DatabaseUrl::parse("postgresql://").is_err());
+        // Never the password where it could be logged.
+        let url = DatabaseUrl::parse("postgresql+asyncpg://u:secret@h/db").unwrap();
+        assert_eq!(url.to_string(), "postgresql://u@h/db");
+        assert!(!format!("{url:?}").contains("secret"));
         assert!(DatabaseUrl::parse("packets.db").is_err());
     }
 }
