@@ -173,7 +173,9 @@ version is a new folder, never new contents in an old one.
 
 ## CI
 
-Every push to `master` and every pull request runs, in `.github/workflows/ci.yml`:
+Every push to `master` and every pull request runs, in `.github/workflows/ci.yml`,
+unless it only changes documentation (the READMEs and `docs/`, but for
+`docs/configuration.md`, which a test checks against the code):
 
 | Job | |
 |---|---|
