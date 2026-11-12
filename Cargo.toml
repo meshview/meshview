@@ -9,7 +9,7 @@ members = ["longley-rice", "meshview-proto", "meshview"]
 resolver = "3"
 
 [workspace.package]
-version = "0.1.0-dev"
+version = "5.0.0-dev"
 edition = "2024"
 # The Python Meshview this is a port of is AGPL-3.0, and so is this.
 license = "AGPL-3.0-or-later"

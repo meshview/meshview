@@ -33,7 +33,7 @@ pub struct Health {
     #[schema(example = "2026-11-11T10:20:30.123456+00:00")]
     pub timestamp: String,
     /// Meshview's version.
-    #[schema(example = "0.1.0")]
+    #[schema(example = "5.0.0")]
     pub version: &'static str,
     /// The commit this was built from, shortened.
     #[schema(example = "c43c989")]
@@ -168,7 +168,7 @@ async fn database_size(config: &Config, db: Option<&Reader>) -> Option<u64> {
         (status = 200, description = "Healthy", body = Health, example = json!({
             "status": "healthy",
             "timestamp": "2026-11-11T16:01:22.553357+00:00",
-            "version": "0.1.0",
+            "version": "5.0.0",
             "git_revision": "c43c989",
             "cleanup": {
                 "days_to_keep": 14,

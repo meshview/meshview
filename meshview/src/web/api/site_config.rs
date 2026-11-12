@@ -165,7 +165,7 @@ pub struct Site {
     #[schema(example = "#BayMeshNet")]
     pub net_tag: String,
     /// Meshview's version.
-    #[schema(example = "0.1.0")]
+    #[schema(example = "5.0.0")]
     pub version: &'static str,
 }
 
