@@ -295,6 +295,25 @@ a.mesh-inspector-packet:hover { background:var(--mesh-hover); }
 .node-picker-item { display:grid; grid-template-columns:10px minmax(0,1fr) auto; align-items:center; gap:9px; width:100%; min-height:40px; padding:6px 8px; border:0; border-radius:6px; background:transparent; color:var(--mesh-text); font-size:13px; line-height:1.3; text-align:left; cursor:pointer; }
 .node-picker-item:hover, .node-picker-item:focus-visible { background:var(--mesh-hover); }
 .node-picker-item:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:-2px; }
+/* On the map page a channel's dot is a button for its color: larger, with a
+   touch area beyond it, so as not to tick the channel by mistake. */
+button.map-filter-dot { position:relative; width:12px; height:12px; padding:0; border:0; cursor:pointer; }
+button.map-filter-dot::before { content:""; position:absolute; inset:-7px; }
+button.map-filter-dot:hover,button.map-filter-dot[aria-expanded="true"] { box-shadow:inset 0 0 0 1px rgba(0,0,0,.18), 0 0 0 2px var(--mesh-surface), 0 0 0 3px var(--mesh-muted); }
+button.map-filter-dot:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:3px; }
+.map-color-popover { position:fixed; z-index:2000; padding:10px; background:var(--mesh-surface); color:var(--mesh-text); border:1px solid var(--mesh-border); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,.18); font-size:12px; }
+.map-color-swatches { display:grid; grid-template-columns:repeat(6,26px); gap:7px; }
+.map-color-swatch { width:26px; height:26px; padding:0; border:0; border-radius:50%; background:var(--swatch); box-shadow:inset 0 0 0 1px rgba(0,0,0,.18); cursor:pointer; transition:transform .1s ease; }
+.map-color-swatch:hover { transform:scale(1.12); }
+.map-color-swatch[aria-pressed="true"] { box-shadow:inset 0 0 0 1px rgba(0,0,0,.18), 0 0 0 2px var(--mesh-surface), 0 0 0 4px var(--mesh-text); }
+.map-color-swatch:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:4px; }
+.map-color-actions { position:relative; display:flex; flex-direction:column; gap:2px; margin-top:10px; padding-top:8px; border-top:1px solid var(--mesh-border); }
+.map-color-actions button { display:flex; align-items:center; gap:8px; padding:6px 8px; border:0; border-radius:6px; background:none; color:var(--mesh-text); font:inherit; text-align:left; cursor:pointer; }
+.map-color-actions button:hover { background:var(--mesh-soft); }
+.map-color-actions button:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:-2px; }
+.map-color-actions .ti { font-size:15px; color:var(--mesh-primary); }
+.map-color-input { position:absolute; left:8px; bottom:0; width:1px; height:1px; padding:0; border:0; opacity:0; pointer-events:none; }
+@media (prefers-reduced-motion: reduce) { .map-color-swatch { transition:none; } }
 .node-picker-dot { width:10px; height:10px; border-radius:50%; background:var(--node-color); box-shadow:0 0 0 1px #fff, 0 0 0 2px rgba(0,0,0,.18); }
 .node-picker-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .node-picker-name strong { font-weight:600; margin-right:6px; }
@@ -646,6 +665,19 @@ const palette = ["#18aa18","#976049","#a5508c","#1898dc","#3a8846","#dc1884",
 
 const channelColorOverrides = new Map();
 
+// The colors a visitor chose for channels on the map page, kept in this
+// browser and followed by every map. Only plain #rrggbb colors are taken from
+// storage, so nothing else reaches the styles.
+const CHANNEL_COLORS_KEY = "mapChannelColors";
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+const customChannelColors = new Map();
+try {
+    const saved = JSON.parse(localStorage.getItem(CHANNEL_COLORS_KEY) || "{}");
+    for(const [channel, color] of Object.entries(saved && typeof saved === "object" ? saved : {})){
+        if(typeof color === "string" && HEX_COLOR.test(color)) customChannelColors.set(channel, color.toLowerCase());
+    }
+} catch (_) { /* storage unavailable or damaged */ }
+
 const colorMap = new Map();
 const channelSet = new Set();
 
@@ -670,10 +702,16 @@ function hashToColor(str){
     const channel = String(str || MeshI18n.t("Unknown"));
     if(colorMap.has(channel)) return colorMap.get(channel);
 
-    const override = channelColorOverrides.get(normalizeChannelName(channel));
-    const c = override || palette[Math.floor(hashToUnit(channel) * palette.length) % palette.length];
+    const c = customChannelColors.get(channel) || defaultChannelColor(channel);
     colorMap.set(channel,c);
     return c;
+}
+
+// A channel's color unless the visitor chose another: the one configured for
+// it, or one of the palette's.
+function defaultChannelColor(channel){
+    return channelColorOverrides.get(normalizeChannelName(channel)) ||
+        palette[Math.floor(hashToUnit(channel) * palette.length) % palette.length];
 }
 
 function hashToUnit(str){
@@ -1598,9 +1636,22 @@ function createChannelFilters(){
         // One pill per channel: checkbox, channel color dot and name stay together.
         const label=document.createElement("label");
         label.className="map-filter";
-        const dot=document.createElement("span");
+        // On the map page the dot also picks the channel's color.
+        const dot=document.createElement(CHANNEL_COLORS_EDITABLE ? "button" : "span");
         dot.className="map-filter-dot";
+        dot.dataset.channel=channel;
         dot.style.setProperty("--chip-color", hashToColor(channel));
+        if(CHANNEL_COLORS_EDITABLE){
+            dot.type="button";
+            dot.title=MeshI18n.t("Change the color of {channel}", {channel});
+            dot.setAttribute("aria-label", dot.title);
+            dot.setAttribute("aria-haspopup", "dialog");
+            dot.setAttribute("aria-expanded", "false");
+            dot.addEventListener("click", event => {
+                event.preventDefault();
+                toggleChannelColors(channel, dot);
+            });
+        }
         const name=document.createElement("span");
         name.textContent=channel;
         label.append(cb, dot, name);
@@ -1618,6 +1669,145 @@ function createChannelFilters(){
     mqttOnly.addEventListener("change", updateNodeVisibility);
 
     updateNodeVisibility();
+}
+
+/* ======================================================
+   CHANNEL COLORS
+   ====================================================== */
+
+const CHANNEL_COLORS_EDITABLE = {% if dashboard %}false{% else %}true{% endif %};
+
+// A channel takes the visitor's color, or its own again with none, on its
+// filter dot and on its nodes. A selected node keeps its ring, and a blinking
+// one blinks back to the new color.
+function setChannelColor(channel, color){
+    if(color) customChannelColors.set(channel, color.toLowerCase());
+    else customChannelColors.delete(channel);
+    try {
+        localStorage.setItem(CHANNEL_COLORS_KEY, JSON.stringify(Object.fromEntries(customChannelColors)));
+    } catch (_) { /* storage unavailable */ }
+    colorMap.delete(channel);
+    const c = hashToColor(channel);
+    document.querySelectorAll(".map-filter-dot").forEach(dot => {
+        if(dot.dataset.channel === channel) dot.style.setProperty("--chip-color", c);
+    });
+    nodes.forEach(n => {
+        const marker = markerById[n.key];
+        if(n.channel !== channel || !marker) return;
+        marker.originalColor = c;
+        marker.setStyle(marker === selectedMarker ? { fillColor: c } : { fillColor: c, color: markerStroke(c) });
+    });
+}
+
+// The color picker for a channel, under its dot: the palette's colors, any
+// other through the browser's own picker, and the channel's own color back.
+let channelColors = null;
+function closeChannelColors(focusDot = false){
+    if(!channelColors) return;
+    const { popover, dot, cleanup } = channelColors;
+    channelColors = null;
+    cleanup();
+    popover.remove();
+    dot.setAttribute("aria-expanded", "false");
+    if(focusDot) dot.focus();
+}
+
+function toggleChannelColors(channel, dot){
+    const open = channelColors?.dot === dot;
+    closeChannelColors();
+    if(open) return;
+
+    const current = hashToColor(channel);
+    const popover = document.createElement("div");
+    popover.className = "map-color-popover";
+    popover.setAttribute("role", "dialog");
+    popover.setAttribute("aria-label", dot.title);
+
+    const pick = color => { setChannelColor(channel, color); closeChannelColors(true); };
+    const swatches = document.createElement("div");
+    swatches.className = "map-color-swatches";
+    palette.forEach(color => {
+        const swatch = document.createElement("button");
+        swatch.type = "button";
+        swatch.className = "map-color-swatch";
+        swatch.style.setProperty("--swatch", color);
+        swatch.title = color;
+        swatch.setAttribute("aria-label", color);
+        swatch.setAttribute("aria-pressed", String(color === current));
+        swatch.addEventListener("click", () => pick(color));
+        swatches.append(swatch);
+    });
+
+    const actions = document.createElement("div");
+    actions.className = "map-color-actions";
+    const action = (icon, text) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        const glyph = document.createElement("span");
+        glyph.className = `ti ${icon}`;
+        glyph.setAttribute("aria-hidden", "true");
+        button.append(glyph, text);
+        actions.append(button);
+        return button;
+    };
+    // The browser's picker only ever gives a #rrggbb color, and shows it on
+    // the map while the visitor moves through it.
+    const input = document.createElement("input");
+    input.type = "color";
+    input.className = "map-color-input";
+    input.tabIndex = -1;
+    input.setAttribute("aria-hidden", "true");
+    input.value = current;
+    input.addEventListener("input", () => setChannelColor(channel, input.value));
+    input.addEventListener("change", () => pick(input.value));
+    action("ti-palette", MeshI18n.t("Custom…")).addEventListener("click", () => input.click());
+    if(customChannelColors.has(channel)){
+        action("ti-arrow-back-up", MeshI18n.t("Restore color")).addEventListener("click", () => pick(null));
+    }
+    actions.append(input);
+    popover.append(swatches, actions);
+    document.body.append(popover);
+
+    // Below the dot, or above it when there is no room, always on screen.
+    const place = () => {
+        const box = dot.getBoundingClientRect();
+        const width = popover.offsetWidth, height = popover.offsetHeight;
+        const left = Math.min(Math.max(8, box.left - 12), window.innerWidth - width - 8);
+        const below = box.bottom + 10;
+        const top = below + height > window.innerHeight - 8 ? Math.max(8, box.top - height - 10) : below;
+        popover.style.left = `${left}px`;
+        popover.style.top = `${top}px`;
+    };
+    place();
+
+    // Closed by a click or a tap elsewhere, Escape, or the page moving under it.
+    const outside = event => {
+        if(!popover.contains(event.target) && !dot.contains(event.target)) closeChannelColors();
+    };
+    const keys = event => {
+        if(event.key === "Escape"){ event.preventDefault(); closeChannelColors(true); return; }
+        const all = [...swatches.children], at = all.indexOf(document.activeElement);
+        const step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 6, ArrowUp: -6 }[event.key];
+        if(at < 0 || !step) return;
+        event.preventDefault();
+        all[(at + step + all.length) % all.length].focus();
+    };
+    const moved = event => { if(!popover.contains(event.target)) closeChannelColors(); };
+    document.addEventListener("pointerdown", outside, true);
+    popover.addEventListener("keydown", keys);
+    document.addEventListener("scroll", moved, true);
+    const resize = () => closeChannelColors();
+    window.addEventListener("resize", resize);
+    channelColors = {
+        popover, dot,
+        cleanup: () => {
+            document.removeEventListener("pointerdown", outside, true);
+            document.removeEventListener("scroll", moved, true);
+            window.removeEventListener("resize", resize);
+        },
+    };
+    dot.setAttribute("aria-expanded", "true");
+    (swatches.querySelector('[aria-pressed="true"]') || swatches.firstChild).focus();
 }
 
 function saveFiltersToLocalStorage(){
