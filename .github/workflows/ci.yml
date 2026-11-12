@@ -9,9 +9,24 @@ on:
     # A tag is a release, and the tag is the version written the way Cargo writes
     # it, with no `v` in front. What a release adds to an ordinary push is at the
     # bottom of this file: the image's own version tag, `latest` moving to it, and
-    # a page carrying the binaries.
+    # a page carrying the binaries. GitHub does not apply `paths` to tags, so a
+    # release always runs.
     tags: ['[0-9]+.[0-9]+.[0-9]+']
+    # Not for documentation alone, which nothing here builds, tests or ships:
+    # the READMEs and docs/, but for docs/configuration.md, which a test holds
+    # to the code. The API reference's introduction is compiled in, and is not
+    # under docs/.
+    paths:
+      - '**'
+      - '!**/README.md'
+      - '!docs/**'
+      - 'docs/configuration.md'
   pull_request:
+    paths:
+      - '**'
+      - '!**/README.md'
+      - '!docs/**'
+      - 'docs/configuration.md'
 
 # A newer push makes the run before it beside the point.
 concurrency:
