@@ -9,7 +9,7 @@ use utoipa::ToSchema;
 #[derive(Debug, Serialize, ToSchema)]
 pub struct Version {
     /// The version, as in Cargo.toml.
-    #[schema(example = "0.1.0")]
+    #[schema(example = "5.0.0")]
     pub version: &'static str,
     /// The date of the commit it was built from, `unknown` when that was not
     /// known at build time. The Python version gave its release date here.
