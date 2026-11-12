@@ -35,6 +35,18 @@ impl From<SqlitePool> for Pool {
     }
 }
 
+impl From<&SqlitePool> for Pool {
+    fn from(pool: &SqlitePool) -> Self {
+        Self::Sqlite(pool.clone())
+    }
+}
+
+impl From<&Pool> for Pool {
+    fn from(pool: &Pool) -> Self {
+        pool.clone()
+    }
+}
+
 /// Refuses PostgreSQL in a build without it.
 #[cfg(not(feature = "postgres"))]
 fn no_postgres() -> anyhow::Error {

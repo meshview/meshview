@@ -72,9 +72,13 @@ async fn cleanup_deletes_what_is_older_than_the_days_kept() {
 
     packet(&pool, 1, 10, old).await;
     packet(&pool, 2, 10, recent).await;
+    packet(&pool, 3, 10, old).await;
     seen(&pool, 1, 20, old).await;
     seen(&pool, 2, 20, recent).await;
-    // A sighting today of an old packet stays: each table goes by its own time.
+    seen(&pool, 3, 20, old).await;
+    // A sighting today of an old packet stays, each table going by its own
+    // time, and so does the packet it is of, so as not to leave it pointing at
+    // nothing.
     seen(&pool, 1, 21, recent).await;
     sqlx::query(
         "INSERT INTO traceroute (packet_id, gateway_node_id, import_time_us) VALUES (1, 20, ?), \
@@ -93,11 +97,15 @@ async fn cleanup_deletes_what_is_older_than_the_days_kept() {
     let details = jobs::cleanup(&pool, 14, true).await.unwrap();
 
     assert_eq!(details["rows_deleted"]["packet"], 1);
-    assert_eq!(details["rows_deleted"]["packet_seen"], 1);
+    assert_eq!(details["rows_deleted"]["packet_seen"], 2);
     assert_eq!(details["rows_deleted"]["traceroute"], 1);
     assert_eq!(details["rows_deleted"]["node"], 1);
     assert_eq!(details["vacuum_completed"], true);
-    assert_eq!(count(&pool, "SELECT count(*) FROM packet").await, 1);
+    assert_eq!(count(&pool, "SELECT count(*) FROM packet").await, 2);
+    assert_eq!(
+        count(&pool, "SELECT count(*) FROM packet WHERE id = 3").await,
+        0
+    );
     assert_eq!(count(&pool, "SELECT count(*) FROM packet_seen").await, 2);
     assert_eq!(count(&pool, "SELECT count(*) FROM traceroute").await, 1);
     assert_eq!(count(&pool, "SELECT count(*) FROM node").await, 2);

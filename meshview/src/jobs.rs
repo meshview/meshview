@@ -13,12 +13,13 @@
 //! the ingester's queue, as the Python version paused its ingestion.
 
 use crate::config::Config;
+use crate::db::Pool;
+use crate::db::write::{self, Arg};
 use anyhow::{Context, Result, bail};
 use jiff::civil::Date;
 use jiff::tz::TimeZone;
 use jiff::{Timestamp, Zoned};
 use serde_json::{Value, json};
-use sqlx::SqlitePool;
 use std::time::Duration;
 use tokio::sync::watch;
 use tracing::{error, info};
@@ -106,21 +107,8 @@ impl Settings {
 /// A job interrupted by the stop is abandoned where it was, which rolls its
 /// transaction back: its run stays recorded as running, and the next start marks
 /// it interrupted.
-pub async fn run(
-    settings: Settings,
-    pool: impl Into<crate::db::Pool>,
-    mut stopping: watch::Receiver<bool>,
-) {
-    // Only until PostgreSQL has its own; without it there is only SQLite.
-    #[allow(clippy::infallible_destructuring_match)]
-    let pool = match pool.into() {
-        crate::db::Pool::Sqlite(pool) => pool,
-        #[cfg(feature = "postgres")]
-        crate::db::Pool::Postgres(_) => {
-            tracing::warn!("the daily jobs on PostgreSQL are not written yet");
-            return;
-        }
-    };
+pub async fn run(settings: Settings, pool: impl Into<Pool>, mut stopping: watch::Receiver<bool>) {
+    let pool: Pool = pool.into();
     if let Err(e) = mark_interrupted(&pool).await {
         error!("could not tidy up the job runs of a previous start: {e:#}");
     }
@@ -188,9 +176,16 @@ async fn wait_until(job: &str, at: TimeOfDay) {
 }
 
 /// Deletes what is older than `days_to_keep`, as the Python version does: the
-/// packets, sightings and traceroutes imported before the cutoff, and the nodes
+/// sightings, traceroutes and packets imported before the cutoff, and the nodes
 /// not seen since. All four in one transaction, then optionally a VACUUM.
-pub async fn cleanup(pool: &SqlitePool, days_to_keep: u32, vacuum: bool) -> Result<Value> {
+///
+/// Unlike the Python version, a packet stays while a sighting or a traceroute
+/// of it does, as when an old packet is heard again: each table still goes by
+/// its own time, but nothing is left pointing at a packet that is gone, which
+/// PostgreSQL's foreign keys would refuse, and which SQLite only kept as rows
+/// nothing could use.
+pub async fn cleanup(pool: impl Into<Pool>, days_to_keep: u32, vacuum: bool) -> Result<Value> {
+    let pool = &pool.into();
     let started = now_us();
     let cutoff_us = started - i64::from(days_to_keep) * MICROS_PER_DAY;
     let mut details = json!({
@@ -208,9 +203,8 @@ pub async fn cleanup(pool: &SqlitePool, days_to_keep: u32, vacuum: bool) -> Resu
     );
 
     let result = async {
-        let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = write::begin(pool).await?;
         for (table, sql) in [
-            ("packet", "DELETE FROM packet WHERE import_time_us < ?"),
             (
                 "packet_seen",
                 "DELETE FROM packet_seen WHERE import_time_us < ?",
@@ -219,14 +213,18 @@ pub async fn cleanup(pool: &SqlitePool, days_to_keep: u32, vacuum: bool) -> Resu
                 "traceroute",
                 "DELETE FROM traceroute WHERE import_time_us < ?",
             ),
+            (
+                "packet",
+                "DELETE FROM packet WHERE import_time_us < ? \
+                 AND NOT EXISTS (SELECT 1 FROM packet_seen WHERE packet_seen.packet_id = packet.id) \
+                 AND NOT EXISTS (SELECT 1 FROM traceroute WHERE traceroute.packet_id = packet.id)",
+            ),
             ("node", "DELETE FROM node WHERE last_seen_us < ?"),
         ] {
-            let deleted = sqlx::query(sql)
-                .bind(cutoff_us)
-                .execute(&mut *tx)
+            let deleted = tx
+                .execute(sql, &[Arg::Int(cutoff_us)])
                 .await
-                .with_context(|| format!("deleting from {table}"))?
-                .rows_affected();
+                .with_context(|| format!("deleting from {table}"))?;
             details["rows_deleted"][table] = json!(deleted);
             info!("Deleted {deleted} rows from {table}");
         }
@@ -234,10 +232,7 @@ pub async fn cleanup(pool: &SqlitePool, days_to_keep: u32, vacuum: bool) -> Resu
 
         if vacuum {
             info!("Running VACUUM...");
-            sqlx::query("VACUUM")
-                .execute(pool)
-                .await
-                .context("VACUUM")?;
+            write::run(pool, "VACUUM").await.context("VACUUM")?;
             details["vacuum_completed"] = json!(true);
             info!("VACUUM completed.");
         }
@@ -254,7 +249,8 @@ pub async fn cleanup(pool: &SqlitePool, days_to_keep: u32, vacuum: bool) -> Resu
 ///
 /// Active nodes are those that sent a packet that day, or whose older packet was
 /// heard again that day; gateways are those that relayed anything that day.
-pub async fn snapshot(pool: &SqlitePool) -> Result<Value> {
+pub async fn snapshot(pool: impl Into<Pool>) -> Result<Value> {
+    let pool = &pool.into();
     let started = now_us();
     let today = Timestamp::now().to_zoned(TimeZone::UTC).date();
     let day = today.yesterday()?;
@@ -264,56 +260,69 @@ pub async fn snapshot(pool: &SqlitePool) -> Result<Value> {
     let run = start(pool, SNAPSHOT, started, &details).await?;
 
     let result = async {
-        let node_count: i64 = sqlx::query_scalar(
-            "SELECT count(from_node_id) FROM ( \
-               SELECT from_node_id FROM packet \
-                WHERE import_time_us >= ?1 AND import_time_us < ?2 \
-               UNION \
-               SELECT packet.from_node_id FROM packet \
-                 JOIN packet_seen ON packet_seen.packet_id = packet.id \
-                WHERE packet_seen.import_time_us >= ?1 AND packet_seen.import_time_us < ?2 \
-             )",
-        )
-        .bind(start_us)
-        .bind(end_us)
-        .fetch_one(pool)
-        .await
-        .context("counting the active nodes")?;
-
-        let packet_count: i64 = sqlx::query_scalar(
+        let window = [Arg::Int(start_us), Arg::Int(end_us)];
+        let count = |sql, what: &'static str| async move {
+            let counted = write::integers(pool, sql, &window).await.context(what)?;
+            anyhow::Ok(counted.first().copied().unwrap_or(0))
+        };
+        // The same window twice, for the two halves of the union.
+        let node_count: i64 = {
+            let counted = write::integers(
+                pool,
+                "SELECT count(from_node_id) FROM ( \
+                   SELECT from_node_id FROM packet \
+                    WHERE import_time_us >= ? AND import_time_us < ? \
+                   UNION \
+                   SELECT packet.from_node_id FROM packet \
+                     JOIN packet_seen ON packet_seen.packet_id = packet.id \
+                    WHERE packet_seen.import_time_us >= ? AND packet_seen.import_time_us < ? \
+                 ) AS active",
+                &[window[0], window[1], window[0], window[1]],
+            )
+            .await
+            .context("counting the active nodes")?;
+            counted.first().copied().unwrap_or(0)
+        };
+        let packet_count = count(
             "SELECT count(*) FROM packet WHERE import_time_us >= ? AND import_time_us < ?",
+            "counting the packets",
         )
-        .bind(start_us)
-        .bind(end_us)
-        .fetch_one(pool)
-        .await
-        .context("counting the packets")?;
-
-        let gateway_count: i64 = sqlx::query_scalar(
+        .await?;
+        let gateway_count = count(
             "SELECT count(DISTINCT node_id) FROM packet_seen \
              WHERE import_time_us >= ? AND import_time_us < ?",
+            "counting the gateways",
         )
-        .bind(start_us)
-        .bind(end_us)
-        .fetch_one(pool)
-        .await
-        .context("counting the gateways")?;
+        .await?;
 
-        sqlx::query(
+        // The day is text in SQLite, which has no dates, and a date in
+        // PostgreSQL; a CAST to DATE in SQLite would make it the number 2026.
+        let day = day.to_string();
+        let mut tx = write::begin(pool).await?;
+        tx.execute_either(
             "INSERT INTO daily_snapshot \
              (snapshot_date, node_count, packet_count, gateway_count, captured_at_us) \
-             VALUES (?1, ?2, ?3, ?4, ?5) \
+             VALUES (?, ?, ?, ?, ?) \
              ON CONFLICT (snapshot_date) DO UPDATE SET \
-               node_count = ?2, packet_count = ?3, gateway_count = ?4, captured_at_us = ?5",
+               node_count = excluded.node_count, packet_count = excluded.packet_count, \
+               gateway_count = excluded.gateway_count, captured_at_us = excluded.captured_at_us",
+            "INSERT INTO daily_snapshot \
+             (snapshot_date, node_count, packet_count, gateway_count, captured_at_us) \
+             VALUES (CAST(? AS DATE), ?, ?, ?, ?) \
+             ON CONFLICT (snapshot_date) DO UPDATE SET \
+               node_count = excluded.node_count, packet_count = excluded.packet_count, \
+               gateway_count = excluded.gateway_count, captured_at_us = excluded.captured_at_us",
+            &[
+                Arg::Text(&day),
+                Arg::Int(node_count),
+                Arg::Int(packet_count),
+                Arg::Int(gateway_count),
+                Arg::Int(now_us()),
+            ],
         )
-        .bind(day.to_string())
-        .bind(node_count)
-        .bind(packet_count)
-        .bind(gateway_count)
-        .bind(now_us())
-        .execute(pool)
         .await
         .context("storing the snapshot")?;
+        tx.commit().await?;
 
         details["node_count"] = json!(node_count);
         details["packet_count"] = json!(packet_count);
@@ -327,60 +336,66 @@ pub async fn snapshot(pool: &SqlitePool) -> Result<Value> {
 }
 
 /// Records that a run of `job` started, and answers its id.
-async fn start(pool: &SqlitePool, job: &str, started_us: i64, details: &Value) -> Result<i64> {
-    let id = sqlx::query_scalar(
+async fn start(pool: &Pool, job: &str, started_us: i64, details: &Value) -> Result<i64> {
+    let details = details.to_string();
+    let ids = write::integers(
+        pool,
         "INSERT INTO job_run (job, status, started_us, details) VALUES (?, 'running', ?, ?) \
          RETURNING id",
+        &[Arg::Text(job), Arg::Int(started_us), Arg::Text(&details)],
     )
-    .bind(job)
-    .bind(started_us)
-    .bind(details.to_string())
-    .fetch_one(pool)
     .await
     .context("recording the job's start")?;
-    Ok(id)
+    ids.first()
+        .copied()
+        .context("recording the job's start: no id came back")
 }
 
 /// Records how a run ended, and forgets the oldest runs of its job.
 async fn finish(
-    pool: &SqlitePool,
+    pool: &Pool,
     run: i64,
     details: &Value,
     failure: Option<&anyhow::Error>,
 ) -> Result<()> {
-    sqlx::query(
+    let details = details.to_string();
+    let error = failure.map(|e| format!("{e:#}"));
+    let mut tx = write::begin(pool).await?;
+    tx.execute(
         "UPDATE job_run SET status = ?, finished_us = ?, details = ?, error = ? WHERE id = ?",
+        &[
+            Arg::Text(if failure.is_some() { "error" } else { "ok" }),
+            Arg::Int(now_us()),
+            Arg::Text(&details),
+            match &error {
+                Some(error) => Arg::Text(error),
+                None => Arg::OptText(None),
+            },
+            Arg::Int(run),
+        ],
     )
-    .bind(if failure.is_some() { "error" } else { "ok" })
-    .bind(now_us())
-    .bind(details.to_string())
-    .bind(failure.map(|e| format!("{e:#}")))
-    .bind(run)
-    .execute(pool)
     .await
     .context("recording the job's end")?;
 
-    sqlx::query(
-        "DELETE FROM job_run WHERE job = (SELECT job FROM job_run WHERE id = ?1) \
-         AND id NOT IN (SELECT id FROM job_run WHERE job = (SELECT job FROM job_run WHERE id = ?1) \
-                        ORDER BY started_us DESC LIMIT ?2)",
+    tx.execute(
+        "DELETE FROM job_run WHERE job = (SELECT job FROM job_run WHERE id = ?) \
+         AND id NOT IN (SELECT id FROM job_run WHERE job = (SELECT job FROM job_run WHERE id = ?) \
+                        ORDER BY started_us DESC LIMIT ?)",
+        &[Arg::Int(run), Arg::Int(run), Arg::Int(HISTORY)],
     )
-    .bind(run)
-    .bind(HISTORY)
-    .execute(pool)
     .await
     .context("forgetting old job runs")?;
-    Ok(())
+    tx.commit().await
 }
 
 /// Runs left as running by a process that was stopped or died in the middle of
 /// them. Only the writer runs jobs, and there is one, so any such run is over.
-async fn mark_interrupted(pool: &SqlitePool) -> Result<()> {
-    sqlx::query(
+async fn mark_interrupted(pool: &Pool) -> Result<()> {
+    write::execute(
+        pool,
         "UPDATE job_run SET status = 'interrupted', finished_us = ? WHERE status = 'running'",
+        &[Arg::Int(now_us())],
     )
-    .bind(now_us())
-    .execute(pool)
     .await?;
     Ok(())
 }
