@@ -116,6 +116,21 @@ fn to_json(value: &tera::Value) -> String {
         .replace('\'', "\\u0027")
 }
 
+/// Where link previews take their picture from: the server's own, at the
+/// configured domain (over HTTPS unless the domain names its scheme), or,
+/// without a domain, the same picture from the project's website, as previews
+/// need an absolute address.
+fn preview_image(domain: &str) -> String {
+    let domain = domain.trim().trim_end_matches('/');
+    if domain.is_empty() {
+        "https://meshview.github.io/og-instance.png".to_string()
+    } else if domain.starts_with("https://") || domain.starts_with("http://") {
+        format!("{domain}/static/og.png")
+    } else {
+        format!("https://{domain}/static/og.png")
+    }
+}
+
 /// The templates, with what they need from the site: its language, the
 /// translation of each string, its tagline and the map's tiles.
 fn tera(config: &Config) -> anyhow::Result<Tera> {
@@ -164,6 +179,8 @@ fn tera(config: &Config) -> anyhow::Result<Tera> {
     globals.insert("ui_translations", &ui);
     globals.insert("ui_language", &config.site.language);
     globals.insert("site_description", config.site.message.trim());
+    globals.insert("site_title", config.site.title.trim());
+    globals.insert("preview_image", &preview_image(&config.site.domain));
     globals.insert("map_tiles", &map_tiles);
     let build = super::api::version::current();
     globals.insert("build_version", build.version);
@@ -356,6 +373,26 @@ mod tests {
         assert_eq!(
             to_json(&value),
             "\"\\u003c/script\\u003e\\u003cb\\u003e\\u0027\\u0026\\u0027\""
+        );
+    }
+
+    #[test]
+    fn link_previews_take_the_picture_from_the_domain_or_the_project() {
+        assert_eq!(
+            preview_image(""),
+            "https://meshview.github.io/og-instance.png"
+        );
+        assert_eq!(
+            preview_image("  "),
+            "https://meshview.github.io/og-instance.png"
+        );
+        assert_eq!(
+            preview_image("mesh.example.org"),
+            "https://mesh.example.org/static/og.png"
+        );
+        assert_eq!(
+            preview_image("http://mesh.example.org/"),
+            "http://mesh.example.org/static/og.png"
         );
     }
 

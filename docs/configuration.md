@@ -125,10 +125,10 @@ once it is restarted.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `domain` | string | `""` | Domain metadata exposed by `/api/config`; does not configure binding or TLS. |
+| `domain` | string | `""` | The address Meshview is reached at, such as `mesh.example.org` (HTTPS is assumed unless it starts with `http://`). Link previews take their picture from it, `/static/og.png`; without it, the same picture from the project's website. Also exposed by `/api/config`; it does not configure binding or TLS. |
 | `language` | string | `"en"` | Language of the pages and of the API reference: `en`, `es` or `ru`. |
-| `title` | string | `""` | Site title, in the browser title bar and headers. |
-| `message` | string | `""` | Tagline, shown in the footer and used as the page description. |
+| `title` | string | `""` | Site title, in the browser title bar, headers and link previews. |
+| `message` | string | `""` | Tagline, shown in the footer and used as the page description, link previews included. |
 | `announcement` | string | `""` | Banner at the top of every page. Visitors can dismiss it; it shows again when the text changes. |
 | `nodes` | boolean | `true` | Show the Nodes link. Pages and API routes stay available either way. |
 | `chat` | boolean | `true` | Show the Chat link. |
