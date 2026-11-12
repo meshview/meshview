@@ -213,18 +213,22 @@ async function loadChannels() {
         if (!res.ok) return;
 
         const data = await res.json();
-        const select = document.getElementById("channel-filter");
-        const channels = data.channels || [];
-
-        for (const channel of channels) {
-            const option = document.createElement("option");
-            option.value = channel;
-            option.textContent = channel;
-            select.appendChild(option);
-        }
+        for (const channel of data.channels || []) addChannel(channel);
     } catch (err) {
         console.error("Failed loading channels:", err);
     }
+}
+
+// A channel in the filter, in its place among the others, unless it is there
+// already: those of the last day when the page loads, and any other as its
+// first packet arrives, so that a new channel shows without a reload.
+function addChannel(channel) {
+    if (!channel) return;
+    const select = document.getElementById("channel-filter");
+    const options = [...select.options].slice(1);
+    if (options.some(option => option.value === channel)) return;
+    const after = options.find(option => option.value > channel);
+    select.insertBefore(new Option(channel, channel), after || null);
 }
 
 function resetFirehose() {
@@ -262,6 +266,7 @@ async function fetchUpdates() {
         const list = document.getElementById("packet_list");
 
         for (const pkt of packets.reverse()) {
+            addChannel(pkt.channel);
             if (!matchesSelectedChannel(pkt)) continue;
 
             logPacketTimes(pkt);

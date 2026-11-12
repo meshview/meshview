@@ -6,6 +6,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     const status = document.getElementById('chat-status');
     const pause = document.getElementById('chat-pause');
     const latest = document.getElementById('chat-latest');
+    // A channel in the filter, in its place among the others, unless it is
+    // there already: those of the last day, and any other as its first message
+    // arrives, so that a new channel shows without a reload.
+    function addChannel(name) {
+        if (!name) return;
+        const options = [...channel.options].slice(1);
+        if (options.some(option => option.value === name)) return;
+        const after = options.find(option => option.value > name);
+        channel.insertBefore(new Option(name, name), after || null);
+    }
     const packets = new Map();
     let lastTime = null;
     let paused = false;
@@ -108,9 +118,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             for (const packet of data.packets) {
                 const id = String(packet.id);
                 if (!packets.has(id)) { packets.set(id, packet); added.add(id); }
-                if (packet.channel && ![...channel.options].some(o => o.value === packet.channel)) {
-                    channel.add(new Option(packet.channel, packet.channel));
-                }
+                addChannel(packet.channel);
             }
             // Keep the browser's session history bounded without changing the API.
             if (packets.size > 1000) {
@@ -167,9 +175,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const response = await fetch('/api/v1/channels');
             if (!response.ok) return;
             const data = await response.json();
-            for (const name of data.channels || []) {
-                if (![...channel.options].some(o => o.value === name)) channel.add(new Option(name, name));
-            }
+            for (const name of data.channels || []) addChannel(name);
         } catch (error) { console.error('Chat channels:', error); }
     })();
     await fetchMessages();
