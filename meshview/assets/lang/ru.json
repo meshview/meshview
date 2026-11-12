@@ -111,6 +111,7 @@
     "layer_nodes": "Ноды",
     "layer_packets_reach": "Достижимость пакетов",
     "layer_position_precision": "Точность позиции",
+    "layer_channel_utilization": "Загрузка канала",
     "layer_traffic_heatmap": "Тепловая карта трафика",
     "map_layers": "Слои карты"
   },

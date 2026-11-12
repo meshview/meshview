@@ -556,3 +556,19 @@ pub async fn latest_positions(
     }
     Ok(rows)
 }
+
+/// The telemetry packets heard since a time, the latest first: the sender and
+/// the stored packet.
+pub async fn telemetry_since(
+    pool: &SqlitePool,
+    since_us: i64,
+) -> Result<Vec<(Option<i64>, Option<Vec<u8>>)>> {
+    sqlx::query_as(
+        "SELECT from_node_id, payload FROM packet \
+         WHERE portnum = 67 AND import_time_us > ? ORDER BY import_time_us DESC, id DESC",
+    )
+    .bind(since_us)
+    .fetch_all(pool)
+    .await
+    .context("reading the latest telemetry")
+}

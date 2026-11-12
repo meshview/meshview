@@ -314,6 +314,10 @@ button.map-filter-dot:focus-visible { outline:2px solid var(--mesh-primary); out
 .map-color-actions .ti { font-size:15px; color:var(--mesh-primary); }
 .map-color-input { position:absolute; left:8px; bottom:0; width:1px; height:1px; padding:0; border:0; opacity:0; pointer-events:none; }
 @media (prefers-reduced-motion: reduce) { .map-color-swatch { transition:none; } }
+/* The utilization colours, in one line under the links in the legend. */
+.legend-utilization { display:flex; flex-wrap:wrap; align-items:center; gap:2px 10px; margin-top:6px; }
+.legend-utilization[hidden] { display:none; }
+.legend-utilization i { width:9px; height:9px; margin-right:4px; vertical-align:-1px; }
 /* An option of the layer above it in the layer picker. */
 .leaflet-control-layers .map-layer-suboption { display:flex; align-items:center; gap:3px; margin:0 0 0 18px; color:var(--mesh-muted); }
 .leaflet-control-layers .map-layer-suboption[hidden] { display:none; }
@@ -416,6 +420,13 @@ button.map-filter-dot:focus-visible { outline:2px solid var(--mesh-primary); out
     <div style="margin-top:6px;">
         <i style="background:gray; width:15px; height:3px; border-radius:0;"></i>
         <span data-translate-lang="legend_neighbor">Neighbor Link</span>
+    </div>
+
+    <div id="legend-utilization" class="legend-utilization" hidden>
+        <span>{{ "Channel Utilization" | tr }}</span>
+        <span><i style="background:#2e9e4f;"></i>&lt;25%</span>
+        <span><i style="background:#e0a800;"></i>25–40%</span>
+        <span><i style="background:#d63333;"></i>&gt;40%</span>
     </div>
 </details>
 
@@ -542,6 +553,8 @@ var packetSeenLayer = L.layerGroup();
 // Under the nodes, so the dots stay on top of the areas around them.
 map.createPane("precisionPane").style.zIndex = 350;
 var precisionLayer = L.layerGroup();
+map.createPane("utilizationPane").style.zIndex = 360;
+var utilizationLayer = L.layerGroup();
 var trafficHeatLayer = L.heatLayer([], {
     radius: 34,
     blur: 18,
@@ -558,6 +571,7 @@ var overlayLayers = {
     [MeshI18n.h("Nodes")]: nodeLayer,
     [MeshI18n.h("Packets Reach")]: packetSeenLayer,
     [MeshI18n.h("Position Precision")]: precisionLayer,
+    [MeshI18n.h("Channel Utilization")]: utilizationLayer,
     [MeshI18n.h("Traffic HeatMap")]: trafficHeatLayer
 };
 // Always folded: the choices are remembered, so it only needs opening to change them.
@@ -572,6 +586,7 @@ function updateMapLayerTranslations() {
         [nodeLayer, mapTranslations.layer_nodes || MeshI18n.t("Nodes")],
         [packetSeenLayer, mapTranslations.layer_packets_reach || MeshI18n.t("Packets Reach")],
         [precisionLayer, mapTranslations.layer_position_precision || MeshI18n.t("Position Precision")],
+        [utilizationLayer, mapTranslations.layer_channel_utilization || MeshI18n.t("Channel Utilization")],
         [trafficHeatLayer, mapTranslations.layer_traffic_heatmap || MeshI18n.t("Traffic HeatMap")]
     ];
     layers.forEach(([layer, label]) => {
@@ -623,7 +638,7 @@ if (mapTools) {
 }
 // Remember the base map and overlay choices in this browser, like the filters.
 const MAP_LAYERS_KEY = "mapLayers";
-const mapLayerIds = new Map([[nodeLayer, "nodes"], [packetSeenLayer, "reach"], [precisionLayer, "precision"], [trafficHeatLayer, "heat"]]);
+const mapLayerIds = new Map([[nodeLayer, "nodes"], [packetSeenLayer, "reach"], [precisionLayer, "precision"], [utilizationLayer, "utilization"], [trafficHeatLayer, "heat"]]);
 function saveMapLayers() {
     const state = { base: Object.keys(baseLayers).find(name => map.hasLayer(baseLayers[name])) };
     mapLayerIds.forEach((id, layer) => { state[id] = map.hasLayer(layer); });
@@ -905,6 +920,10 @@ map.on("overlayadd", e => {
     if(e.layer === nodeLayer) updateNodeVisibility();
     if(e.layer === trafficHeatLayer) loadTrafficHeat();
     if(e.layer === precisionLayer) loadPrecision();
+    if(e.layer === utilizationLayer) loadUtilization();
+});
+map.on("overlayadd overlayremove", e => {
+    if(e.layer === utilizationLayer) syncUtilizationLegend();
 });
 
 map.on("overlayremove", e => {
@@ -1030,6 +1049,8 @@ fetch('/api/v1/nodes?days_active=3')
             loadTrafficHeat();
         }
         if(map.hasLayer(precisionLayer)) loadPrecision();
+        if(map.hasLayer(utilizationLayer)) loadUtilization();
+        syncUtilizationLegend();
     })
     .catch(error => {
         console.error(error);
@@ -1874,6 +1895,7 @@ function saveFiltersToLocalStorage(){
 function updateNodeVisibility(){
     clearPacketSeenHighlights();
     drawPrecision();
+    drawUtilization();
     if(!map.hasLayer(nodeLayer)) return;
 
     nodes.forEach(n=>{
@@ -1944,6 +1966,65 @@ function drawPrecision(){
             interactive: false
         }).addTo(precisionLayer);
     });
+}
+
+/* ======================================================
+   CHANNEL UTILIZATION
+   ====================================================== */
+
+// How busy each node hears its channel, from its latest device telemetry: a
+// ring around its dot, green below 25 %, where the firmware starts holding
+// back its routine broadcasts, yellow up to 40 %, its limit for sending
+// anything else, and red above. Kept fresh every five minutes while it is on, as
+// nodes report every half hour.
+const UTILIZATION_LEVELS = [[25, "#2e9e4f"], [40, "#e0a800"], [Infinity, "#d63333"]];
+const utilizationByNode = new Map();
+let utilizationLoading = false, utilizationTimer = null;
+async function loadUtilization(){
+    if(utilizationLoading) return;
+    utilizationLoading = true;
+    try {
+        const res = await fetch('/api/v1/nodes?days_active=3&has_position=true&fields=channel_utilization,air_util_tx');
+        if(!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        utilizationByNode.clear();
+        for(const n of data.nodes || []){
+            if(typeof n.channel_utilization === "number") utilizationByNode.set(n.node_id, n);
+        }
+        drawUtilization();
+    } catch(err) {
+        console.error("Failed to load channel utilization:", err);
+    } finally {
+        utilizationLoading = false;
+    }
+    clearTimeout(utilizationTimer);
+    utilizationTimer = setTimeout(() => { if(map.hasLayer(utilizationLayer)) loadUtilization(); }, 5 * 60 * 1000);
+}
+
+function drawUtilization(){
+    utilizationLayer.clearLayers();
+    if(!map.hasLayer(utilizationLayer)) return;
+    nodes.forEach(n => {
+        const report = utilizationByNode.get(n.node_id);
+        const marker = markerById[n.key];
+        if(!report || !marker || !passesFilters(n)) return;
+        const color = UTILIZATION_LEVELS.find(([limit]) => report.channel_utilization < limit)[1];
+        L.circleMarker(marker.getLatLng(), {
+            pane: "utilizationPane",
+            radius: 12,
+            color,
+            weight: 2,
+            opacity: .9,
+            fillColor: color,
+            fillOpacity: .35,
+            interactive: false
+        }).addTo(utilizationLayer);
+    });
+}
+
+function syncUtilizationLegend(){
+    const legend = document.getElementById("legend-utilization");
+    if(legend) legend.hidden = !map.hasLayer(utilizationLayer);
 }
 
 /* ======================================================

@@ -696,6 +696,90 @@ async fn the_position_precision_comes_from_the_latest_position_only_when_asked()
     assert!(all["nodes"][0].get("position_precision").is_none());
 }
 
+/// A telemetry packet from a node: device metrics with these utilizations, or
+/// environment metrics when there are none.
+async fn telemetry(api: &Api, id: i64, node_id: i64, utilization: Option<(f32, f32)>, at: i64) {
+    use meshview_proto::meshtastic::mesh_packet::PayloadVariant;
+    use meshview_proto::meshtastic::telemetry::Variant;
+    use meshview_proto::meshtastic::{
+        Data, DeviceMetrics, EnvironmentMetrics, MeshPacket, PortNum, Telemetry,
+    };
+    use prost::Message;
+
+    let variant = match utilization {
+        Some((channel, air)) => Variant::DeviceMetrics(DeviceMetrics {
+            channel_utilization: Some(channel),
+            air_util_tx: Some(air),
+            ..Default::default()
+        }),
+        None => Variant::EnvironmentMetrics(EnvironmentMetrics {
+            temperature: Some(21.0),
+            ..Default::default()
+        }),
+    };
+    let packet = MeshPacket {
+        from: node_id as u32,
+        payload_variant: Some(PayloadVariant::Decoded(Data {
+            portnum: PortNum::TelemetryApp as i32,
+            payload: Telemetry {
+                variant: Some(variant),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+            ..Default::default()
+        })),
+        ..Default::default()
+    };
+    sqlx::query(
+        "INSERT INTO packet (id, portnum, from_node_id, payload, import_time_us) \
+         VALUES (?, 67, ?, ?, ?)",
+    )
+    .bind(id)
+    .bind(node_id)
+    .bind(packet.encode_to_vec())
+    .bind(at)
+    .execute(&api.pool)
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn the_utilization_is_the_latest_device_telemetry_only_when_asked() {
+    let api = api().await;
+    some_nodes(&api).await;
+    let now = now_us();
+    let hour = 3_600_000_000;
+    // Alfa: an older report, the latest, then environment metrics after it.
+    telemetry(&api, 20, 1, Some((10.0, 1.0)), now - hour).await;
+    telemetry(&api, 21, 1, Some((18.3, 2.25)), now - 2_000_000).await;
+    telemetry(&api, 22, 1, None, now - 1_000_000).await;
+    // Charlie: only one from before the window.
+    telemetry(&api, 23, 3, Some((50.0, 9.0)), now - 3 * hour).await;
+
+    let (status, body) = api
+        .get("/api/v1/nodes?sort=node_id&fields=channel_utilization,air_util_tx")
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["nodes"],
+        json!([
+            {"node_id": 1, "channel_utilization": 18.3, "air_util_tx": 2.25},
+            {"node_id": 2, "channel_utilization": null, "air_util_tx": null},
+            {"node_id": 3, "channel_utilization": null, "air_util_tx": null},
+        ])
+    );
+    // One without the other, and neither among every field.
+    let (_, one) = api
+        .get("/api/v1/nodes?node_id=1&fields=channel_utilization")
+        .await;
+    assert_eq!(
+        one["nodes"],
+        json!([{"node_id": 1, "channel_utilization": 18.3}])
+    );
+    let (_, all) = api.get("/api/v1/nodes?node_id=1").await;
+    assert!(all["nodes"][0].get("channel_utilization").is_none());
+}
+
 #[tokio::test]
 async fn facets_count_the_nodes_by_field() {
     let api = api().await;
