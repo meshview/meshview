@@ -177,7 +177,7 @@ Every push to `master` and every pull request runs, in `.github/workflows/ci.yml
 
 | Job | |
 |---|---|
-| Format, lint and test | `cargo fmt --check`, clippy with warnings as errors, `cargo test --workspace --locked`. |
+| Format, lint and test | `cargo fmt --check`, clippy with warnings as errors, with every feature and without PostgreSQL, and `cargo test --workspace --locked` against a PostgreSQL 18 service, so that its tests run too. |
 | Static binary | For `amd64` and `arm64`, musl, checked to have no dynamic loader. |
 | Container image | Built from those binaries, started, asked `/readyz`, `/api/openapi.json` and a redirect, stopped, and checked to have left nothing but `packets.db` in `/data`. Published to GHCR on a push. |
 | Release page | Only for a tag: see below. |
