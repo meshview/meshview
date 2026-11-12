@@ -144,8 +144,10 @@ fn readable_size(bytes: u64) -> String {
 }
 
 fn database_size(config: &Config) -> Option<u64> {
-    let DatabaseUrl::Sqlite(path) = config.database().ok()?;
-    std::fs::metadata(path).ok().map(|metadata| metadata.len())
+    match config.database().ok()? {
+        DatabaseUrl::Sqlite(path) => std::fs::metadata(path).ok().map(|metadata| metadata.len()),
+        DatabaseUrl::Postgres(_) => None,
+    }
 }
 
 /// Health

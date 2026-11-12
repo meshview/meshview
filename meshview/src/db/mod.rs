@@ -2,60 +2,192 @@
 // Copyright (C) 2026 Óscar García Amor <ogarcia@connectical.com>
 
 //! The database, and the line between what is true of any of them and what is
-//! true of SQLite.
+//! true of each.
 //!
-//! Only SQLite exists for now. Everything that knows it is talking to SQLite —
-//! connection options, its catalogue, its migrations — lives in [`sqlite`], so
-//! that PostgreSQL can arrive as a sibling module rather than as a rewrite. What
-//! sits here is what the rest of the program reasons about whichever database it
-//! is.
+//! SQLite always, and PostgreSQL with the `postgres` feature. Everything that
+//! knows which one it is talking to — connection options, the catalogue, the
+//! migrations, the SQL — lives in [`sqlite`] or [`postgres`]. What sits here is
+//! what the rest of the program reasons about whichever database it is, and a
+//! [`Pool`] that is one or the other.
 
+#[cfg(feature = "postgres")]
+pub mod postgres;
 pub mod sqlite;
 
-use anyhow::Result;
+use crate::config::DatabaseUrl;
+use anyhow::{Result, bail};
 use sqlx::SqlitePool;
 use std::fmt;
+use std::path::Path;
+
+/// Connections to the database, whichever it is.
+#[derive(Debug, Clone)]
+pub enum Pool {
+    Sqlite(SqlitePool),
+    #[cfg(feature = "postgres")]
+    Postgres(sqlx::PgPool),
+}
+
+impl From<SqlitePool> for Pool {
+    fn from(pool: SqlitePool) -> Self {
+        Self::Sqlite(pool)
+    }
+}
+
+/// Refuses PostgreSQL in a build without it.
+#[cfg(not(feature = "postgres"))]
+fn no_postgres() -> anyhow::Error {
+    anyhow::anyhow!(
+        "this build of Meshview has no PostgreSQL support: use a SQLite connection string, or \
+         a build with the `postgres` feature"
+    )
+}
+
+/// The versions of the migrations this build carries, in order. Both databases
+/// carry the same steps under the same numbers.
+pub fn known_versions(database: &DatabaseUrl) -> Vec<i64> {
+    match database {
+        DatabaseUrl::Sqlite(_) => sqlite::known_versions(),
+        #[cfg(feature = "postgres")]
+        DatabaseUrl::Postgres(_) => postgres::known_versions(),
+        #[cfg(not(feature = "postgres"))]
+        DatabaseUrl::Postgres(_) => Vec::new(),
+    }
+}
+
+/// Opens the database for writing, creating what it can, and brings its schema
+/// up to date.
+pub async fn open_for_writing(database: &DatabaseUrl) -> Result<Pool> {
+    match database {
+        DatabaseUrl::Sqlite(path) => Ok(Pool::Sqlite(sqlite::open_for_writing(path).await?)),
+        #[cfg(feature = "postgres")]
+        DatabaseUrl::Postgres(url) => Ok(Pool::Postgres(
+            postgres::open_for_writing(url, &database.to_string()).await?,
+        )),
+        #[cfg(not(feature = "postgres"))]
+        DatabaseUrl::Postgres(_) => Err(no_postgres()),
+    }
+}
+
+/// Opens the database for reading, without ever changing it. `None` while a
+/// SQLite file is not there yet.
+pub async fn open_for_reading(database: &DatabaseUrl) -> Result<Option<Pool>> {
+    match database {
+        DatabaseUrl::Sqlite(path) => Ok(sqlite::open_for_reading(path).await?.map(Pool::Sqlite)),
+        #[cfg(feature = "postgres")]
+        DatabaseUrl::Postgres(url) => Ok(Some(Pool::Postgres(
+            postgres::open_for_reading(url, &database.to_string()).await?,
+        ))),
+        #[cfg(not(feature = "postgres"))]
+        DatabaseUrl::Postgres(_) => Err(no_postgres()),
+    }
+}
+
+/// Opens one read connection that does not warn about slow statements.
+pub async fn open_quietly_for_reading(database: &DatabaseUrl) -> Result<Pool> {
+    match database {
+        DatabaseUrl::Sqlite(path) => {
+            Ok(Pool::Sqlite(sqlite::open_quietly_for_reading(path).await?))
+        }
+        #[cfg(feature = "postgres")]
+        DatabaseUrl::Postgres(url) => Ok(Pool::Postgres(
+            postgres::open_quietly_for_reading(url, &database.to_string()).await?,
+        )),
+        #[cfg(not(feature = "postgres"))]
+        DatabaseUrl::Postgres(_) => Err(no_postgres()),
+    }
+}
+
+/// What the database holds, read from its catalogue.
+pub async fn inspect(pool: &Pool) -> Result<Schema> {
+    match pool {
+        Pool::Sqlite(pool) => sqlite::inspect(pool).await,
+        #[cfg(feature = "postgres")]
+        Pool::Postgres(pool) => postgres::inspect(pool).await,
+    }
+}
+
+/// Closes the writer: for SQLite, folding its log back in first.
+pub async fn close_writer(pool: Pool) {
+    match pool {
+        Pool::Sqlite(pool) => sqlite::close_writer(pool).await,
+        #[cfg(feature = "postgres")]
+        Pool::Postgres(pool) => pool.close().await,
+    }
+}
+
+/// Closes a pool that only read, waiting for its connections.
+pub async fn close_reader(pool: Pool) {
+    match pool {
+        Pool::Sqlite(pool) => sqlite::close_reader(pool).await,
+        #[cfg(feature = "postgres")]
+        Pool::Postgres(pool) => pool.close().await,
+    }
+}
+
+/// Copies the database to `output`. Only for SQLite: PostgreSQL has its own
+/// tools for that, which do it better than anything here could.
+pub async fn backup(database: &DatabaseUrl, output: &Path) -> Result<u64> {
+    match database {
+        DatabaseUrl::Sqlite(path) => sqlite::backup(path, output).await,
+        DatabaseUrl::Postgres(_) => bail!(
+            "meshview backup copies SQLite databases; back PostgreSQL up with its own tools, \
+             such as pg_dump"
+        ),
+    }
+}
+
+/// Hands a read to the module of the database the pool is on.
+macro_rules! on {
+    ($self:ident, $name:ident ( $($arg:expr),* )) => {
+        match &$self.pool {
+            Pool::Sqlite(pool) => sqlite::queries::$name(pool $(, $arg)*).await,
+            #[cfg(feature = "postgres")]
+            Pool::Postgres(_) => bail!("PostgreSQL reads are not written yet"),
+        }
+    };
+}
 
 /// Reading the database, for the web server and the API.
 ///
 /// Every query the web side makes is a method here, and nothing outside `db`
-/// writes SQL. Today each method hands over to [`sqlite::queries`]; a PostgreSQL
-/// backend makes this an enum over the two, and nothing that calls it changes.
+/// writes SQL. Each hands over to the queries of the database the pool is on,
+/// and nothing that calls it needs to know which.
 #[derive(Debug, Clone)]
 pub struct Reader {
-    pool: SqlitePool,
+    pool: Pool,
 }
 
 impl Reader {
-    pub fn new(pool: SqlitePool) -> Self {
-        Self { pool }
+    pub fn new(pool: impl Into<Pool>) -> Self {
+        Self { pool: pool.into() }
     }
 
     /// The pool, for closing it.
-    pub fn pool(&self) -> &SqlitePool {
+    pub fn pool(&self) -> &Pool {
         &self.pool
     }
 
     /// The channels of the packets imported since `since_us`, without repeats,
     /// in byte order.
     pub async fn channels_since(&self, since_us: i64) -> Result<Vec<String>> {
-        sqlite::queries::channels_since(&self.pool, since_us).await
+        on!(self, channels_since(since_us))
     }
 
     /// The daily snapshots, oldest first: all of them, or only the latest
     /// `latest` days.
     pub async fn daily_snapshots(&self, latest: Option<i64>) -> Result<Vec<DailySnapshot>> {
-        sqlite::queries::daily_snapshots(&self.pool, latest).await
+        on!(self, daily_snapshots(latest))
     }
 
     /// When the latest packet was imported, if there is any.
     pub async fn last_import_us(&self) -> Result<Option<i64>> {
-        sqlite::queries::last_import_us(&self.pool).await
+        on!(self, last_import_us())
     }
 
     /// The latest run of a daily job, if it has run.
     pub async fn latest_job_run(&self, job: &str) -> Result<Option<JobRun>> {
-        sqlite::queries::latest_job_run(&self.pool, job).await
+        on!(self, latest_job_run(job))
     }
 
     /// How many packets were imported in each hour or day since `filter.since_us`,
@@ -65,38 +197,38 @@ impl Reader {
         period: Period,
         filter: &PacketFilter,
     ) -> Result<Vec<PeriodCount>> {
-        sqlite::queries::packets_per_period(&self.pool, period, filter).await
+        on!(self, packets_per_period(period, filter))
     }
 
     /// How many packets match `filter`, all of them when it is `None`.
     pub async fn count_packets(&self, filter: Option<&PacketFilter>) -> Result<i64> {
-        sqlite::queries::count_packets(&self.pool, filter).await
+        on!(self, count_packets(filter))
     }
 
     /// How many sightings there are: of one packet, of the packets matching a
     /// filter, or all of them.
     pub async fn count_sightings(&self, of: SightingsOf<'_>) -> Result<i64> {
-        sqlite::queries::count_sightings(&self.pool, of).await
+        on!(self, count_sightings(of))
     }
 
     /// The nodes by traffic, the most heard first, and how many there are.
     pub async fn top_nodes(&self, query: &TopQuery) -> Result<(i64, Vec<TopNode>)> {
-        sqlite::queries::top_nodes(&self.pool, query).await
+        on!(self, top_nodes(query))
     }
 
     /// The nodes matching a filter, in order, a page of them if asked.
     pub async fn nodes(&self, query: &NodeQuery) -> Result<Vec<Node>> {
-        sqlite::queries::nodes(&self.pool, query).await
+        on!(self, nodes(query))
     }
 
     /// One node, by its number.
     pub async fn node(&self, node_id: i64) -> Result<Option<Node>> {
-        sqlite::queries::node(&self.pool, node_id).await
+        on!(self, node(node_id))
     }
 
     /// The stored node info packets a node sent, the latest first.
     pub async fn nodeinfo_payloads(&self, node_id: i64) -> Result<Vec<Option<Vec<u8>>>> {
-        sqlite::queries::nodeinfo_payloads(&self.pool, node_id).await
+        on!(self, nodeinfo_payloads(node_id))
     }
 
     /// The latest position packet and map report of each of these nodes: the
@@ -105,7 +237,7 @@ impl Reader {
         &self,
         node_ids: &[i64],
     ) -> Result<Vec<(i64, i64, Option<i64>, Option<Vec<u8>>)>> {
-        sqlite::queries::latest_positions(&self.pool, node_ids).await
+        on!(self, latest_positions(node_ids))
     }
 
     /// The telemetry packets heard since a time, the latest first: the sender
@@ -114,7 +246,7 @@ impl Reader {
         &self,
         since_us: i64,
     ) -> Result<Vec<(Option<i64>, Option<Vec<u8>>)>> {
-        sqlite::queries::telemetry_since(&self.pool, since_us).await
+        on!(self, telemetry_since(since_us))
     }
 
     /// The packets imported since a time, map reports aside, counted by
@@ -123,45 +255,45 @@ impl Reader {
         &self,
         since_us: i64,
     ) -> Result<Vec<(Option<String>, bool, i64)>> {
-        sqlite::queries::packets_by_channel(&self.pool, since_us).await
+        on!(self, packets_by_channel(since_us))
     }
 
     /// How many nodes match a filter.
     pub async fn count_nodes(&self, filter: &NodeFilter) -> Result<i64> {
-        sqlite::queries::count_nodes(&self.pool, filter).await
+        on!(self, count_nodes(filter))
     }
 
     /// The values a node field has among the nodes matching a filter, the most
     /// common first, with how many nodes have each.
     pub async fn node_facet(&self, field: NodeFacet, filter: &NodeFilter) -> Result<Vec<Facet>> {
-        sqlite::queries::node_facet(&self.pool, field, filter).await
+        on!(self, node_facet(field, filter))
     }
 
     /// The traceroute rows of a packet, one per gateway that heard it, the
     /// first heard first, at most `limit`.
     pub async fn traceroutes(&self, packet_id: i64, limit: i64) -> Result<Vec<TracerouteRow>> {
-        sqlite::queries::traceroutes(&self.pool, packet_id, limit).await
+        on!(self, traceroutes(packet_id, limit))
     }
 
     /// The traceroute rows imported since a time, the first imported first,
     /// with the endpoints of their packet.
     pub async fn traceroutes_since(&self, since_us: i64) -> Result<Vec<TracerouteHop>> {
-        sqlite::queries::traceroutes_since(&self.pool, since_us).await
+        on!(self, traceroutes_since(since_us))
     }
 
     /// One packet, by its row id.
     pub async fn packet(&self, id: i64) -> Result<Option<PacketRow>> {
-        sqlite::queries::packet(&self.pool, id).await
+        on!(self, packet(id))
     }
 
     /// The latest packets matching a filter, latest first.
     pub async fn packets(&self, query: &PacketQuery) -> Result<Vec<PacketRow>> {
-        sqlite::queries::packets(&self.pool, query).await
+        on!(self, packets(query))
     }
 
     /// Every sighting of one packet, latest first.
     pub async fn packet_sightings(&self, packet_id: i64) -> Result<Vec<PacketSeen>> {
-        sqlite::queries::packet_sightings(&self.pool, packet_id).await
+        on!(self, packet_sightings(packet_id))
     }
 }
 

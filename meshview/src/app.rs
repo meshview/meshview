@@ -9,14 +9,13 @@
 //! what lets one ingester feed any number of web servers.
 
 use crate::config::{Config, DatabaseUrl};
+use crate::db::Pool;
 use crate::db::{self, Compatibility};
 use crate::ingest::{self, store::Store};
 use crate::jobs;
 use crate::state::{AppState, CHECK_DATABASE, CHECK_MQTT, Readiness};
 use crate::web;
 use anyhow::{Context, Result, bail};
-use sqlx::SqlitePool;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
@@ -71,17 +70,13 @@ pub async fn run_until(
     stop: watch::Sender<bool>,
     stopping: watch::Receiver<bool>,
 ) -> Result<()> {
-    let DatabaseUrl::Sqlite(database) = config.database()?;
-    info!(
-        "database {} ({})",
-        database.display(),
-        config.database_origin()
-    );
+    let database = config.database()?;
+    info!("database {database} ({})", config.database_origin());
 
     if role == Role::Migrate {
-        let pool = db::sqlite::open_for_writing(&database).await?;
-        db::sqlite::close_writer(pool).await;
-        info!("{} is up to date", database.display());
+        let pool = db::open_for_writing(&database).await?;
+        db::close_writer(pool).await;
+        info!("{database} is up to date");
         return Ok(());
     }
 
@@ -181,14 +176,14 @@ pub async fn run_until(
         let _ = warming.await;
     }
     if let Some(reader) = state_reader.get().cloned() {
-        db::sqlite::close_reader(reader.pool().clone()).await;
+        db::close_reader(reader.pool().clone()).await;
     }
     if let Some(jobs) = jobs {
         // A job in the middle of something is abandoned, which rolls it back.
         let _ = jobs.await;
     }
     if let Some(writer) = writer {
-        db::sqlite::close_writer(writer).await;
+        db::close_writer(writer).await;
     }
     info!("stopped");
 
@@ -197,13 +192,9 @@ pub async fn run_until(
 
 /// Copies the database to `output`, for a scheduler outside Meshview to keep.
 pub async fn backup(config: &Config, output: &std::path::Path) -> Result<()> {
-    let DatabaseUrl::Sqlite(database) = config.database()?;
-    let size = db::sqlite::backup(&database, output).await?;
-    info!(
-        "{} copied to {} ({size} bytes)",
-        database.display(),
-        output.display()
-    );
+    let database = config.database()?;
+    let size = db::backup(&database, output).await?;
+    info!("{database} copied to {} ({size} bytes)", output.display());
     Ok(())
 }
 
@@ -216,9 +207,9 @@ const TOP_WINDOW_US: i64 = 86_400 * 1_000_000;
 /// first visitor waits seconds for each, after which it is instant. Done on a
 /// connection of its own, which does not warn about slow statements as the
 /// web's do, and given up as soon as the process stops.
-async fn warm_cache(database: PathBuf, stopping: watch::Receiver<bool>) {
+async fn warm_cache(database: DatabaseUrl, stopping: watch::Receiver<bool>) {
     let started = std::time::Instant::now();
-    let pool = match db::sqlite::open_quietly_for_reading(&database).await {
+    let pool = match db::open_quietly_for_reading(&database).await {
         Ok(pool) => pool,
         Err(e) => {
             debug!("not warming the cache: {e:#}");
@@ -247,16 +238,16 @@ async fn warm_cache(database: PathBuf, stopping: watch::Receiver<bool>) {
         },
         _ = wait_until(stopping) => {}
     }
-    pool.close().await;
+    db::close_reader(pool).await;
 }
 
 /// Gets the database where this role needs it, and says so through readiness.
 /// Answers the writer, for a role that ingests.
-async fn prepare(role: Role, database: PathBuf, state: AppState) -> Result<Option<SqlitePool>> {
+async fn prepare(role: Role, database: DatabaseUrl, state: AppState) -> Result<Option<Pool>> {
     // The writer migrates. Doing it before the reader looks is what lets `run`
     // be ready at once instead of waiting on itself.
     let writer = if role.ingests() {
-        Some(db::sqlite::open_for_writing(&database).await?)
+        Some(db::open_for_writing(&database).await?)
     } else {
         None
     };
@@ -279,13 +270,13 @@ async fn prepare(role: Role, database: PathBuf, state: AppState) -> Result<Optio
 /// behind, means the ingester has not got to it and the thing to do is wait. One
 /// that is ahead was migrated by a newer build and would be misread, and one that
 /// cannot be migrated never will be: both stop the process.
-async fn wait_for_schema(database: &std::path::Path) -> Result<SqlitePool> {
-    let known = db::sqlite::known_versions();
+async fn wait_for_schema(database: &DatabaseUrl) -> Result<Pool> {
+    let known = db::known_versions(database);
     let mut said = false;
 
     loop {
-        if let Some(pool) = db::sqlite::open_for_reading(database).await? {
-            let schema = db::sqlite::inspect(&pool).await?;
+        if let Some(pool) = db::open_for_reading(database).await? {
+            let schema = db::inspect(&pool).await?;
             match schema.compatibility(&known) {
                 Compatibility::Current => return Ok(pool),
                 Compatibility::Behind => {
@@ -298,18 +289,14 @@ async fn wait_for_schema(database: &std::path::Path) -> Result<SqlitePool> {
                     latest_known,
                     found,
                 } => bail!(
-                    "{} has been migrated to {found} by a newer Meshview, and this one only \
-                     knows up to {latest_known}: run the newer version",
-                    database.display()
+                    "{database} has been migrated to {found} by a newer Meshview, and this one \
+                     only knows up to {latest_known}: run the newer version"
                 ),
-                Compatibility::Incompatible(why) => bail!("{}: {why}", database.display()),
+                Compatibility::Incompatible(why) => bail!("{database}: {why}"),
             }
-            pool.close().await;
+            db::close_reader(pool).await;
         } else if !said {
-            info!(
-                "{} does not exist yet; waiting for the ingester to create it",
-                database.display()
-            );
+            info!("{database} does not exist yet; waiting for the ingester to create it");
             said = true;
         }
 
