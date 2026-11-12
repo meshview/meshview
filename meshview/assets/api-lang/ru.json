@@ -193,6 +193,7 @@
   "The database cannot be read": "Не удаётся прочитать базу данных",
   "The database's size, readable, as `412.37 MB`, when it can be known: the file's in SQLite, the database's in PostgreSQL.": "Размер базы данных в удобочитаемом виде, например `412.37 MB`, если его можно узнать: размер файла в SQLite, размер базы данных в PostgreSQL.",
   "The date of the commit it was built from, `unknown` when that was not known at build time. The Python version gave its release date here.": "Дата коммита, из которого выполнена сборка; `unknown`, если она не была известна при сборке. Версия на Python указывала здесь дату выпуска.",
+  "The day the weekly net page's weeks start on, in English and lower case: `monday` unless configured.": "День, с которого начинаются недели на странице еженедельной переклички, по-английски и строчными буквами: `monday`, если не задано.",
   "The days, oldest first; none when nothing has been recorded.": "Дни от старых к новым; пусто, если ничего не записано.",
   "The facets": "Распределение",
   "The field to sort by, `-` in front for descending: `short_name`, `long_name`, `hw_model`, `firmware`, `role`, `channel`, `last_lat`, `last_long`, `last_altitude`, `is_mqtt_gateway`, `first_seen_us`, `last_seen_us` or `node_id`. Default: by short name.": "Поле сортировки, с `-` впереди для убывания: `short_name`, `long_name`, `hw_model`, `firmware`, `role`, `channel`, `last_lat`, `last_long`, `last_altitude`, `is_mqtt_gateway`, `first_seen_us`, `last_seen_us` или `node_id`. По умолчанию: по короткому имени.",
