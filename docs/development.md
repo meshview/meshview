@@ -133,8 +133,8 @@ converted, and are developed here now.
 
 A few templates are not pages but parts the pages include: the node page's
 coverage help (`coverage-help.html`), the map's dot borders
-(`marker-stroke.js`) and the footer's link to the project
-(`footer-project.html`).
+(`marker-stroke.js`) and the footer's corner for the project, with its link
+to GitHub and the about dialog (`footer-project.html`).
 
 Templates translate their strings with the `tr` filter, `{{ "Text" | tr }}`,
 from the `ui` section of the catalogs under `meshview/assets/lang/`, keyed by

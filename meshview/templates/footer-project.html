@@ -1,6 +1,24 @@
-{#- The footer's link to the project, with the version answering and the commit
-    it was built from, which tells one development build from the next. -#}
-<a class="mesh-footer-project" href="https://github.com/meshview/meshview" target="_blank" rel="noopener" title="{{ "Meshview on GitHub" | tr }}">
-        <span class="ti ti-brand-github" aria-hidden="true"></span>
-        <span id="site-version">Meshview {{ build_version }}{% if build_revision %} ({{ build_revision }}){% endif %}</span><span class="visually-hidden"> · GitHub</span>
-    </a>
+{#- The footer's corner for the project: the GitHub icon goes to the repository,
+    and the version, with the commit it was built from, which tells one
+    development build from the next, opens the about dialog. -#}
+<span class="mesh-footer-project">
+    <a class="mesh-footer-github" href="https://github.com/meshview/meshview" target="_blank" rel="noopener" title="{{ "Meshview on GitHub" | tr }}" aria-label="{{ "Meshview on GitHub" | tr }}"><span class="ti ti-brand-github" aria-hidden="true"></span></a>
+    <button type="button" id="site-version" class="mesh-footer-about" aria-haspopup="dialog" aria-controls="mesh-about" title="{{ "About Meshview" | tr }}">Meshview {{ build_version }}{% if build_revision %} ({{ build_revision }}){% endif %}</button>
+</span>
+<dialog id="mesh-about" class="mesh-dialog mesh-about" aria-labelledby="mesh-about-title">
+    <button type="button" class="mesh-dialog-close" aria-label="{{ "Close" | tr }}" title="{{ "Close" | tr }}"><span class="ti ti-x" aria-hidden="true"></span></button>
+    <div class="mesh-about-body">
+        <img src="/static/meshview-icon.svg" width="72" height="72" alt="">
+        <h2 id="mesh-about-title">Meshview</h2>
+        <p class="mesh-about-version">{{ build_version }}{% if build_revision %} ({{ build_revision }}){% endif %}</p>
+        <p>{{ "Meshview reads a Meshtastic mesh network from an MQTT broker and shows it as it happens: a map of its nodes, the packets they send, the paths those packets take, and statistics about all of it." | tr }}</p>
+        <nav class="mesh-about-links" aria-label="{{ "About Meshview" | tr }}">
+            <a href="https://meshview.github.io/{% if ui_language == "es" %}es/{% endif %}" target="_blank" rel="noopener"><span class="ti ti-world-www" aria-hidden="true"></span> {{ "Website" | tr }}</a>
+            <a href="https://github.com/meshview/meshview" target="_blank" rel="noopener"><span class="ti ti-brand-github" aria-hidden="true"></span> GitHub</a>
+            <a href="https://github.com/meshview/meshview/issues" target="_blank" rel="noopener"><span class="ti ti-bug" aria-hidden="true"></span> {{ "Report a problem" | tr }}</a>
+            <a href="https://meshview.world" target="_blank" rel="noopener"><span class="ti ti-world" aria-hidden="true"></span> MeshviewWorld</a>
+        </nav>
+        <p class="mesh-about-small"><a href="https://github.com/meshview/meshview/blob/master/LICENSE" target="_blank" rel="noopener">{{ "Free software under the AGPL, version 3 or later" | tr }}</a></p>
+        <p class="mesh-about-small">{{ "Made with" | tr }} <span class="mesh-about-heart" role="img" aria-label="{{ "love" | tr }}">♥</span> {{ "in Galicia, Spain, Europe" | tr }} <span aria-hidden="true">🇪🇺</span> {{ "by" | tr }} <span class="mesh-about-name">Óscar García Amor</span> {{ "and in San Francisco, California, USA" | tr }} <span aria-hidden="true">🇺🇸</span> {{ "by" | tr }} <span class="mesh-about-name">Pablo Revilla</span></p>
+    </div>
+</dialog>
