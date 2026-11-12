@@ -22,6 +22,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     let busy = false;
     let loaded = false;
     let unread = 0;
+    // Older messages, a page at a time, from where the first page ended.
+    let olderBefore = null, olderLoading = false, olderDone = false;
     let chatLang = {};
     const colors = ['#b54136', '#2563b4', '#23824d', '#8553af', '#a65d19', '#15817b', '#b63b79'];
     const timeOf = p => Number(p.import_time_us) || Date.parse(p.import_time) * 1000 || 0;
@@ -47,6 +49,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const visible = sorted.filter(p => (!channel.value || (p.channel || '') === channel.value) &&
             `${nodeName(p)} ${p.payload || ''} ${p.from_node_id} ${p.channel || ''}`.toLowerCase().includes(query));
         const fragment = document.createDocumentFragment();
+        if (packets.size) fragment.append(olderControl());
         let lastDay = '';
         const parents = new Map(sorted.map(p => [String(p.packet_id ?? p.id), p]));
         for (const packet of visible) {
@@ -102,6 +105,53 @@ document.addEventListener('DOMContentLoaded', async () => {
         syncLatest();
     }
 
+    // The top of the list: earlier messages to load, loading, or no more.
+    function olderControl() {
+        const top = document.createElement('div');
+        top.className = 'chat-older';
+        if (olderDone) {
+            top.textContent = MeshI18n.t("No earlier messages.");
+        } else if (olderLoading) {
+            top.textContent = MeshI18n.t("Loading earlier messages…");
+        } else {
+            const button = document.createElement('button');
+            button.type = 'button'; button.className = 'chat-control';
+            button.textContent = MeshI18n.t("Load earlier messages");
+            button.addEventListener('click', loadOlder);
+            top.append(button);
+        }
+        return top;
+    }
+
+    // The page before the oldest message loaded, keeping in view what was.
+    async function loadOlder() {
+        if (olderLoading || olderDone || !loaded) return;
+        olderLoading = true;
+        render();
+        try {
+            const url = new URL('/api/v1/packets', location.origin);
+            url.searchParams.set('portnum', '1'); url.searchParams.set('limit', '100');
+            url.searchParams.set('before', olderBefore);
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            if (!Array.isArray(data.packets)) throw new Error('Invalid packet response');
+            for (const packet of data.packets) {
+                if (!packets.has(String(packet.id))) packets.set(String(packet.id), packet);
+                addChannel(packet.channel);
+            }
+            olderBefore = data.next_before ?? null;
+            olderDone = olderBefore === null;
+        } catch (error) {
+            console.error('Chat older:', error);
+        } finally {
+            olderLoading = false;
+            const height = log.scrollHeight, top = log.scrollTop;
+            render();
+            log.scrollTop = top + log.scrollHeight - height;
+        }
+    }
+
     async function fetchMessages() {
         if (paused || busy || document.hidden) return;
         busy = true;
@@ -120,10 +170,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (!packets.has(id)) { packets.set(id, packet); added.add(id); }
                 addChannel(packet.channel);
             }
-            // Keep the browser's session history bounded without changing the API.
-            if (packets.size > 1000) {
-                const oldest = [...packets.values()].sort((a, b) => timeOf(a) - timeOf(b));
-                for (const p of oldest.slice(0, packets.size - 1000)) packets.delete(String(p.id));
+            // The first page says where the older ones start.
+            if (!loaded) {
+                olderBefore = data.next_before ?? null;
+                olderDone = olderBefore === null;
             }
             if (!loaded || added.size) render(follow, loaded ? added : new Set());
             if (loaded && !follow && added.size) {
@@ -148,7 +198,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     channel.addEventListener('change', () => render(true));
     search.addEventListener('input', () => render(true));
     latest.addEventListener('click', goLatest);
-    log.addEventListener('scroll', () => { if (atBottom()) { unread = 0; showUnread(); } else syncLatest(); });
+    log.addEventListener('scroll', () => {
+        if (atBottom()) { unread = 0; showUnread(); } else syncLatest();
+        // Only in a list long enough to scroll, and scrolled near its top: a
+        // short, filtered one sits at the top without asking for the whole
+        // history, and has the button for that.
+        const scrolls = log.scrollHeight > log.clientHeight + 300;
+        if (scrolls && log.scrollTop < 150) loadOlder();
+    });
     pause.addEventListener('click', () => {
         paused = !paused; pause.setAttribute('aria-pressed', String(paused));
         pause.textContent = paused ? MeshI18n.t("Resume") : MeshI18n.t("Pause");
