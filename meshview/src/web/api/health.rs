@@ -12,7 +12,7 @@
 use super::now_us;
 use super::version::REVISION;
 use crate::config::{Config, DatabaseUrl};
-use crate::db::JobRun;
+use crate::db::{JobRun, Reader};
 use crate::jobs;
 use crate::state::AppState;
 use axum::Json;
@@ -62,8 +62,8 @@ pub struct Health {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(example = 4.2)]
     pub seconds_since_last_message: Option<f64>,
-    /// The database file's size, readable, as `412.37 MB`, when it can be
-    /// known.
+    /// The database's size, readable, as `412.37 MB`, when it can be known:
+    /// the file's in SQLite, the database's in PostgreSQL.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(example = "245.66 MB")]
     pub database_size: Option<String>,
@@ -143,10 +143,11 @@ fn readable_size(bytes: u64) -> String {
     }
 }
 
-fn database_size(config: &Config) -> Option<u64> {
+/// The database's size: its file's, or what PostgreSQL says it takes.
+async fn database_size(config: &Config, db: Option<&Reader>) -> Option<u64> {
     match config.database().ok()? {
         DatabaseUrl::Sqlite(path) => std::fs::metadata(path).ok().map(|metadata| metadata.len()),
-        DatabaseUrl::Postgres(_) => None,
+        DatabaseUrl::Postgres(_) => db?.size().await.ok().flatten(),
     }
 }
 
@@ -267,7 +268,7 @@ pub async fn health(State(state): State<AppState>) -> (StatusCode, Json<Health>)
         }
     }
 
-    if let Some(bytes) = database_size(config) {
+    if let Some(bytes) = database_size(config, db).await {
         health.database_size = Some(readable_size(bytes));
         health.database_size_bytes = Some(bytes);
     }

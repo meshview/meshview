@@ -143,7 +143,7 @@ macro_rules! on {
         match &$self.pool {
             Pool::Sqlite(pool) => sqlite::queries::$name(pool $(, $arg)*).await,
             #[cfg(feature = "postgres")]
-            Pool::Postgres(_) => bail!("PostgreSQL reads are not written yet"),
+            Pool::Postgres(pool) => postgres::queries::$name(pool $(, $arg)*).await,
         }
     };
 }
@@ -166,6 +166,16 @@ impl Reader {
     /// The pool, for closing it.
     pub fn pool(&self) -> &Pool {
         &self.pool
+    }
+
+    /// What the database takes on disk, where the database itself says: in
+    /// PostgreSQL. A SQLite database is a file, and its size the file's.
+    pub async fn size(&self) -> Result<Option<u64>> {
+        match &self.pool {
+            Pool::Sqlite(_) => Ok(None),
+            #[cfg(feature = "postgres")]
+            Pool::Postgres(pool) => postgres::queries::size(pool).await,
+        }
     }
 
     /// The channels of the packets imported since `since_us`, without repeats,
