@@ -13,6 +13,7 @@
 #[cfg(feature = "postgres")]
 pub mod postgres;
 pub mod sqlite;
+pub mod write;
 
 use crate::config::DatabaseUrl;
 use anyhow::{Result, bail};

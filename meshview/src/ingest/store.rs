@@ -11,6 +11,8 @@
 //! than by accident now.
 
 use super::opened::Opened;
+use crate::db::Pool;
+use crate::db::write::{self, Arg, Tx};
 use crate::decode::BROADCAST;
 use anyhow::{Context, Result};
 use meshview_proto::meshtastic::config::device_config::Role;
@@ -19,7 +21,6 @@ use meshview_proto::meshtastic::{
     Data, HardwareModel, MapReport, MeshPacket, PortNum, Position, User,
 };
 use meshview_proto::wire;
-use sqlx::{Sqlite, SqlitePool, Transaction};
 use std::collections::HashSet;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::warn;
@@ -62,7 +63,7 @@ pub enum Outcome {
 
 /// The writer, and what it remembers between messages.
 pub struct Store {
-    pool: SqlitePool,
+    pool: Pool,
     /// Gateways already marked as such, so the mark is written once per process
     /// rather than once per packet.
     gateways: HashSet<i64>,
@@ -70,21 +71,15 @@ pub struct Store {
 
 impl Store {
     /// Takes the writer pool, and loads the gateways already marked.
-    pub async fn new(pool: impl Into<crate::db::Pool>) -> Result<Self> {
-        // Only until PostgreSQL has its own; without it there is only SQLite.
-        #[allow(clippy::infallible_destructuring_match)]
-        let pool = match pool.into() {
-            crate::db::Pool::Sqlite(pool) => pool,
-            #[cfg(feature = "postgres")]
-            crate::db::Pool::Postgres(_) => {
-                anyhow::bail!("storing packets in PostgreSQL is not written yet")
-            }
-        };
-        let gateways: Vec<i64> =
-            sqlx::query_scalar("SELECT node_id FROM node WHERE is_mqtt_gateway = 1")
-                .fetch_all(&pool)
-                .await
-                .context("loading the known gateways")?;
+    pub async fn new(pool: impl Into<Pool>) -> Result<Self> {
+        let pool = pool.into();
+        let gateways = write::integers(
+            &pool,
+            "SELECT node_id FROM node WHERE is_mqtt_gateway IS TRUE AND node_id IS NOT NULL",
+            &[],
+        )
+        .await
+        .context("loading the known gateways")?;
 
         Ok(Self {
             pool,
@@ -120,21 +115,22 @@ impl Store {
             return Ok(Outcome::NoPacketId);
         };
 
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = write::begin(&self.pool).await?;
 
-        sqlx::query(
+        tx.execute(
             "INSERT INTO packet \
              (id, portnum, from_node_id, to_node_id, payload, import_time_us, channel) \
              VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING",
+            &[
+                Arg::Int(packet_id),
+                Arg::Int(i64::from(data.portnum)),
+                Arg::Int(i64::from(packet.from)),
+                Arg::Int(storage_to_node_id(packet, data)),
+                Arg::Bytes(&opened.packet_bytes),
+                Arg::Int(now_us()),
+                Arg::Text(&envelope.channel_id),
+            ],
         )
-        .bind(packet_id)
-        .bind(data.portnum)
-        .bind(i64::from(packet.from))
-        .bind(storage_to_node_id(packet, data))
-        .bind(&opened.packet_bytes)
-        .bind(now_us())
-        .bind(&envelope.channel_id)
-        .execute(&mut *tx)
         .await
         .context("storing the packet")?;
 
@@ -152,37 +148,39 @@ impl Store {
         // exist yet, in which case nothing is marked until the next start loads
         // the cache from the database again. The Python version's behaviour.
         if self.gateways.insert(gateway) {
-            sqlx::query("UPDATE node SET is_mqtt_gateway = 1 WHERE node_id = ?")
-                .bind(gateway)
-                .execute(&mut *tx)
-                .await
-                .context("marking the gateway")?;
+            tx.execute(
+                "UPDATE node SET is_mqtt_gateway = TRUE WHERE node_id = ?",
+                &[Arg::Int(gateway)],
+            )
+            .await
+            .context("marking the gateway")?;
         }
 
-        sqlx::query(
+        tx.execute(
             "INSERT INTO packet_seen \
              (packet_id, node_id, channel, rx_time, rx_snr, rx_rssi, hop_limit, hop_start, \
               topic, import_time_us) \
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
              ON CONFLICT (packet_id, node_id, rx_time) DO NOTHING",
+            &[
+                Arg::Int(packet_id),
+                Arg::Int(gateway),
+                Arg::Text(&envelope.channel_id),
+                Arg::Int(i64::from(packet.rx_time.unwrap_or(0))),
+                // Not finite is not a reading, and JSON could not carry it anyway.
+                Arg::OptReal(
+                    packet
+                        .rx_snr
+                        .is_finite()
+                        .then_some(f64::from(packet.rx_snr)),
+                ),
+                Arg::Int(i64::from(packet.rx_rssi.unwrap_or(0))),
+                Arg::Int(i64::from(packet.hop_limit)),
+                Arg::Int(i64::from(packet.hop_start)),
+                Arg::Text(topic),
+                Arg::Int(now_us()),
+            ],
         )
-        .bind(packet_id)
-        .bind(gateway)
-        .bind(&envelope.channel_id)
-        .bind(i64::from(packet.rx_time.unwrap_or(0)))
-        // Not finite is not a reading, and JSON could not carry it anyway.
-        .bind(
-            packet
-                .rx_snr
-                .is_finite()
-                .then_some(f64::from(packet.rx_snr)),
-        )
-        .bind(packet.rx_rssi.unwrap_or(0))
-        .bind(i64::from(packet.hop_limit))
-        .bind(i64::from(packet.hop_start))
-        .bind(topic)
-        .bind(now_us())
-        .execute(&mut *tx)
         .await
         .context("storing the sighting")?;
 
@@ -217,18 +215,19 @@ impl Store {
             if has_valid_location(lat, lon) {
                 let node_id = i64::from(packet.from);
                 ensure_node_exists(&mut tx, node_id, &envelope.channel_id).await?;
-                sqlx::query(
+                tx.execute(
                     "UPDATE node SET last_lat = ?, last_long = ?, \
                      last_altitude = COALESCE(?, last_altitude), last_seen_us = ?, \
                      first_seen_us = COALESCE(first_seen_us, ?) WHERE node_id = ?",
+                    &[
+                        Arg::Int(i64::from(lat)),
+                        Arg::Int(i64::from(lon)),
+                        Arg::OptInt(position.altitude.map(i64::from)),
+                        Arg::Int(now_us()),
+                        Arg::Int(now_us()),
+                        Arg::Int(node_id),
+                    ],
                 )
-                .bind(i64::from(lat))
-                .bind(i64::from(lon))
-                .bind(position.altitude.map(i64::from))
-                .bind(now_us())
-                .bind(now_us())
-                .bind(node_id)
-                .execute(&mut *tx)
                 .await
                 .context("storing the position")?;
             }
@@ -236,17 +235,18 @@ impl Store {
 
         // One row per gateway that heard it, under the packet's own id.
         if data.portnum == PortNum::TracerouteApp as i32 {
-            sqlx::query(
+            tx.execute(
                 "INSERT INTO traceroute \
                  (packet_id, route, done, gateway_node_id, import_time_us) \
                  VALUES (?, ?, ?, ?, ?)",
+                &[
+                    Arg::Int(i64::from(packet.id)),
+                    Arg::Bytes(&data.payload),
+                    Arg::Bool(!data.want_response),
+                    Arg::Int(gateway),
+                    Arg::Int(now_us()),
+                ],
             )
-            .bind(i64::from(packet.id))
-            .bind(&data.payload)
-            .bind(!data.want_response)
-            .bind(gateway)
-            .bind(now_us())
-            .execute(&mut *tx)
             .await
             .context("storing the traceroute")?;
         }
@@ -279,54 +279,57 @@ impl Store {
         let hw_model = hw_model_name(report.hw_model);
         let role = role_name(report.role);
 
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = write::begin(&self.pool).await?;
 
         // Names as they come, unlike node info: the Python version does not
         // clean these.
-        let updated = sqlx::query(
-            "UPDATE node SET long_name = ?, short_name = ?, hw_model = ?, role = ?, \
-             channel = CASE WHEN channel IS NULL OR channel = '' THEN ? ELSE channel END, \
-             last_lat = COALESCE(?, last_lat), last_long = COALESCE(?, last_long), \
-             last_altitude = COALESCE(?, last_altitude), firmware = ?, last_seen_us = ?, \
-             first_seen_us = COALESCE(first_seen_us, ?) WHERE node_id = ?",
-        )
-        .bind(&report.long_name)
-        .bind(&report.short_name)
-        .bind(&hw_model)
-        .bind(&role)
-        .bind(channel)
-        .bind(lat)
-        .bind(lon)
-        .bind(altitude)
-        .bind(&report.firmware_version)
-        .bind(now)
-        .bind(now)
-        .bind(node_id)
-        .execute(&mut *tx)
-        .await
-        .context("updating a node from its map report")?;
+        let updated = tx
+            .execute(
+                "UPDATE node SET long_name = ?, short_name = ?, hw_model = ?, role = ?, \
+                 channel = CASE WHEN channel IS NULL OR channel = '' THEN ? ELSE channel END, \
+                 last_lat = COALESCE(?, last_lat), last_long = COALESCE(?, last_long), \
+                 last_altitude = COALESCE(?, last_altitude), firmware = ?, last_seen_us = ?, \
+                 first_seen_us = COALESCE(first_seen_us, ?) WHERE node_id = ?",
+                &[
+                    Arg::Text(&report.long_name),
+                    Arg::Text(&report.short_name),
+                    Arg::Text(&hw_model),
+                    Arg::Text(&role),
+                    Arg::Text(channel),
+                    Arg::OptInt(lat),
+                    Arg::OptInt(lon),
+                    Arg::OptInt(altitude),
+                    Arg::Text(&report.firmware_version),
+                    Arg::Int(now),
+                    Arg::Int(now),
+                    Arg::Int(node_id),
+                ],
+            )
+            .await
+            .context("updating a node from its map report")?;
 
-        if updated.rows_affected() == 0 {
-            sqlx::query(
+        if updated == 0 {
+            tx.execute(
                 "INSERT INTO node \
                  (id, node_id, long_name, short_name, hw_model, role, channel, firmware, \
                   first_seen_us, last_seen_us, last_lat, last_long, last_altitude) \
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                &[
+                    Arg::Text(&node_user_id(node_id)),
+                    Arg::Int(node_id),
+                    Arg::Text(&report.long_name),
+                    Arg::Text(&report.short_name),
+                    Arg::Text(&hw_model),
+                    Arg::Text(&role),
+                    Arg::Text(channel),
+                    Arg::Text(&report.firmware_version),
+                    Arg::Int(now),
+                    Arg::Int(now),
+                    Arg::OptInt(lat),
+                    Arg::OptInt(lon),
+                    Arg::OptInt(altitude),
+                ],
             )
-            .bind(node_user_id(node_id))
-            .bind(node_id)
-            .bind(&report.long_name)
-            .bind(&report.short_name)
-            .bind(&hw_model)
-            .bind(&role)
-            .bind(channel)
-            .bind(&report.firmware_version)
-            .bind(now)
-            .bind(now)
-            .bind(lat)
-            .bind(lon)
-            .bind(altitude)
-            .execute(&mut *tx)
             .await
             .context("adding a node from its map report")?;
         }
@@ -342,7 +345,7 @@ impl Store {
 /// node it has just found, on whichever channel reaches that one: such a node
 /// info only gives the node a channel when it has none yet.
 async fn node_info(
-    tx: &mut Transaction<'_, Sqlite>,
+    tx: &mut Tx<'_>,
     user: &User,
     node_id: i64,
     channel: &str,
@@ -374,46 +377,51 @@ async fn node_info(
                  last_seen_us = ?, first_seen_us = COALESCE(first_seen_us, ?) WHERE node_id = ?"
             }
         };
-        let query = sqlx::query(sql)
-            .bind(node_id)
-            .bind(&long_name)
-            .bind(&short_name)
-            .bind(&hw_model)
-            .bind(&role)
-            .bind(broadcast)
-            .bind(channel)
-            .bind(now)
-            .bind(now);
-        let query = if column == "id" {
-            query.bind(&user.id)
+        let key = if column == "id" {
+            Arg::Text(&user.id)
         } else {
-            query.bind(node_id)
+            Arg::Int(node_id)
         };
-        let updated = query
-            .execute(&mut **tx)
+        let updated = tx
+            .execute(
+                sql,
+                &[
+                    Arg::Int(node_id),
+                    Arg::Text(&long_name),
+                    Arg::Text(&short_name),
+                    Arg::Text(&hw_model),
+                    Arg::Text(&role),
+                    Arg::Bool(broadcast),
+                    Arg::Text(channel),
+                    Arg::Int(now),
+                    Arg::Int(now),
+                    key,
+                ],
+            )
             .await
             .context("updating a node from its node info")?;
-        if updated.rows_affected() > 0 {
+        if updated > 0 {
             return Ok(());
         }
     }
 
-    sqlx::query(
+    tx.execute(
         "INSERT INTO node \
          (id, node_id, long_name, short_name, hw_model, role, channel, first_seen_us, \
           last_seen_us) \
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        &[
+            Arg::Text(&user.id),
+            Arg::Int(node_id),
+            Arg::Text(&long_name),
+            Arg::Text(&short_name),
+            Arg::Text(&hw_model),
+            Arg::Text(&role),
+            Arg::Text(channel),
+            Arg::Int(now),
+            Arg::Int(now),
+        ],
     )
-    .bind(&user.id)
-    .bind(node_id)
-    .bind(&long_name)
-    .bind(&short_name)
-    .bind(&hw_model)
-    .bind(&role)
-    .bind(channel)
-    .bind(now)
-    .bind(now)
-    .execute(&mut **tx)
     .await
     .context("adding a node from its node info")?;
 
@@ -422,43 +430,42 @@ async fn node_info(
 
 /// Makes sure there is a row for a node about to be given a position, with a
 /// placeholder name if this is the first that is heard of it.
-async fn ensure_node_exists(
-    tx: &mut Transaction<'_, Sqlite>,
-    node_id: i64,
-    channel: &str,
-) -> Result<()> {
+async fn ensure_node_exists(tx: &mut Tx<'_>, node_id: i64, channel: &str) -> Result<()> {
     let now = now_us();
-    let updated = sqlx::query(
-        "UPDATE node SET last_seen_us = ?, first_seen_us = COALESCE(first_seen_us, ?), \
-         channel = CASE WHEN ? <> '' AND (channel IS NULL OR channel = '') THEN ? \
-                        ELSE channel END \
-         WHERE node_id = ?",
-    )
-    .bind(now)
-    .bind(now)
-    .bind(channel)
-    .bind(channel)
-    .bind(node_id)
-    .execute(&mut **tx)
-    .await
-    .context("touching a node")?;
+    let updated = tx
+        .execute(
+            "UPDATE node SET last_seen_us = ?, first_seen_us = COALESCE(first_seen_us, ?), \
+             channel = CASE WHEN ? <> '' AND (channel IS NULL OR channel = '') THEN ? \
+                            ELSE channel END \
+             WHERE node_id = ?",
+            &[
+                Arg::Int(now),
+                Arg::Int(now),
+                Arg::Text(channel),
+                Arg::Text(channel),
+                Arg::Int(node_id),
+            ],
+        )
+        .await
+        .context("touching a node")?;
 
-    if updated.rows_affected() == 0 {
+    if updated == 0 {
         let id = node_user_id(node_id);
-        let short_name = id[id.len() - 4..].to_string();
-        sqlx::query(
+        let short_name = &id[id.len() - 4..];
+        tx.execute(
             "INSERT INTO node \
              (id, node_id, long_name, short_name, channel, first_seen_us, last_seen_us) \
              VALUES (?, ?, ?, ?, ?, ?, ?)",
+            &[
+                Arg::Text(&id),
+                Arg::Int(node_id),
+                Arg::Text(&node_id.to_string()),
+                Arg::Text(short_name),
+                Arg::Text(channel),
+                Arg::Int(now),
+                Arg::Int(now),
+            ],
         )
-        .bind(&id)
-        .bind(node_id)
-        .bind(node_id.to_string())
-        .bind(short_name)
-        .bind(channel)
-        .bind(now)
-        .bind(now)
-        .execute(&mut **tx)
         .await
         .context("adding a node first heard of through its position")?;
     }
