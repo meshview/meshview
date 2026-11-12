@@ -572,3 +572,22 @@ pub async fn telemetry_since(
     .await
     .context("reading the latest telemetry")
 }
+
+/// The packets imported since a time, but for map reports, which go to the
+/// broker rather than over the mesh, counted by channel and by whether they
+/// went to everyone: the channel, the broadcast flag and the count.
+pub async fn packets_by_channel(
+    pool: &SqlitePool,
+    since_us: i64,
+) -> Result<Vec<(Option<String>, bool, i64)>> {
+    sqlx::query_as(
+        "SELECT channel, to_node_id = ? AS broadcast, count(id) FROM packet \
+         WHERE import_time_us >= ? AND portnum IS NOT 73 \
+         GROUP BY channel, broadcast ORDER BY channel, broadcast",
+    )
+    .bind(crate::decode::BROADCAST)
+    .bind(since_us)
+    .fetch_all(pool)
+    .await
+    .context("counting packets by channel")
+}

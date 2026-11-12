@@ -81,6 +81,7 @@ for changing in a future version instead.
 | `/api/v1/stats?node=` | `sent` and `seen` always 0: it read a key its query does not return | The totals it meant: packets the node sent, and packets sent to it, in the window. |
 | `/api/v1/stats` invalid `period_type` | The message lists `{'hour', 'day'}` in an order that changes from one start to the next | Always `{'hour', 'day'}`. |
 | `/api/v1/stats/count` unknown `period_type` | 500, in plain text | 400, `{"error": "period_type must be 'hour' or 'day'"}`. |
+| `/api/v1/stats/channels` | Not there | The packets of the latest hours or days by channel, to everyone and to a single node, each channel marked as named by a preset or not, for the statistics' packets by channel and by destination. |
 | `/api/v1/nodes` when the database fails | `{"nodes": []}`, as if there were none | 500, `{"error": "Failed to fetch nodes"}`. |
 | `/api/v1/nodes` with a `node_id` or `days_active` too large | An empty list without paging, a 500 with it | No nodes; or, for `days_active`, every node. |
 | `/api/v1/nodes` `position_precision` | Not there | The bits its latest position keeps, for the map's position precision layer. Only when `fields` asks for it, as it takes reading the node's latest position packets. |

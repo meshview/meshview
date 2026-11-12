@@ -452,6 +452,61 @@ async fn totals_count_what_is_asked() {
 }
 
 #[tokio::test]
+async fn packets_are_counted_by_channel_and_destination() {
+    let api = api().await;
+    let now = now_us();
+    let hour = 3_600_000_000;
+    for (id, channel, to, portnum, hours_ago) in [
+        (1_i64, Some("LongFast"), 0xffff_ffff_i64, 1_i64, 1_i64),
+        (2, Some("LongFast"), 0xffff_ffff, 3, 2),
+        (3, Some("LongFast"), 1234, 1, 3),
+        (4, Some("Galicia"), 0xffff_ffff, 1, 1),
+        (5, Some("Custom"), 0xffff_ffff, 1, 1),
+        (6, None, 5678, 70, 1),
+        // A map report, which never went over the mesh, and one too old.
+        (7, Some("LongFast"), 1, 73, 1),
+        (8, Some("Galicia"), 0xffff_ffff, 1, 30),
+    ] {
+        sqlx::query(
+            "INSERT INTO packet (id, portnum, to_node_id, channel, import_time_us) \
+             VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(id)
+        .bind(portnum)
+        .bind(to)
+        .bind(channel)
+        .bind(now - hours_ago * hour)
+        .execute(&api.pool)
+        .await
+        .unwrap();
+    }
+
+    let (status, body) = api.get("/api/v1/stats/channels").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body,
+        json!({"channels": [
+            {"channel": "LongFast", "preset": true, "broadcast": 2, "direct": 1},
+            {"channel": null, "preset": false, "broadcast": 0, "direct": 1},
+            {"channel": "Custom", "preset": false, "broadcast": 1, "direct": 0},
+            {"channel": "Galicia", "preset": false, "broadcast": 1, "direct": 0},
+        ]})
+    );
+    let (_, two_days) = api
+        .get("/api/v1/stats/channels?period_type=day&length=2")
+        .await;
+    // Galicia's older packet moves it up, the busier.
+    assert_eq!(
+        two_days["channels"][1],
+        json!({"channel": "Galicia", "preset": false, "broadcast": 2, "direct": 0})
+    );
+    assert_eq!(
+        api.get("/api/v1/stats/channels?period_type=week").await.0,
+        StatusCode::BAD_REQUEST
+    );
+}
+
+#[tokio::test]
 async fn the_top_nodes_are_the_most_heard() {
     let api = api().await;
     traffic(&api).await;

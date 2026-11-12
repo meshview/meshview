@@ -117,6 +117,15 @@ impl Reader {
         sqlite::queries::telemetry_since(&self.pool, since_us).await
     }
 
+    /// The packets imported since a time, map reports aside, counted by
+    /// channel and by whether they went to everyone.
+    pub async fn packets_by_channel(
+        &self,
+        since_us: i64,
+    ) -> Result<Vec<(Option<String>, bool, i64)>> {
+        sqlite::queries::packets_by_channel(&self.pool, since_us).await
+    }
+
     /// How many nodes match a filter.
     pub async fn count_nodes(&self, filter: &NodeFilter) -> Result<i64> {
         sqlite::queries::count_nodes(&self.pool, filter).await

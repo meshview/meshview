@@ -7,6 +7,7 @@
 use super::error::{ApiError, ErrorBody};
 use super::now_us;
 use super::params::{Params, parse_db_int};
+use super::site_config::is_preset_channel;
 use crate::db::{PacketFilter, Period, PeriodCount, SightingsOf, TopQuery};
 use crate::state::AppState;
 use axum::Json;
@@ -317,6 +318,95 @@ pub async fn count(
         total_packets,
         total_seen,
     }))
+}
+
+/// A channel's packets, split by where they went.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ChannelPackets {
+    /// The channel, as the gateway's topic names it; null when unknown.
+    #[schema(example = "LongFast")]
+    pub channel: Option<String>,
+    /// Whether one of the official presets names it, as one whose key is
+    /// commonly known: LongFast, MediumFast and the like, but not `Custom`.
+    pub preset: bool,
+    /// Packets to everyone.
+    #[schema(example = 812)]
+    pub broadcast: i64,
+    /// Packets to a single node.
+    #[schema(example = 97)]
+    pub direct: i64,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ChannelsPackets {
+    /// The channels with packets in the window, the busiest first.
+    pub channels: Vec<ChannelPackets>,
+}
+
+/// Packets by channel
+///
+/// The packets imported in the latest hours or days (by default the latest
+/// day), by channel, and on each, those to everyone and those to a single
+/// node. Map reports are left out: nodes send them to the broker, not over the
+/// mesh.
+#[utoipa::path(
+    get,
+    path = "/stats/channels",
+    tag = "stats",
+    params(
+        ("period_type" = Option<String>, Query, description = "`hour` or `day`. Default `day`."),
+        ("length" = Option<i64>, Query, description = "How many of them, 1 to 3650. Default 1."),
+    ),
+    responses(
+        (status = 200, description = "The packets by channel", body = ChannelsPackets, example = json!({
+            "channels": [
+                {"channel": "LongFast", "preset": true, "broadcast": 812, "direct": 97},
+                {"channel": "Galicia", "preset": false, "broadcast": 140, "direct": 3},
+            ],
+        })),
+        (status = 400, description = "`period_type` is not `hour` or `day`, or `length` is not valid", body = ErrorBody),
+        (status = 500, description = "They could not be counted", body = ErrorBody),
+    )
+)]
+pub async fn channels(
+    State(state): State<AppState>,
+    params: Params,
+) -> Result<Json<ChannelsPackets>, ApiError> {
+    let unit = period(params.text("period_type").unwrap_or("day"))
+        .ok_or_else(|| ApiError::bad_request("period_type must be 'hour' or 'day'"))?;
+    let length = params
+        .int("length", Some(1), Some(1), Some(3650))?
+        .unwrap_or(1);
+
+    let db = state.db()?;
+    let rows = db
+        .packets_by_channel(now_us() - length * unit.micros())
+        .await
+        .map_err(|e| ApiError::internal("Failed to count packets", &e))?;
+
+    let mut channels: Vec<ChannelPackets> = Vec::new();
+    for (channel, broadcast, count) in rows {
+        if channels.last().is_none_or(|last| last.channel != channel) {
+            channels.push(ChannelPackets {
+                preset: channel.as_deref().is_some_and(is_preset_channel),
+                channel,
+                broadcast: 0,
+                direct: 0,
+            });
+        }
+        let last = channels.last_mut().expect("just pushed");
+        if broadcast {
+            last.broadcast += count;
+        } else {
+            last.direct += count;
+        }
+    }
+    channels.sort_by(|a, b| {
+        (b.broadcast + b.direct)
+            .cmp(&(a.broadcast + a.direct))
+            .then_with(|| a.channel.cmp(&b.channel))
+    });
+    Ok(Json(ChannelsPackets { channels }))
 }
 
 #[derive(Debug, Serialize, ToSchema)]
