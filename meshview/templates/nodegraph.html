@@ -108,6 +108,7 @@
             <dt>{{ "Short Name:" | tr }}</dt><dd id="node-short-name"></dd>
             <dt>{{ "Role:" | tr }}</dt><dd id="node-role"></dd>
             <dt>{{ "Hardware Model:" | tr }}</dt><dd id="node-hw-model"></dd>
+            <dt>{{ "Channel:" | tr }}</dt><dd id="node-channel"></dd>
         </dl>
         <a id="node-info-link" href="/nodelist">{{ "Full node details ↗" | tr }}</a>
     </aside>
@@ -247,19 +248,25 @@ async function loadData() {
 // -----------------------------------
 // CHANNEL FILTER
 // -----------------------------------
+// One channel at a time, the first to begin with, or all of them together,
+// which shows the links between nodes on different channels as well (bridged
+// over UDP, or on one preset with different primary channels). The choice is
+// kept in this browser.
+const CHANNEL_KEY = "nodegraphChannel";
 function populateChannelDropdown() {
     const sel = document.getElementById("channel-select");
-    const chans = [...new Set(nodes.map(n => n.channel))].sort();
+    const chans = [...new Set(nodes.map(n => n.channel).filter(Boolean))].sort();
 
-    chans.forEach(ch => {
-        const opt = document.createElement("option");
-        opt.value = ch;
-        opt.text = ch;
-        sel.appendChild(opt);
-    });
+    sel.append(new Option(MeshI18n.t("All channels"), ""));
+    chans.forEach(ch => sel.append(new Option(ch, ch)));
 
-    selectedChannel = chans[0];
+    let saved = null;
+    try { saved = localStorage.getItem(CHANNEL_KEY); } catch (_) { /* storage unavailable */ }
+    selectedChannel = saved !== null && (saved === "" || chans.includes(saved)) ? saved : (chans[0] ?? "");
     sel.value = selectedChannel;
+    sel.addEventListener("change", () => {
+        try { localStorage.setItem(CHANNEL_KEY, sel.value); } catch (_) { /* storage unavailable */ }
+    });
 
     filterByChannel();
 }
@@ -267,7 +274,7 @@ function populateChannelDropdown() {
 function filterByChannel() {
     selectedChannel = document.getElementById("channel-select").value;
 
-    filteredNodes = nodes.filter(n => n.channel === selectedChannel);
+    filteredNodes = selectedChannel ? nodes.filter(n => n.channel === selectedChannel) : nodes;
 
     const allowed = new Set(filteredNodes.map(n => n.name));
     filteredEdges = edges.filter(e => allowed.has(e.source) && allowed.has(e.target));
@@ -350,6 +357,7 @@ function updateSelectedNode(id) {
     document.getElementById("node-short-name").innerText = n.short_name || "—";
     document.getElementById("node-role").innerText = n.role || "—";
     document.getElementById("node-hw-model").innerText = n.hw_model || "—";
+    document.getElementById("node-channel").innerText = n.channel || "—";
     document.getElementById("node-info-link").href = `/node/${encodeURIComponent(n.node_id)}`;
     document.getElementById("node-info").hidden = false;
 }
