@@ -16,9 +16,9 @@ everything it serves inside it.
 ## Status
 
 Everything the Python Meshview 4.0 does, it does: it reads its configuration,
-takes a Python Meshview database over or creates one, ingests from MQTT (plain or
-over TLS), runs the daily cleanup and snapshot, makes consistent backups, and
-serves the API and the web pages.
+takes a Python Meshview database over or creates one, in SQLite or in
+PostgreSQL, ingests from MQTT (plain or over TLS), runs the daily cleanup and
+snapshot, makes consistent backups, and serves the API and the web pages.
 
 Ingestion stores what the Python version stores, byte for byte: run side by side
 on the same broker, both write identical databases. The API answers what the

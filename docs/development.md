@@ -11,8 +11,8 @@ do, and in a crate of their own they are built once and left alone.
 | `longley-rice/` | The ITS Irregular Terrain Model in area mode, from NTIA's C++, with its own licence and README: a crate meant to be published on its own. |
 | `meshview-proto/` | The Meshtastic protobufs, vendored under `protobufs/` and compiled by prost, and their descriptors. Also `wire`, for what prost reads differently from Python's protobuf (unknown fields, fields of the wrong wire type), and `text_format`, the protobuf text format as Python writes it. |
 | `meshview/src/config.rs` | The configuration: TOML, environment variables, defaults. |
-| `meshview/src/db/` | The database. `mod.rs` is what holds for any backend; `sqlite.rs` everything that knows it is SQLite, so that PostgreSQL can be a sibling module. |
-| `meshview/migrations/sqlite/` | The SQLite migrations, compiled into the binary. |
+| `meshview/src/db/` | The database. `mod.rs` is what holds for either, and the pool that is one or the other; `sqlite/` and `postgres/` everything that knows which, each with its queries; `write.rs` the SQL the ingester and the jobs write, once for both. |
+| `meshview/migrations/sqlite/`, `meshview/migrations/postgres/` | The migrations of each database, compiled into the binary. |
 | `meshview/templates/` | The web pages' templates, Tera 2. See [The web pages](#the-web-pages). |
 | `meshview/assets/` | What the web side serves and is built into the binary: the pages' files under `static/`, the translation catalogs under `lang/`, and the API reference's introduction (`api/intro.md`) and translations (`api-lang/`). |
 | `meshview/src/ingest/` | MQTT ingestion: the connection (`mod.rs`), keys and decryption (`keys.rs`), opening a message (`opened.rs`) and storing it (`store.rs`). |
@@ -42,6 +42,17 @@ Nothing needs installing beyond Rust: SQLite is compiled in, and the protobufs
 are compiled by [protox](https://crates.io/crates/protox), so there is no
 `protoc` to have.
 
+PostgreSQL is the `postgres` feature, on by default; `cargo build
+--no-default-features` leaves it out, and the checks should pass that way too.
+Its tests need a server, named in `MESHVIEW_TEST_POSTGRES`, where the role can
+create databases: each test makes one of its own, sorting text by language
+through ICU where the server has it, and drops it. Without the variable they
+pass doing nothing.
+
+```sh
+MESHVIEW_TEST_POSTGRES=postgresql://postgres@127.0.0.1:5432/postgres cargo test --workspace
+```
+
 What the integration tests cover:
 
 | Test | |
@@ -55,13 +66,19 @@ What the integration tests cover:
 | `jobs.rs` | The daily cleanup and snapshot, the record of their runs, and `backup` copying a database that is being written. |
 | `decode.rs` | Real packets of every port, shown exactly as the Python version showed them. |
 | `revert.rs` | `scripts/revert-to-python.py` gives a taken over database back exactly as Python left it, and refuses what it cannot. Needs `python3`; skipped without it. |
+| `postgres_schema.rs` | As `schema.rs`, on PostgreSQL, against the schema the Python version leaves there. |
+| `postgres_ingest.rs` | The same messages stored in SQLite and in PostgreSQL leave the same rows. |
+| `postgres_jobs.rs` | The daily jobs do the same on either. |
+| `postgres_api.rs` | Every endpoint answers the same on either, from the same rows, NULLs, names sorted by bytes and by language, and zero bytes in payloads included. |
 
 The fixtures were made with the Python Meshview; each test says how.
 
 ## Database migrations
 
-Migrations live in `meshview/migrations/sqlite/`, numbered, and are applied
-by the writer on start. A migration that has been released is never edited: a
+Migrations live in `meshview/migrations/sqlite/` and
+`meshview/migrations/postgres/`, numbered, and are applied by the writer on
+start. Each step is in both, under the same number, written for each, and a
+test fails when the two lists disagree. A migration that has been released is never edited: a
 change is a new migration. They should only add to the schema, so that web
 servers of the previous version keep working while an update rolls out (see
 [Deployment](deployment.md#kubernetes)).
@@ -76,9 +93,13 @@ release notes.
 
 `0001_baseline.sql` is the Python Meshview's schema at Alembic revision
 `44612e74a798`, copied from what `alembic upgrade head` produces rather than from
-its models, which disagree about some indexes. Every statement in it is
-`IF NOT EXISTS`, which is what lets it adopt a Python database by changing
+its models, which disagree about some indexes; for PostgreSQL, read back with
+`pg_dump` from a database the Python version migrated there. Every statement in
+it is `IF NOT EXISTS`, which is what lets it adopt a Python database by changing
 nothing.
+
+`scripts/revert-to-python.py` is for SQLite only: there is no way back from
+PostgreSQL, and the migration guide says to try Meshview on a copy instead.
 
 ## The protobufs
 

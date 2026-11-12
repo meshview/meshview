@@ -27,4 +27,4 @@ checked against the Python version's behaviour before it was called done.
 | API | Done, answering what the Python version answers |
 | Web pages | Done, the Python version's converted to Tera 2 |
 | Coverage prediction | Done, with NTIA's model, in the [`longley-rice`](../longley-rice) crate |
-| PostgreSQL | Later |
+| PostgreSQL | Done: the Python version's schema, and the same answers as SQLite |

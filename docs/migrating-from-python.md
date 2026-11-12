@@ -16,7 +16,12 @@ To see which revision a database is at:
 
 ```sh
 sqlite3 packets.db 'SELECT version_num FROM alembic_version'
+psql postgresql://meshview@localhost/meshview -c 'SELECT version_num FROM alembic_version'
 ```
+
+What follows is for SQLite, which is what nearly every Python Meshview uses. A
+database in PostgreSQL is taken over the same way, but there is no going back
+from it: see [PostgreSQL](#postgresql).
 
 ### Taking it over
 
@@ -76,6 +81,35 @@ taking the database over. It refuses, and changes nothing, when:
 
 Every Meshview release says in its notes whether it adds a migration, and
 from which version on the script refuses.
+
+### PostgreSQL
+
+A Python Meshview on PostgreSQL is taken over as one on SQLite: the same
+revision is needed, the data is not touched, and the same bookkeeping goes and
+comes. Meshview's log names `meshview::db::postgres` instead.
+
+There is **no way back** from it: `scripts/revert-to-python.py` is for SQLite
+only. So rather than taking the database itself over, try Meshview on a copy,
+beside the Python instance, and move over once it does what you expect:
+
+1. Copy the database into a new one, with PostgreSQL's own tools:
+
+   ```sh
+   createdb -O meshview meshview_new
+   pg_dump -Fc meshview | pg_restore --no-owner --role=meshview -d meshview_new
+   ```
+
+2. Convert the configuration, as [below](#converting-configini), pointing it at
+   the copy, `postgresql://meshview:…@localhost/meshview_new`, and with a port
+   of its own if both are to serve at once.
+3. Run `meshview migrate` on it, then Meshview. Both can ingest from the same
+   broker meanwhile, each into its own database.
+4. Once satisfied, stop the Python Meshview. Its database stays as it was, as
+   the way back.
+
+The schema Meshview builds in an empty PostgreSQL database, and the one it
+leaves in a Python one, are the same, down to the names of the sequences,
+constraints and indexes.
 
 ## Converting `config.ini`
 
@@ -156,6 +190,7 @@ with every key, and [Configuration](configuration.md) has them all.
 | Stopping | the database's side files can be left behind | stops in order and leaves only the database file |
 | Backups | scheduled, copying the live file | `meshview backup`, a consistent copy, for your scheduler to run |
 | Last cleanup | a JSON file beside the cleanup log | the `job_run` table |
+| Cleanup order | packets first, then their sightings and traceroutes: in SQLite an old packet heard again lately left its new sighting pointing at nothing, and in PostgreSQL, whose foreign keys refuse that, the cleanup failed as soon as there was an old packet with a sighting | sightings and traceroutes first, then the packets nothing points at any more: an old packet heard again stays until its sightings go too |
 | Cleanup log | a file of its own | standard output, with everything else |
 | Stored packets | — | the same, byte for byte. See [Ingestion](ingestion.md). |
 
