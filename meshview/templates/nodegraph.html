@@ -51,6 +51,7 @@
 .graph-search button { display:inline-flex; align-items:center; gap:6px; height:34px; padding:0 12px; border:1px solid var(--mesh-border); border-radius:6px; background:var(--mesh-soft); color:var(--mesh-primary); font-size:13px; font-weight:500; cursor:pointer; }
 .graph-search button:hover { background:var(--mesh-hover); }
 #graph-search-status { font-size:12px; color:#b42318; }
+#graph-search-status:empty { display:none; }
 [data-bs-theme="dark"] #graph-search-status { color:#ffb4a6; }
 :is(.graph-toolbar select,.graph-toolbar input,.graph-search button):focus-visible { outline:2px solid var(--mesh-primary); outline-offset:2px; }
 
@@ -60,7 +61,16 @@
     .legend-items { grid-template-columns:repeat(2,auto); }
     .graph-tools button { justify-content:center; width:34px; padding:0; }
     .graph-tool-label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
-    .graph-search { flex-basis:100%; max-width:none; }
+    /* Channel and search stay on one line: the channel's label and the search
+       button's word go, which the select and the magnifier say well enough. */
+    .graph-toolbar { flex-wrap:nowrap; }
+    .graph-toolbar select { flex:0 1 auto; min-width:0; max-width:45%; }
+    .graph-search { flex:1 1 0; min-width:0; max-width:none; }
+    .graph-search button { justify-content:center; width:34px; padding:0; flex-shrink:0; }
+    :is(.graph-channel-label,.graph-search-label) { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+    /* A search that finds nothing says so on a line of its own. */
+    .graph-toolbar:has(#graph-search-status:not(:empty)) { flex-wrap:wrap; }
+    #graph-search-status { flex-basis:100%; }
 }
 </style>
 {% endblock %}
@@ -104,11 +114,11 @@
 </div>
 
 <div class="graph-toolbar">
-    <label for="channel-select">{{ "Channel:" | tr }}</label>
+    <label for="channel-select" class="graph-channel-label">{{ "Channel:" | tr }}</label>
     <select id="channel-select" onchange="filterByChannel()"></select>
     <form class="graph-search" role="search" onsubmit="event.preventDefault(); searchNode();">
         <input type="search" id="node-search" aria-label="{{ "Search node..." | tr }}" placeholder="{{ "Search node..." | tr }}">
-        <button type="submit"><span class="ti ti-search" aria-hidden="true"></span>{{ "Search" | tr }}</button>
+        <button type="submit" title="{{ "Search" | tr }}"><span class="ti ti-search" aria-hidden="true"></span><span class="graph-search-label">{{ "Search" | tr }}</span></button>
     </form>
     <span id="graph-search-status" role="status"></span>
 </div>
