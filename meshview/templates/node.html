@@ -37,6 +37,13 @@
 .mesh-dialog-body p { margin:0 0 10px; }
 .mesh-dialog-body ul { margin:0 0 10px; padding-left:20px; }
 .mesh-dialog-body code { padding:1px 5px; border-radius:4px; background:var(--mesh-soft); color:var(--mesh-text); font-size:12.5px; }
+/* A node's popup on the map, laid out as the map's node inspector. */
+.node-popup { min-width:240px; font-size:12px; }
+.node-popup-name { display:block; font-size:15px; font-weight:650; overflow-wrap:anywhere; }
+.node-popup-meta { color:var(--mesh-muted); font-size:11px; margin:3px 0 10px; overflow-wrap:anywhere; }
+.node-popup-facts { display:grid; grid-template-columns:auto minmax(0,1fr); gap:5px 12px; margin:0; }
+.node-popup-facts dt { color:var(--mesh-muted); font-weight:500; }
+.node-popup-facts dd { margin:0; overflow-wrap:anywhere; }
 .chart-container { position:relative; width:100%; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; margin-bottom:20px; overflow:hidden; }
 .chart-header { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:16px 20px; border-bottom:1px solid var(--mesh-border); font-size:14px; font-weight:600; }
 .chart-title { display:flex; align-items:center; gap:8px; min-width:0; margin:0; font-size:15px; font-weight:650; }
@@ -363,26 +370,28 @@ function applyTranslationsNode(dict, root=document) {
    ====================================================== */
 
 function makeNodePopup(node) {
-    const id = Number(node.node_id);
-    const hex = Number.isInteger(id) ? ` (!${id.toString(16).padStart(8, "0")})` : "";
-    // A row only for what the node has told us; firmware, above all, seldom comes.
-    const rows = [
-        ["node_id", "Node ID", `${escapeHtml(node.node_id)}${hex}`],
-        ["hw_model", "HW Model", node.hw_model && escapeHtml(node.hw_model)],
-        ["channel", "Channel", node.channel && escapeHtml(node.channel)],
-        ["role", "Role", node.role && escapeHtml(node.role)],
-        ["firmware", "Firmware", node.firmware && escapeHtml(node.firmware)],
-        ["last_update", "Last Update", node.last_seen_us && formatLastSeen(node.last_seen_us)],
-        ["first_update", "First Update", node.first_seen_us && formatLastSeen(node.first_seen_us)],
-    ].filter(([, , value]) => value).map(([key, fallback, value]) =>
-        `<b><span data-translate-lang="${key}">${nodeTranslations[key] || MeshI18n.t(fallback)}:</span></b> ${value}`);
+    const id = node.node_id;
+    const hex = Number.isInteger(Number(id)) ? ` (!${Number(id).toString(16).padStart(8, "0")})` : "";
+    const name = node.long_name || node.short_name || MeshI18n.t("Node {id}", {id});
+    const shortName = node.short_name && node.short_name !== name ? `${node.short_name} · ` : "";
+    // As the map's inspector shows a node, leaving out what the node never sent;
+    // last seen always closes.
+    const facts = [
+        [MeshI18n.t("Role"), node.role],
+        [MeshI18n.t("Channel"), node.channel],
+        ["Hardware", node.hw_model],
+        [MeshI18n.t("Firmware"), node.firmware],
+        [MeshI18n.t("Last seen"), node.last_seen_us
+            ? new Date(Number(node.last_seen_us) / 1000).toLocaleString(MeshI18n.language)
+            : MeshI18n.t("Unknown")],
+    ].filter(([, value]) => value)
+        .map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`)
+        .join("");
     return `
-        <div style="font-size:0.9em">
-            <a href="/node/${node.node_id}" style="color:inherit; text-decoration:underline;">
-                <b>${escapeHtml(node.long_name || node.short_name || node.node_id)}</b>
-            </a>
-            ${node.short_name ? ` (${escapeHtml(node.short_name)})` : ""}<br>
-            ${rows.join("<br>")}
+        <div class="node-popup">
+            <a class="node-popup-name" href="/node/${encodeURIComponent(id)}">${escapeHtml(name)}</a>
+            <p class="node-popup-meta">${escapeHtml(shortName + MeshI18n.t("Node {id}", {id}) + hex)}</p>
+            <dl class="node-popup-facts">${facts}</dl>
         </div>
     `;
 }
@@ -693,7 +702,7 @@ function addMarker(id, lat, lon, color = "red", node = null) {
         color,
         fillColor: color,
         fillOpacity: 1
-    }).addTo(map).bindPopup(popupHtml);
+    }).addTo(map).bindPopup(popupHtml, {closeButton:false});
 
     markers[id] = m;
     m.bringToFront();
@@ -825,14 +834,14 @@ async function loadTrack(){
             color: 'green',
             fillColor: 'green',
             fillOpacity: 1
-        }).addTo(map).bindPopup(node ? makeNodePopup(node) : MeshI18n.t("Start"));
+        }).addTo(map).bindPopup(node ? makeNodePopup(node) : MeshI18n.t("Start"), {closeButton:false});
 
         const endMarker = L.circleMarker([last.lat, last.lon], {
             radius: 6,
             color: 'red',
             fillColor: 'red',
             fillOpacity: 1
-        }).addTo(map).bindPopup(node ? makeNodePopup(node) : MeshI18n.t("Latest"));
+        }).addTo(map).bindPopup(node ? makeNodePopup(node) : MeshI18n.t("Latest"), {closeButton:false});
 
         markers["__track_start"] = startMarker;
         markers["__track_end"]   = endMarker;
