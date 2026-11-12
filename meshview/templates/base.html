@@ -270,6 +270,17 @@ body { min-height:100dvh; display:flex; flex-direction:column; }
 :is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tr.payload-row { display:none; grid-column:1 / -1; padding:0; overflow:hidden; }
 :is(.mesh-data-page,.mesh-dashboard) .packet-table.card-table.is-cards tr.expanded + .payload-row { display:block; }
 :is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards .payload-cell { padding:12px 14px; }
+/* As cards, the arrival cue tints the whole card instead of each of its cells. */
+:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tr.packet-arrival-glow > td { animation:none; box-shadow:none; background:none; }
+:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tr.packet-arrival-glow { animation:packet-arrival-beat-card 1s ease-in-out 1; animation-delay:var(--packet-glow-delay,0ms); box-shadow:inset 4px 0 0 var(--mesh-primary),inset 0 0 14px rgba(24,115,70,.12); }
+@keyframes packet-arrival-beat-card {
+    0%,100% { background-color:var(--mesh-surface); }
+    45% { background-color:var(--mesh-pulse-peak); }
+    75% { background-color:var(--mesh-pulse-mid); }
+}
+@media(prefers-reduced-motion:reduce) {
+    :is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tr.packet-arrival-glow { animation:none; background:var(--mesh-soft); }
+}
 :is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tr.mesh-traffic-payload { display:block; grid-column:1 / -1; padding:0; overflow:hidden; }
 :is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tr.mesh-traffic-payload td { padding:12px 14px; }
 :is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tr[hidden] { display:none; }
