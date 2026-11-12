@@ -39,7 +39,8 @@
 .mesh-dialog-body code { padding:1px 5px; border-radius:4px; background:var(--mesh-soft); color:var(--mesh-text); font-size:12.5px; }
 /* A node's popup on the map, laid out as the map's node inspector. */
 .node-popup { min-width:240px; font-size:12px; }
-.node-popup-name { display:block; font-size:15px; font-weight:650; overflow-wrap:anywhere; }
+.node-popup-title { font-size:15px; font-weight:650; overflow-wrap:anywhere; }
+.node-popup-short { color:var(--mesh-muted); font-weight:500; }
 .node-popup-meta { color:var(--mesh-muted); font-size:11px; margin:3px 0 10px; overflow-wrap:anywhere; }
 .node-popup-facts { display:grid; grid-template-columns:auto minmax(0,1fr); gap:5px 12px; margin:0; }
 .node-popup-facts dt { color:var(--mesh-muted); font-weight:500; }
@@ -373,7 +374,12 @@ function makeNodePopup(node) {
     const id = node.node_id;
     const hex = Number.isInteger(Number(id)) ? ` (!${Number(id).toString(16).padStart(8, "0")})` : "";
     const name = node.long_name || node.short_name || MeshI18n.t("Node {id}", {id});
-    const shortName = node.short_name && node.short_name !== name ? `${node.short_name} · ` : "";
+    const shortName = node.short_name && node.short_name !== name
+        ? ` <span class="node-popup-short">(${escapeHtml(node.short_name)})</span>` : "";
+    // A link to any node but the one whose page this is.
+    const title = String(id) === String(fromNodeId)
+        ? escapeHtml(name)
+        : `<a href="/node/${encodeURIComponent(id)}">${escapeHtml(name)}</a>`;
     // As the map's inspector shows a node, leaving out what the node never sent;
     // last seen always closes.
     const facts = [
@@ -389,8 +395,8 @@ function makeNodePopup(node) {
         .join("");
     return `
         <div class="node-popup">
-            <a class="node-popup-name" href="/node/${encodeURIComponent(id)}">${escapeHtml(name)}</a>
-            <p class="node-popup-meta">${escapeHtml(shortName + MeshI18n.t("Node {id}", {id}) + hex)}</p>
+            <div class="node-popup-title">${title}${shortName}</div>
+            <p class="node-popup-meta">${escapeHtml(MeshI18n.t("Node {id}", {id}) + hex)}</p>
             <dl class="node-popup-facts">${facts}</dl>
         </div>
     `;
