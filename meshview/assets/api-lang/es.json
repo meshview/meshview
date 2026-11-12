@@ -276,7 +276,7 @@
   "The tagline, for the page footer and description; empty when unset.": "El eslogan, para el pie de página y la descripción; vacío si no está definido.",
   "The template of the tiles' addresses: the configured one, or OpenStreetMap's.": "La plantilla de las direcciones de las teselas: la configurada, o la de OpenStreetMap.",
   "The text of the banner every page shows until a visitor dismisses it; empty when unset.": "El texto del aviso que muestran todas las páginas hasta que el visitante lo cierra; vacío si no está definido.",
-  "The text of the weekly net page.": "El texto de la página de la red semanal.",
+  "The text of the weekly net page; empty when not configured, and the page explains the net itself.": "El texto de la página de la red semanal; vacío si no se configura, y la página explica la red por sí misma.",
   "The threshold asked for.": "El umbral pedido.",
   "The tiles' attribution, in HTML.": "La atribución de las teselas, en HTML.",
   "The topics read.": "Los temas leídos.",

@@ -74,6 +74,7 @@ for changing in a future version instead.
 | `/api/v1/config` `cleanup` | The values as written in `config.ini`, so `minute = 00` gave `"00"` | The configured numbers, as strings, as before: `"0"`. TOML numbers have no leading zeros. |
 | `/api/v1/config` `site.version` | The Python version's | Meshview's |
 | `/api/v1/config` `site.map_channel_colors` | Only the configured colours | The colours built in for the presets' channels too, which the configured ones replace. |
+| `/api/v1/config` `site.weekly_net_message` when not configured | `Weekly Mesh check-in message.` | Empty: the weekly net page then explains the net itself, in the visitor's language. |
 | `/health` `cleanup` | From the JSON file the cleanup wrote, with its path as `status_file` | From the cleanup's latest run in `job_run`, with no `status_file`; `last_run` has the same keys. |
 | `/health` `backup` | The scheduled backups' settings and last run | `{"enabled": false, "status": "disabled"}`: Meshview does not back up by itself (see [Deployment](deployment.md#backups)). |
 | `/health` `snapshot` | Not reported | The daily snapshot's schedule, status and latest run, as `cleanup`'s. |
