@@ -63,6 +63,24 @@ pub async fn packet_sightings(pool: &SqlitePool, packet_id: i64) -> Result<Vec<P
     .context("listing the sightings of a packet")
 }
 
+pub async fn sightings_of(pool: &SqlitePool, packet_ids: &[i64]) -> Result<Vec<PacketSeen>> {
+    let mut query = QueryBuilder::new(
+        "SELECT packet_id, node_id, rx_time, hop_limit, hop_start, channel, rx_snr, rx_rssi, \
+                topic, import_time_us \
+         FROM packet_seen WHERE packet_id IN (",
+    );
+    let mut ids = query.separated(", ");
+    for id in packet_ids {
+        ids.push_bind(*id);
+    }
+    query.push(")");
+    query
+        .build_query_as()
+        .fetch_all(pool)
+        .await
+        .context("listing the sightings of packets")
+}
+
 pub async fn last_import_us(pool: &SqlitePool) -> Result<Option<i64>> {
     sqlx::query_scalar("SELECT max(import_time_us) FROM packet")
         .fetch_one(pool)

@@ -601,6 +601,8 @@ const URIS: &[&str] = &[
     "/api/v1/snapshots/daily?days=2",
     "/api/v1/packets_seen/4",
     "/api/v1/packets_seen/900",
+    "/api/v1/packets_seen?packet_ids=900,4,900,12345",
+    "/api/v1/packets_seen?packet_ids=4,x",
     "/api/v1/stats",
     "/api/v1/stats?period_type=day&length=14",
     "/api/v1/stats?period_type=hour&length=24&portnum=1",

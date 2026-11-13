@@ -384,5 +384,21 @@
   "`period_type` is not `hour` or `day`, or `length`, `packet_id`, `from_node` or `to_node` is not an integer": "`period_type` не `hour` и не `day`, или `length`, `packet_id`, `from_node` или `to_node` не является целым числом",
   "`role` is compared in upper case; `channel`, `hw_model` and `firmware` must match exactly. `search` looks for the text as it is, `%` and `_` included, in the long and short names, the `!` id and the number.": "`role` сравнивается в верхнем регистре; `channel`, `hw_model` и `firmware` должны совпадать точно. `search` ищет текст как есть, включая `%` и `_`, в длинном и коротком именах, ID с `!` и номере.",
   "`traceroute` when a traceroute went through it, `neighbor` when a node reported the other as its neighbour.": "`traceroute`, если через неё прошла трассировка, `neighbor`, если узел сообщил о другом как о соседе.",
-  "Meshview's version.": "Версия Meshview."
+  "Meshview's version.": "Версия Meshview.",
+  "Packet sightings, summed up": "Наблюдения пакетов, в сводке",
+  "For each of several packets, how many gateways heard it and the range of what they heard: signal strength, signal to noise ratio and hops taken. It is for a table of packets, where every sighting of each would be too much; `/packets_seen/{packet_id}` has those of one.": "Для каждого из нескольких пакетов: сколько шлюзов его услышали и диапазон услышанного — мощность сигнала, отношение сигнал/шум и пройденные переходы. Это для таблицы пакетов, где все наблюдения каждого были бы излишни; `/packets_seen/{packet_id}` отдаёт наблюдения одного.",
+  "Gateways go on reporting a packet for some seconds after it is first stored, so the summary of a packet just in can still grow: ask again for the latest ones.": "Шлюзы продолжают сообщать о пакете ещё несколько секунд после того, как он впервые сохранён, поэтому сводка только что пришедшего пакета может ещё вырасти: запрашивайте последние пакеты повторно.",
+  "How a packet was heard, summed up over every gateway that heard it.": "Как пакет был услышан, в сводке по всем шлюзам, которые его услышали.",
+  "The ranges leave out what a gateway did not report: the signal when its strength is 0, as for a packet a gateway sent itself rather than heard, a signal to noise ratio that was not a number, and the hops when the packet did not say how many it started with.": "Диапазоны не учитывают то, о чём шлюз не сообщил: сигнал, когда его мощность равна 0, как у пакета, который шлюз отправил сам, а не услышал; отношение сигнал/шум, не являющееся числом; и переходы, когда пакет не указал, со сколькими он начал.",
+  "How many gateways heard it, each once however many times it did.": "Сколько шлюзов его услышали, каждый один раз, сколько бы раз он его ни услышал.",
+  "One for each packet asked for that somebody heard, in the order asked.": "По одной на каждый запрошенный пакет, который кто-то услышал, в порядке запроса.",
+  "The fewest hops it had taken when heard.": "Наименьшее число переходов, пройденных к моменту, когда его услышали.",
+  "The most hops it had taken when heard.": "Наибольшее число переходов, пройденных к моменту, когда его услышали.",
+  "The highest signal to noise ratio heard, in dB.": "Наибольшее услышанное отношение сигнал/шум в дБ.",
+  "The lowest signal to noise ratio heard, in dB.": "Наименьшее услышанное отношение сигнал/шум в дБ.",
+  "The strongest signal strength heard, in dBm.": "Наибольшая услышанная мощность сигнала в дБм.",
+  "The weakest signal strength heard, in dBm.": "Наименьшая услышанная мощность сигнала в дБм.",
+  "The packets' stored ids, in decimal, separated by commas: up to 100.": "Сохранённые ID пакетов в десятичной записи через запятую: до 100.",
+  "The summaries, maybe none": "Сводки, возможно пустые",
+  "`packet_ids` is missing, has more than 100, or one is not an integer": "`packet_ids` отсутствует, содержит больше 100 значений или одно из них не является целым числом"
 }

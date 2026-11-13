@@ -34,6 +34,7 @@ pub fn v1() -> OpenApiRouter<AppState> {
         .routes(routes!(channels::channels))
         .routes(routes!(snapshots::daily))
         .routes(routes!(packets_seen::packets_seen))
+        .routes(routes!(packets_seen::sighting_summaries))
         .routes(routes!(site_config::config))
         .routes(routes!(lang::lang))
         .routes(routes!(stats::stats))

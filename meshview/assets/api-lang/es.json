@@ -384,5 +384,21 @@
   "`period_type` is not `hour` or `day`, or `length`, `packet_id`, `from_node` or `to_node` is not an integer": "`period_type` no es `hour` ni `day`, o `length`, `packet_id`, `from_node` o `to_node` no es un entero",
   "`role` is compared in upper case; `channel`, `hw_model` and `firmware` must match exactly. `search` looks for the text as it is, `%` and `_` included, in the long and short names, the `!` id and the number.": "`role` se compara en mayúsculas; `channel`, `hw_model` y `firmware` deben coincidir exactamente. `search` busca el texto tal cual, `%` y `_` incluidos, en los nombres largo y corto, el id `!` y el número.",
   "`traceroute` when a traceroute went through it, `neighbor` when a node reported the other as its neighbour.": "`traceroute` cuando un traceroute pasó por él, `neighbor` cuando un nodo informó del otro como su vecino.",
-  "Meshview's version.": "La versión de Meshview."
+  "Meshview's version.": "La versión de Meshview.",
+  "Packet sightings, summed up": "Observaciones de paquetes, resumidas",
+  "For each of several packets, how many gateways heard it and the range of what they heard: signal strength, signal to noise ratio and hops taken. It is for a table of packets, where every sighting of each would be too much; `/packets_seen/{packet_id}` has those of one.": "Para cada uno de varios paquetes, cuántos gateways lo oyeron y el rango de lo que oyeron: intensidad de la señal, relación señal/ruido y saltos dados. Es para una tabla de paquetes, donde todas las observaciones de cada uno serían demasiado; `/packets_seen/{packet_id}` da las de uno.",
+  "Gateways go on reporting a packet for some seconds after it is first stored, so the summary of a packet just in can still grow: ask again for the latest ones.": "Los gateways siguen informando de un paquete durante unos segundos después de que se guarde por primera vez, así que el resumen de un paquete recién llegado aún puede crecer: vuelve a pedir el de los más recientes.",
+  "How a packet was heard, summed up over every gateway that heard it.": "Cómo se oyó un paquete, resumido sobre todos los gateways que lo oyeron.",
+  "The ranges leave out what a gateway did not report: the signal when its strength is 0, as for a packet a gateway sent itself rather than heard, a signal to noise ratio that was not a number, and the hops when the packet did not say how many it started with.": "Los rangos dejan fuera lo que un gateway no informó: la señal cuando su intensidad es 0, como en un paquete que un gateway envió él mismo en lugar de oírlo, una relación señal/ruido que no era un número y los saltos cuando el paquete no decía con cuántos empezó.",
+  "How many gateways heard it, each once however many times it did.": "Cuántos gateways lo oyeron, cada uno una vez por muchas veces que lo oyera.",
+  "One for each packet asked for that somebody heard, in the order asked.": "Uno por cada paquete pedido que alguien oyó, en el orden pedido.",
+  "The fewest hops it had taken when heard.": "Los menos saltos que había dado cuando se oyó.",
+  "The most hops it had taken when heard.": "Los más saltos que había dado cuando se oyó.",
+  "The highest signal to noise ratio heard, in dB.": "La relación señal/ruido más alta oída, en dB.",
+  "The lowest signal to noise ratio heard, in dB.": "La relación señal/ruido más baja oída, en dB.",
+  "The strongest signal strength heard, in dBm.": "La intensidad de señal más fuerte oída, en dBm.",
+  "The weakest signal strength heard, in dBm.": "La intensidad de señal más débil oída, en dBm.",
+  "The packets' stored ids, in decimal, separated by commas: up to 100.": "Los ids almacenados de los paquetes, en decimal, separados por comas: hasta 100.",
+  "The summaries, maybe none": "Los resúmenes, quizá ninguno",
+  "`packet_ids` is missing, has more than 100, or one is not an integer": "Falta `packet_ids`, tiene más de 100 o alguno no es un número entero"
 }
