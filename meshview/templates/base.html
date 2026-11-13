@@ -141,14 +141,14 @@ input[type="checkbox"],input[type="radio"] { accent-color:var(--mesh-primary); }
 .form-check-input:focus { border-color:#91bda1; box-shadow:0 0 0 .25rem rgba(var(--mesh-primary-rgb),.2); }
 .page-link { --bs-pagination-color:var(--mesh-primary); --bs-pagination-hover-color:var(--mesh-primary-dark); --bs-pagination-active-bg:var(--mesh-primary); --bs-pagination-active-border-color:var(--mesh-primary); }
 [data-bs-theme="light"] body { background:var(--mesh-page); color:var(--mesh-text); }
-/* Tint whole cells: an edge-only shadow is too subtle on wide packet tables. */
+/* Tint whole cells, evenly: an edge-only shadow is too subtle on wide packet
+   tables, and a shadow inside each cell leaves a lighter box around its text. */
 .packet-arrival-glow > td {
     animation:packet-arrival-beat 1s ease-in-out 1;
     animation-delay:var(--packet-glow-delay,0ms);
-    box-shadow:inset 0 0 14px rgba(24,115,70,.12);
 }
 .packet-arrival-glow > td:first-child {
-    box-shadow:inset 4px 0 0 var(--mesh-primary),inset 0 0 14px rgba(24,115,70,.12);
+    box-shadow:inset 4px 0 0 var(--mesh-primary);
 }
 @keyframes packet-arrival-beat {
     0%,100% { background-color:transparent; }
