@@ -44,9 +44,9 @@
     ]
   },
   "bootstrap": {
-    "version": "5.3.3",
-    "source": "https://registry.npmjs.org/bootstrap/-/bootstrap-5.3.3.tgz",
-    "archive_sha256": "38cee936dbd80138de6775683149f22e9226fc2d654392337a921f53000c789e",
+    "version": "5.3.9",
+    "source": "https://registry.npmjs.org/bootstrap/-/bootstrap-5.3.9.tgz",
+    "archive_sha256": "06bdf78289c3c12ea99d40df84eedf6278c724c73eebf38f11f3a65b44ec8c94",
     "files": [
       "dist/js/bootstrap.bundle.min.js",
       "dist/js/bootstrap.bundle.min.js.map",
