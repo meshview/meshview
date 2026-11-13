@@ -247,6 +247,28 @@ document.addEventListener("DOMContentLoaded", async () => {
     /* ---------------------------------------------
        Map setup
     ----------------------------------------------*/
+    // A node's popup, laid out as the map's node inspector and the node page's:
+    // its names, linked to its page, what it is in this packet beside its id,
+    // and the facts given, leaving out those it has none for.
+    function nodePopup(id, node, role, facts) {
+        const hex = Number.isInteger(Number(id)) ? ` (!${Number(id).toString(16).padStart(8, "0")})` : "";
+        const name = node?.long_name || node?.short_name || MeshI18n.t("Node {id}", {id});
+        const shortName = node?.short_name && node.short_name !== name
+            ? ` <span class="node-popup-short">(${escapeHtml(node.short_name)})</span>` : "";
+        const meta = [role, MeshI18n.t("Node {id}", {id}) + hex].filter(Boolean).join(" · ");
+        const rows = facts
+            .filter(([, value]) => value != null && value !== "")
+            .map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`)
+            .join("");
+        return `
+            <div class="node-popup">
+                <div class="node-popup-title"><a href="/node/${encodeURIComponent(id)}">${escapeHtml(name)}</a>${shortName}</div>
+                <p class="node-popup-meta">${escapeHtml(meta)}</p>
+                <dl class="node-popup-facts">${rows}</dl>
+            </div>
+        `;
+    }
+
     const map = L.map("map");
     mapDiv.style.display = "block";
 
@@ -280,16 +302,12 @@ document.addEventListener("DOMContentLoaded", async () => {
             zIndexOffset: 9999
         }).addTo(map);
 
-        sourceMarker.bindPopup(`
-            <div style="font-size:0.9em">
-                <b data-translate-lang="packet_source">${packetTranslations.packet_source || MeshI18n.t("Packet Source")}</b><br>
-                ${MeshI18n.h("Lat:")} ${srcLat.toFixed(6)}<br>
-                ${MeshI18n.h("Lon:")} ${srcLon.toFixed(6)}<br>
-                <span data-translate-lang="from_node">${packetTranslations.from_node || MeshI18n.t("From Node:")}</span> ${fromNodeLabel}<br>
-                <span data-translate-lang="channel">${packetTranslations.channel || MeshI18n.t("Channel:")}</span> ${escapeHtml(p.channel ?? "—")}<br>
-                <span data-translate-lang="port">${packetTranslations.port || "Port:"}</span> ${PORT_NAMES[p.portnum] || "UNKNOWN"} (${p.portnum})
-            </div>
-        `);
+        sourceMarker.bindPopup(nodePopup(p.from_node_id, fromNodeObj,
+            MeshI18n.t("Packet Source"), [
+                [MeshI18n.t("Channel"), p.channel],
+                [MeshI18n.t("Port"), `${PORT_NAMES[p.portnum] || MeshI18n.t("UNKNOWN APP")} (${p.portnum})`],
+                [MeshI18n.t("Position"), `${srcLat.toFixed(6)}, ${srcLon.toFixed(6)}`],
+            ]), {closeButton:false});
     } else {
         map.setView([0,0], 2);
     }
@@ -414,29 +432,15 @@ seenTableBody.innerHTML = Object.keys(hopGroups)
                     })
                 }).addTo(map);
 
-                marker.bindPopup(`
-                <div style="font-size:0.9em">
-                    <b>${label}</b><br>
-                    <span data-translate-lang="node_id_short">${MeshI18n.h("Node ID")}</span>:
-                    <a href="/node/${s.node_id}">${s.node_id}</a><br>
-                    ${MeshI18n.h("HW:")} ${escapeHtml(node?.hw_model ?? "—")}<br>
-                    <span data-translate-lang="channel">${MeshI18n.h("Channel")}</span>: ${escapeHtml(s.channel ?? "—")}<br>
-                    ${
-                        distanceKm !== null
-                            ? `<span data-translate-lang="distance">${MeshI18n.h("Distance")}</span>:
-                               ${distanceKm.toFixed(1)} km / ${distanceMi.toFixed(1)} mi<br>`
-                            : ""
-                    }
-
-                    <br>
-
-                    <b data-translate-lang="signal">${MeshI18n.h("Signal")}</b><br>
-                    RSSI: ${s.rx_rssi ?? "—"}<br>
-                    SNR: ${s.rx_snr ?? "—"}<br><br>
-
-                    <b data-translate-lang="hops">${MeshI18n.h("Hops")}</b>: ${hopDisplay}
-                </div>
-            `);
+                marker.bindPopup(nodePopup(s.node_id, node, MeshI18n.t("Gateway"), [
+                    ["Hardware", node?.hw_model],
+                    [MeshI18n.t("Channel"), s.channel],
+                    [MeshI18n.t("Distance"), distanceKm !== null
+                        ? `${distanceKm.toFixed(1)} km / ${distanceMi.toFixed(1)} mi` : null],
+                    ["RSSI", s.rx_rssi],
+                    ["SNR", s.rx_snr],
+                    [MeshI18n.t("Hops"), hopDisplay],
+                ]), {closeButton:false});
 
             }
 
