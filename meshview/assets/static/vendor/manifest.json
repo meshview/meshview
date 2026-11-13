@@ -34,9 +34,9 @@
     ]
   },
   "echarts": {
-    "version": "5.5.0",
-    "source": "https://registry.npmjs.org/echarts/-/echarts-5.5.0.tgz",
-    "archive_sha256": "9e5771738a966d74ca027b0987499cddafe24f5271767b23cee6badb010bf058",
+    "version": "6.1.0",
+    "source": "https://registry.npmjs.org/echarts/-/echarts-6.1.0.tgz",
+    "archive_sha256": "681aff88cc1038c3fa941a3a53d1b177a52250b05335efc607d6105ae13be481",
     "files": [
       "dist/echarts.min.js",
       "LICENSE",

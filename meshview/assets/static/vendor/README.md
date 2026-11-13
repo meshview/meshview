@@ -18,7 +18,7 @@ To update a library:
 4. Check the affected pages in a browser, including maps, charts, and QR codes,
    and remove the old version once no references remain.
 
-All charts use ECharts 5.5.0, including pages that previously loaded an unpinned
+All charts use ECharts 6.1.0, including pages that previously loaded an unpinned
 version. Leaflet is 1.9.4, Leaflet Heat is 0.2.0, PolylineDecorator is 1.6.0,
 Bootstrap is 5.3.9, and QRCode.js is 1.0.0.
 
