@@ -7,6 +7,17 @@
 <style>
 .firehose-filter { width:190px; }
 @media(max-width:700px) { .firehose-filter { flex:1; width:120px; } }
+/* How each packet was heard, between its channel and its port. */
+.packet-table :is(.c-time,.c-id,.c-gw,.c-hops) { white-space:nowrap; }
+.packet-table :is(.c-gw,.c-rssi,.c-snr,.c-hops) { font-variant-numeric:tabular-nums; }
+.packet-table td.is-empty { color:var(--mesh-muted); }
+.mesh-firehose-page .packet-table.card-table.is-cards tr.packet-row { grid-template-columns:repeat(4,minmax(0,1fr)); grid-template-areas:"port port time time" "from from to to" "meta meta id id" "gw gw hops hops" "rssi rssi snr snr"; }
+.mesh-firehose-page .card-table.is-cards :is(.c-gw,.c-rssi,.c-snr,.c-hops) { font-size:12px; }
+.mesh-firehose-page .card-table.is-cards :is(.c-gw,.c-rssi,.c-snr,.c-hops)::before { content:attr(data-label) " "; color:var(--mesh-muted); }
+.mesh-firehose-page .card-table.is-cards .c-gw { grid-area:gw; }
+.mesh-firehose-page .card-table.is-cards .c-hops { grid-area:hops; }
+.mesh-firehose-page .card-table.is-cards .c-rssi { grid-area:rssi; }
+.mesh-firehose-page .card-table.is-cards .c-snr { grid-area:snr; }
 </style>
 {% endblock %}
 
@@ -28,7 +39,7 @@
 </header>
 
     <div class="data-table-wrap" role="region" aria-label="{{ "Live packet table" | tr }}" tabindex="0">
-    <table class="packet-table card-table" data-cards-below="1100">
+    <table class="packet-table card-table" data-cards-below="1300">
         <thead>
             <tr>
                 <th data-translate-lang="time">Time</th>
@@ -36,6 +47,10 @@
                 <th data-translate-lang="from">From</th>
                 <th data-translate-lang="to">To</th>
                 <th data-translate-lang="channel">Channel</th>
+                <th>{{ "Gateways" | tr }}</th>
+                <th>RSSI</th>
+                <th>SNR</th>
+                <th>{{ "Hops" | tr }}</th>
                 <th data-translate-lang="port">Port</th>
             </tr>
         </thead>
@@ -163,6 +178,78 @@ function logPacketTimes(packet) {
 }
 
 /* ======================================================
+   SIGHTINGS: HOW MANY GATEWAYS HEARD EACH PACKET, AND HOW
+   ====================================================== */
+
+// Gateways go on reporting a packet for some seconds after it is stored (in
+// the map's measurements, 97% of them within 10 s and 98% within 15 s), so
+// the summaries of the latest rows are asked for again until they are this old.
+const SIGHTINGS_REFRESH_MS = 20000;
+const SIGHTINGS_PER_REQUEST = 100;
+// The packets whose summaries are still being asked for, by stored id, with
+// when their row was added: the oldest first.
+const sightingsDue = new Map();
+
+const formatNumber = value =>
+    Number(value).toLocaleString(MeshI18n.language, {maximumFractionDigits: 2});
+
+// A range as "-124 to -64", or the one value when both ends are the same.
+function formatRange(min, max) {
+    if (min == null || max == null) return null;
+    if (min === max) return formatNumber(min);
+    return MeshI18n.t("{min} to {max}", {min: formatNumber(min), max: formatNumber(max)});
+}
+
+function hopsRange(min, max) {
+    if (min == null || max == null) return null;
+    return min === max ? String(min) : `${min}–${max}`;
+}
+
+function fillSightings(row, summary) {
+    const fill = (selector, text) => {
+        const cell = row.querySelector(selector);
+        cell.textContent = text ?? "—";
+        cell.classList.toggle("is-empty", text == null);
+    };
+    const rssi = summary && formatRange(summary.rssi_min, summary.rssi_max);
+    const snr = summary && formatRange(summary.snr_min, summary.snr_max);
+    fill(".c-gw", summary ? formatNumber(summary.gateways) : null);
+    // A range may take two lines where the table is narrow, but a unit never
+    // goes on one of its own.
+    fill(".c-rssi", rssi ? `${rssi}\u00a0dBm` : null);
+    fill(".c-snr", snr ? `${snr}\u00a0dB` : null);
+    fill(".c-hops", summary ? hopsRange(summary.hops_min, summary.hops_max) : null);
+}
+
+let sightingsBusy = false;
+async function refreshSightings() {
+    if (sightingsBusy) return;
+    const now = Date.now();
+    for (const [id, shownAt] of sightingsDue) {
+        if (now - shownAt > SIGHTINGS_REFRESH_MS) sightingsDue.delete(id);
+    }
+    const ids = [...sightingsDue.keys()].slice(-SIGHTINGS_PER_REQUEST);
+    if (!ids.length) return;
+    sightingsBusy = true;
+    try {
+        const url = new URL("/api/v1/packets_seen", window.location.origin);
+        url.searchParams.set("packet_ids", ids.join(","));
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const summaries = new Map((data.packets || []).map(s => [String(s.packet_id), s]));
+        for (const id of ids) {
+            const row = document.querySelector(`.packet-row[data-storage-id="${CSS.escape(id)}"]`);
+            if (row) fillSightings(row, summaries.get(id));
+        }
+    } catch (err) {
+        console.error("Sightings fetch failed:", err);
+    } finally {
+        sightingsBusy = false;
+    }
+}
+
+/* ======================================================
    FIREHOSE FETCHING
    ====================================================== */
 let lastImportTimeUs = null;
@@ -234,6 +321,7 @@ function addChannel(channel) {
 function resetFirehose() {
     firehoseLoaded = false;
     lastImportTimeUs = null;
+    sightingsDue.clear();
     document.getElementById("packet_list").innerHTML = "";
 }
 
@@ -335,8 +423,9 @@ async function fetchUpdates() {
                 ? `<span class="text-secondary" title="${MeshI18n.h("MQTT map report")}">${MeshI18n.h("Not a Packet")}</span>`
                 : `<span class="text-secondary" title="${MeshI18n.h("No Meshtastic packet ID")}">—</span>`;
 
+            const storageId = pkt.storage_id ?? pkt.id;
             const html = `
-<tr class="packet-row">
+<tr class="packet-row" data-storage-id="${escapeHtml(storageId)}">
 
     <td class="c-time">${formatTimes(pkt.import_time_us).local}</td>
 
@@ -348,16 +437,20 @@ async function fetchUpdates() {
     <td class="c-from">${from}</td>
     <td class="c-to">${to}</td>
     <td class="c-channel">${escapeHtml(pkt.channel || "—")}</td>
+    <td class="c-gw is-empty" data-label="${MeshI18n.h("Gateways")}">—</td>
+    <td class="c-rssi is-empty" data-label="RSSI">—</td>
+    <td class="c-snr is-empty" data-label="SNR">—</td>
+    <td class="c-hops is-empty" data-label="${MeshI18n.h("Hops")}">—</td>
     <td class="c-port">${portLabel(pkt.portnum, pkt.payload, inlineLinks)}</td>
-
 </tr>
 
 <tr class="payload-row">
-    <td colspan="6" class="payload-cell">${safePayload}</td>
+    <td colspan="10" class="payload-cell">${safePayload}</td>
 </tr>
 `;
 
             list.insertAdjacentHTML("afterbegin", html);
+            if (storageId != null) sightingsDue.set(String(storageId), Date.now());
             if (highlightNewPackets) markNewPacketArrival(list.firstElementChild);
         }
 
@@ -371,6 +464,7 @@ async function fetchUpdates() {
         console.error("Packet fetch failed:", err);
     } finally {
         updateLiveStatus();
+        if (!updatesPaused) refreshSightings();
     }
 }
 
