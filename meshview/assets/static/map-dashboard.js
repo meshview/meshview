@@ -40,7 +40,9 @@ function renderNodeExplorer() {
             nodeLayer.addTo(map);
             nodeLayer.addLayer(marker);
             map.setView(marker.getLatLng(), Math.max(map.getZoom(), 12));
-            marker.fire('click');
+            // The node chosen, as a click on its dot alone would: a synthetic
+            // click has no point on the map for the picker of overlapping nodes.
+            onNodeClick(node);
         });
         list.append(row);
     }
