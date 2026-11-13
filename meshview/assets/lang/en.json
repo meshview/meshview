@@ -1088,6 +1088,7 @@
     "Limitations": "Limitations",
     "No terrain or building data is used (area mode only).": "No terrain or building data is used (area mode only).",
     "Results are sensitive to power, height and threshold.": "Results are sensitive to power, height and threshold.",
-    "Environmental factors can cause large real-world deviations.": "Environmental factors can cause large real-world deviations."
+    "Environmental factors can cause large real-world deviations.": "Environmental factors can cause large real-world deviations.",
+    "{min} to {max}": "{min} to {max}"
   }
 }
