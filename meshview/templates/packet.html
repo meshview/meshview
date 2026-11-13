@@ -17,7 +17,8 @@
 .packet-card dl { display:grid; grid-template-columns:180px minmax(0,1fr); gap:16px 24px; margin:0; font-size:13px; }
 .packet-card dt { color:var(--mesh-muted); font-weight:500; }
 .packet-card dd { margin:0; overflow-wrap:anywhere; }
-.packet-card pre { padding:14px; background:var(--mesh-stripe); border:1px solid var(--mesh-border); border-radius:6px; color:var(--mesh-text); font-size:12px; white-space:pre-wrap; overflow-wrap:anywhere; margin:0; }
+/* Monospaced and as sent, but no box of its own within the card. */
+.packet-card pre { padding:0; background:none; border:0; color:var(--mesh-text); font:12px/1.6 ui-monospace,Consolas,monospace; white-space:pre-wrap; overflow-wrap:anywhere; margin:0; }
 #map { display:none; }
 .source-marker { width:24px; height:24px; background:#f4484866; border:3px solid #e33; border-radius:50%; box-shadow:0 0 6px #f007; }
 #seen-container { background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; overflow:hidden; }
@@ -226,14 +227,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                 ${
                     telemetryExtras.length
-                    ? `<dt data-translate-lang="decoded_telemetry">${packetTranslations.decoded_telemetry || MeshI18n.t("Decoded Telemetry")}</dt>
+                    ? `<dt data-translate-lang="decoded_telemetry">${packetTranslations.decoded_telemetry || MeshI18n.t("Decoded Telemetry")}:</dt>
                        <dd><pre>${escapeHtml(telemetryExtras.join("\n"))}</pre></dd>`
                     : ""
                 }
 
                 ${
                     lat && lon
-                    ? `<dt data-translate-lang="location">${packetTranslations.location || MeshI18n.t("Location:")}</dt>
+                    ? `<dt data-translate-lang="location">${packetTranslations.location || MeshI18n.t("Location")}:</dt>
                        <dd>${lat.toFixed(6)}, ${lon.toFixed(6)}</dd>`
                     : ""
                 }
