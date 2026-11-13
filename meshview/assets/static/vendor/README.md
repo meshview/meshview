@@ -20,7 +20,7 @@ To update a library:
 
 All charts use ECharts 5.5.0, including pages that previously loaded an unpinned
 version. Leaflet is 1.9.4, Leaflet Heat is 0.2.0, PolylineDecorator is 1.6.0,
-Bootstrap is 5.3.3, and QRCode.js is 1.0.0.
+Bootstrap is 5.3.9, and QRCode.js is 1.0.0.
 
 The Inter typeface is bundled from `@fontsource-variable/inter` 5.3.0 (SIL Open Font
 License 1.1): only the variable weight axis, normal and italic, for every subset.
