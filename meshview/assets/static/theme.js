@@ -39,6 +39,14 @@
         }
         const themed = visit(option,'');
         themed.textStyle = {...themed.textStyle,color:palette.text};
+        // Keep ECharts 5's softer default series colors, which suit the site better.
+        if (!themed.color) themed.color = ['#5470c6','#91cc75','#fac858','#ee6666','#73c0de','#3ba272','#fc8452','#9a60b4','#ea7ccc'];
+        // ECharts 6 gives axis labels a fixed grey instead of the text color.
+        for (const name of ['xAxis','yAxis','radiusAxis','angleAxis']) {
+            const axis = value => value && {...value,axisLabel:{color:palette.text,...value.axisLabel}};
+            if (Array.isArray(themed[name])) themed[name] = themed[name].map(axis);
+            else if (themed[name]) themed[name] = axis(themed[name]);
+        }
         const tooltip = value => ({...value,backgroundColor:palette.surface,borderColor:palette.border,textStyle:{...value?.textStyle,color:palette.text}});
         if (Array.isArray(themed.tooltip)) themed.tooltip = themed.tooltip.map(tooltip);
         else themed.tooltip = tooltip(themed.tooltip);

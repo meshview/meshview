@@ -151,7 +151,7 @@ async fn static_files_are_revalidated_and_vendored_ones_kept() {
     // Big scripts go compressed to who takes it.
     let compressed = get(
         &app,
-        "/static/vendor/echarts-5.5.0/dist/echarts.min.js",
+        "/static/vendor/echarts-6.1.0/dist/echarts.min.js",
         &[(header::ACCEPT_ENCODING, "gzip")],
     )
     .await;
