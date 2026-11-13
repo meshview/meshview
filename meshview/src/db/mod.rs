@@ -318,6 +318,14 @@ impl Reader {
     pub async fn packet_sightings(&self, packet_id: i64) -> Result<Vec<PacketSeen>> {
         on!(self, packet_sightings(packet_id))
     }
+
+    /// Every sighting of these packets, in no particular order.
+    pub async fn sightings_of(&self, packet_ids: &[i64]) -> Result<Vec<PacketSeen>> {
+        if packet_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        on!(self, sightings_of(packet_ids))
+    }
 }
 
 /// A row of `daily_snapshot`.

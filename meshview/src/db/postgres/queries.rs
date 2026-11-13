@@ -77,6 +77,25 @@ pub async fn packet_sightings(pool: &PgPool, packet_id: i64) -> Result<Vec<Packe
     .context("listing the sightings of a packet")
 }
 
+pub async fn sightings_of(pool: &PgPool, packet_ids: &[i64]) -> Result<Vec<PacketSeen>> {
+    let mut query = QueryBuilder::new(
+        "SELECT packet_id, node_id, rx_time, hop_limit::bigint AS hop_limit, \
+                hop_start::bigint AS hop_start, channel, rx_snr, rx_rssi::bigint AS rx_rssi, \
+                topic, import_time_us \
+         FROM packet_seen WHERE packet_id IN (",
+    );
+    let mut ids = query.separated(", ");
+    for id in packet_ids {
+        ids.push_bind(*id);
+    }
+    query.push(")");
+    query
+        .build_query_as()
+        .fetch_all(pool)
+        .await
+        .context("listing the sightings of packets")
+}
+
 pub async fn last_import_us(pool: &PgPool) -> Result<Option<i64>> {
     sqlx::query_scalar("SELECT max(import_time_us) FROM packet")
         .fetch_one(pool)
