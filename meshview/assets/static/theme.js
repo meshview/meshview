@@ -47,7 +47,8 @@
             if (Array.isArray(themed[name])) themed[name] = themed[name].map(axis);
             else if (themed[name]) themed[name] = axis(themed[name]);
         }
-        const tooltip = value => ({...value,backgroundColor:palette.surface,borderColor:palette.border,textStyle:{...value?.textStyle,color:palette.text}});
+        // Confined tooltips stay on screen on narrow phones.
+        const tooltip = value => ({confine:true,...value,backgroundColor:palette.surface,borderColor:palette.border,textStyle:{...value?.textStyle,color:palette.text}});
         if (Array.isArray(themed.tooltip)) themed.tooltip = themed.tooltip.map(tooltip);
         else themed.tooltip = tooltip(themed.tooltip);
         return themed;
