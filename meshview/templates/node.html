@@ -1613,6 +1613,9 @@ function expandChart(type){
     const sourceChart = echarts.getInstanceByDom(srcEl);
     if (!sourceChart) return;
 
+    // A tooltip left open on the page would float above the modal.
+    document.querySelectorAll('[_echarts_instance_]').forEach(el =>
+        echarts.getInstanceByDom(el)?.dispatchAction({ type: 'hideTip' }));
     const modal = document.getElementById('chartModal');
     const modalChart = initMeshChart(document.getElementById('modalChart'));
     modal.style.display = "flex";
