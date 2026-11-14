@@ -1620,6 +1620,14 @@ function expandChart(type){
     modalChart.resize();
     fitLegend(modalChart);
 }
+// The modal chart follows its box, e.g. when a phone is rotated.
+new ResizeObserver(() => {
+    const chart = echarts.getInstanceByDom(document.getElementById('modalChart'));
+    if (chart && document.getElementById('chartModal').style.display === "flex") {
+        chart.resize();
+        fitLegend(chart);
+    }
+}).observe(document.getElementById('modalChart'));
 function closeModal(){
     document.getElementById('chartModal').style.display = "none";
 }
