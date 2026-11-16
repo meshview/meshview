@@ -6,8 +6,8 @@
 //! tiebreak, one is added, so that the answer does not depend on the query plan.
 
 use crate::db::{
-    DailySnapshot, Facet, JobRun, Node, NodeFacet, NodeFilter, NodeQuery, PacketFilter, PacketSeen,
-    Period, PeriodCount, SightingsOf, TopNode, TopQuery,
+    DailySnapshot, DirectReception, Direction, Facet, JobRun, Node, NodeFacet, NodeFilter,
+    NodeQuery, PacketFilter, PacketSeen, Period, PeriodCount, SightingsOf, TopNode, TopQuery,
 };
 use crate::db::{PacketQuery, PacketRow, TracerouteHop, TracerouteRow};
 use anyhow::{Context, Result};
@@ -79,6 +79,50 @@ pub async fn sightings_of(pool: &SqlitePool, packet_ids: &[i64]) -> Result<Vec<P
         .fetch_all(pool)
         .await
         .context("listing the sightings of packets")
+}
+
+pub async fn direct_receptions(
+    pool: &SqlitePool,
+    node_id: i64,
+    direction: Direction,
+    since_us: i64,
+    limit: i64,
+) -> Result<Vec<DirectReception>> {
+    // Received: what the node, as a gateway, heard of others. Transmitted:
+    // what gateways heard of the node. Either way at no hops, a reading and
+    // not a gateway's own packet.
+    let sql = match direction {
+        Direction::Received => {
+            "SELECT p.from_node_id AS peer, n.long_name, n.short_name, s.packet_id, \
+                    s.import_time_us AS time_us, s.rx_rssi AS rssi, s.rx_snr AS snr \
+             FROM packet_seen s \
+             JOIN packet p ON p.id = s.packet_id \
+             LEFT JOIN node n ON n.node_id = p.from_node_id \
+             WHERE s.node_id = ? AND s.import_time_us >= ? \
+               AND s.hop_start > 0 AND s.hop_limit = s.hop_start AND s.rx_rssi <> 0 \
+               AND p.from_node_id IS NOT NULL AND p.from_node_id <> s.node_id \
+             ORDER BY s.import_time_us DESC, s.packet_id DESC LIMIT ?"
+        }
+        Direction::Transmitted => {
+            "SELECT s.node_id AS peer, n.long_name, n.short_name, s.packet_id, \
+                    s.import_time_us AS time_us, s.rx_rssi AS rssi, s.rx_snr AS snr \
+             FROM packet p \
+             JOIN packet_seen s ON s.packet_id = p.id \
+             LEFT JOIN node n ON n.node_id = s.node_id \
+             WHERE p.from_node_id = ? AND p.import_time_us >= ? \
+               AND s.import_time_us IS NOT NULL \
+               AND s.hop_start > 0 AND s.hop_limit = s.hop_start AND s.rx_rssi <> 0 \
+               AND s.node_id <> p.from_node_id \
+             ORDER BY s.import_time_us DESC, s.packet_id DESC LIMIT ?"
+        }
+    };
+    sqlx::query_as(sql)
+        .bind(node_id)
+        .bind(since_us)
+        .bind(limit)
+        .fetch_all(pool)
+        .await
+        .context("listing direct receptions")
 }
 
 pub async fn last_import_us(pool: &SqlitePool) -> Result<Option<i64>> {

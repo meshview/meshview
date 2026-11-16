@@ -515,6 +515,31 @@ async fn rows(pool: &Pool, now: i64) {
         .await
         .unwrap();
     }
+    // Direct receptions: heard at no hops with a reading, and what does not
+    // count as one: a hop taken, no hops said, no signal strength.
+    for (packet, node, start, limit, rssi, snr, time) in [
+        (900, 257, 3, 3, -101, 4.5, at),
+        (901, 257, 3, 3, -99, -2.25, at - HOUR_US),
+        (904, 256, 3, 2, -80, 1.0, at),
+        (905, 257, 0, 0, -90, 0.0, at),
+        (902, 257, 3, 3, 0, 0.0, at),
+    ] {
+        tx.execute(
+            "INSERT INTO packet_seen (packet_id, node_id, rx_time, hop_start, hop_limit, rx_rssi, \
+             rx_snr, import_time_us, channel) VALUES (?, ?, 1, ?, ?, ?, ?, ?, 'LongFast')",
+            &[
+                Arg::Int(packet),
+                Arg::Int(node),
+                Arg::Int(start),
+                Arg::Int(limit),
+                Arg::Int(rssi),
+                Arg::OptReal(Some(snr)),
+                Arg::Int(time),
+            ],
+        )
+        .await
+        .unwrap();
+    }
     for (day, nodes) in [("2026-11-01", 10), ("2026-11-02", 12), ("2026-11-03", 9)] {
         tx.execute_either(
             "INSERT INTO daily_snapshot VALUES (?, ?, 100, 3, 1)",
@@ -603,6 +628,10 @@ const URIS: &[&str] = &[
     "/api/v1/packets_seen/900",
     "/api/v1/packets_seen?packet_ids=900,4,900,12345",
     "/api/v1/packets_seen?packet_ids=4,x",
+    "/api/v1/node/257/direct_receptions",
+    "/api/v1/node/257/direct_receptions?since=1",
+    "/api/v1/node/256/direct_receptions?direction=transmitted",
+    "/api/v1/node/258/direct_receptions?direction=sideways",
     "/api/v1/stats",
     "/api/v1/stats?period_type=day&length=14",
     "/api/v1/stats?period_type=hour&length=24&portnum=1",

@@ -1087,6 +1087,21 @@
     "No terrain or building data is used (area mode only).": "No terrain or building data is used (area mode only).",
     "Results are sensitive to power, height and threshold.": "Results are sensitive to power, height and threshold.",
     "Environmental factors can cause large real-world deviations.": "Environmental factors can cause large real-world deviations.",
-    "{min} to {max}": "{min} to {max}"
+    "{min} to {max}": "{min} to {max}",
+    "Direct receptions": "Direct receptions",
+    "Direct receptions time range": "Direct receptions time range",
+    "Last 30 days": "Last 30 days",
+    "Direction": "Direction",
+    "Received": "Received",
+    "Transmitted": "Transmitted",
+    "Avg": "Avg",
+    "Min": "Min",
+    "Max": "Max",
+    "Click a node to show or hide it; click a point to open its packet. Scroll on the chart to zoom.": "Click a node to show or hide it; click a point to open its packet. Scroll on the chart to zoom.",
+    "No direct receptions in this period.": "No direct receptions in this period.",
+    "Only the latest are shown.": "Only the latest are shown.",
+    "Show or hide this node": "Show or hide this node",
+    "Nodes heard straight from, at no hops: {n}. Packets: {total}.": "Nodes heard straight from, at no hops: {n}. Packets: {total}.",
+    "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}.": "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}."
   }
 }

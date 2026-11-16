@@ -1095,6 +1095,21 @@
     "No terrain or building data is used (area mode only).": "No se usan datos de terreno ni de edificios (solo modo área).",
     "Results are sensitive to power, height and threshold.": "Los resultados dependen mucho de la potencia, la altura y el umbral.",
     "Environmental factors can cause large real-world deviations.": "Los factores del entorno pueden provocar grandes desviaciones en la realidad.",
-    "{min} to {max}": "{min} a {max}"
+    "{min} to {max}": "{min} a {max}",
+    "Direct receptions": "Recepciones directas",
+    "Direct receptions time range": "Periodo de las recepciones directas",
+    "Last 30 days": "Últimos 30 días",
+    "Direction": "Dirección",
+    "Received": "Recibidas",
+    "Transmitted": "Transmitidas",
+    "Avg": "Media",
+    "Min": "Mín.",
+    "Max": "Máx.",
+    "Click a node to show or hide it; click a point to open its packet. Scroll on the chart to zoom.": "Pulsa un nodo para mostrarlo u ocultarlo; pulsa un punto para abrir su paquete. Desplaza sobre el gráfico para ampliar.",
+    "No direct receptions in this period.": "No hay recepciones directas en este periodo.",
+    "Only the latest are shown.": "Solo se muestran los más recientes.",
+    "Show or hide this node": "Mostrar u ocultar este nodo",
+    "Nodes heard straight from, at no hops: {n}. Packets: {total}.": "Nodos oídos directamente, sin saltos: {n}. Paquetes: {total}.",
+    "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}.": "Gateways que oyeron este nodo directamente, sin saltos: {n}. Paquetes: {total}."
   }
 }

@@ -191,6 +191,122 @@ async fn sightings_come_latest_first() {
 }
 
 #[tokio::test]
+async fn direct_receptions_are_those_heard_at_no_hops() {
+    let api = api().await;
+    let now = now_us();
+    // 10 is a gateway; 20 and 30 send. 20's packets: heard by 10 at no hops,
+    // twice, then after a hop, with no hops said, and with no signal. 10's
+    // own packet, which it reports itself, and 30's, heard by 10 an hour ago.
+    api.exec(
+        "INSERT INTO node (id, node_id, long_name, short_name) VALUES \
+         ('!00000014', 20, 'Twenty', 'T20'), ('!0000000a', 10, 'Gateway', 'GW')",
+    )
+    .await;
+    for (id, from) in [
+        (1, 20),
+        (2, 20),
+        (3, 20),
+        (4, 20),
+        (5, 20),
+        (6, 10),
+        (7, 30),
+    ] {
+        sqlx::query("INSERT INTO packet (id, from_node_id, import_time_us) VALUES (?, ?, ?)")
+            .bind(id)
+            .bind(from)
+            .bind(now)
+            .execute(&api.pool)
+            .await
+            .unwrap();
+    }
+    for (packet, gateway, start, limit, rssi, snr, ago) in [
+        (1, 10, 3, 3, -110, -4.0, 2),
+        (2, 10, 3, 3, -100, 6.0, 1),
+        (3, 10, 3, 2, -90, 8.0, 1),
+        (4, 10, 0, 0, -90, 8.0, 1),
+        (5, 10, 3, 3, 0, 0.0, 1),
+        (6, 10, 3, 3, 0, 0.0, 1),
+        (6, 20, 7, 7, -95, 3.5, 1),
+        (7, 10, 3, 3, -120, -9.5, 3_600),
+    ] {
+        sqlx::query(
+            "INSERT INTO packet_seen (packet_id, node_id, rx_time, hop_start, hop_limit, \
+             rx_rssi, rx_snr, import_time_us) VALUES (?, ?, 0, ?, ?, ?, ?, ?)",
+        )
+        .bind(packet)
+        .bind(gateway)
+        .bind(start)
+        .bind(limit)
+        .bind(rssi)
+        .bind(snr)
+        .bind(now - ago * 1_000_000)
+        .execute(&api.pool)
+        .await
+        .unwrap();
+    }
+
+    let (status, body) = api.get("/api/v1/node/10/direct_receptions").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["direction"], "received");
+    assert_eq!(body["truncated"], false);
+    let nodes = body["nodes"].as_array().unwrap();
+    assert_eq!(nodes.len(), 2);
+    assert_eq!(
+        nodes[0],
+        json!({"node_id": 20, "long_name": "Twenty", "short_name": "T20", "packets": 2,
+        "rssi_avg": -105.0, "rssi_min": -110, "rssi_max": -100,
+        "snr_avg": 1.0, "snr_min": -4.0, "snr_max": 6.0,
+        "receptions": [
+            {"packet_id": 1, "time_us": now - 2_000_000, "rssi": -110, "snr": -4.0},
+            {"packet_id": 2, "time_us": now - 1_000_000, "rssi": -100, "snr": 6.0},
+        ]})
+    );
+    // A node with no name stored comes without one.
+    assert_eq!(
+        (nodes[1]["node_id"].clone(), nodes[1]["long_name"].clone()),
+        (json!(30), json!(null))
+    );
+
+    // Since a time: 30's reception, an hour ago, is left out.
+    let since = now - 60 * 1_000_000;
+    let (_, recent) = api
+        .get(&format!("/api/v1/node/10/direct_receptions?since={since}"))
+        .await;
+    assert_eq!(recent["nodes"].as_array().unwrap().len(), 1);
+
+    // Transmitted: the gateways that heard 10, here 20 at no hops.
+    let (_, sent) = api
+        .get("/api/v1/node/10/direct_receptions?direction=transmitted")
+        .await;
+    assert_eq!(sent["direction"], "transmitted");
+    let gateways: Vec<i64> = sent["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|node| node["node_id"].as_i64().unwrap())
+        .collect();
+    assert_eq!(gateways, [20]);
+
+    // A node that is not a gateway heard nothing.
+    assert_eq!(
+        api.get("/api/v1/node/30/direct_receptions").await.1["nodes"],
+        json!([])
+    );
+    assert_eq!(
+        api.get("/api/v1/node/10/direct_receptions?direction=sideways")
+            .await,
+        (
+            StatusCode::BAD_REQUEST,
+            json!({"error": "direction must be 'received' or 'transmitted'"})
+        )
+    );
+    assert_eq!(
+        api.get("/api/v1/node/x/direct_receptions").await.0,
+        StatusCode::BAD_REQUEST
+    );
+}
+
+#[tokio::test]
 async fn unknown_api_addresses_are_json_404s() {
     let api = api().await;
     assert_eq!(

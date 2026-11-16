@@ -9,6 +9,7 @@ pub mod params;
 
 mod channels;
 mod coverage;
+mod direct_receptions;
 mod edges;
 mod health;
 pub(crate) mod lang;
@@ -47,6 +48,7 @@ pub fn v1() -> OpenApiRouter<AppState> {
         .routes(routes!(traceroute::traceroute))
         .routes(routes!(edges::edges))
         .routes(routes!(qr::qr))
+        .routes(routes!(direct_receptions::direct_receptions))
         .routes(routes!(coverage::coverage))
 }
 

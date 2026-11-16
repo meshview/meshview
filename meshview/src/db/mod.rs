@@ -326,6 +326,19 @@ impl Reader {
         }
         on!(self, sightings_of(packet_ids))
     }
+
+    /// The packets a node heard straight from other nodes, at no hops, or
+    /// those of its own that gateways heard straight from it: the latest
+    /// `limit` stored since a time, latest first.
+    pub async fn direct_receptions(
+        &self,
+        node_id: i64,
+        direction: Direction,
+        since_us: i64,
+        limit: i64,
+    ) -> Result<Vec<DirectReception>> {
+        on!(self, direct_receptions(node_id, direction, since_us, limit))
+    }
 }
 
 /// A row of `daily_snapshot`.
@@ -631,6 +644,36 @@ pub struct JobRun {
     /// JSON, the job's own.
     pub details: Option<String>,
     pub error: Option<String>,
+}
+
+/// Which way a direct reception goes, seen from the node asked about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Direction {
+    /// The node, as a gateway, heard the other one.
+    Received,
+    /// A gateway heard the node.
+    Transmitted,
+}
+
+/// One packet heard straight from the node that sent it, at no hops, with the
+/// signal it was heard with.
+///
+/// Only what a gateway reported as heard counts: a packet that says how many
+/// hops it started with and has taken none of them, with a signal strength
+/// other than 0, which is what a gateway reports of the packets it sends
+/// itself.
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct DirectReception {
+    /// The node on the other side: the sender of a received packet, the
+    /// gateway that heard a transmitted one.
+    pub peer: i64,
+    pub long_name: Option<String>,
+    pub short_name: Option<String>,
+    pub packet_id: i64,
+    /// When the sighting was stored, in microseconds since the epoch.
+    pub time_us: i64,
+    pub rssi: i64,
+    pub snr: Option<f64>,
 }
 
 /// A row of `packet_seen`: one gateway hearing one packet.

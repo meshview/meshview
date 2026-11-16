@@ -1087,6 +1087,21 @@
     "No terrain or building data is used (area mode only).": "Данные о рельефе и зданиях не используются (только зональный режим).",
     "Results are sensitive to power, height and threshold.": "Результаты сильно зависят от мощности, высоты и порога.",
     "Environmental factors can cause large real-world deviations.": "Условия окружающей среды могут сильно отличать реальность от прогноза.",
-    "{min} to {max}": "от {min} до {max}"
+    "{min} to {max}": "от {min} до {max}",
+    "Direct receptions": "Прямые приёмы",
+    "Direct receptions time range": "Период прямых приёмов",
+    "Last 30 days": "Последние 30 дней",
+    "Direction": "Направление",
+    "Received": "Принятые",
+    "Transmitted": "Переданные",
+    "Avg": "Сред.",
+    "Min": "Мин.",
+    "Max": "Макс.",
+    "Click a node to show or hide it; click a point to open its packet. Scroll on the chart to zoom.": "Нажмите на узел, чтобы показать или скрыть его; нажмите на точку, чтобы открыть её пакет. Прокрутка над графиком меняет масштаб.",
+    "No direct receptions in this period.": "За этот период прямых приёмов нет.",
+    "Only the latest are shown.": "Показаны только последние.",
+    "Show or hide this node": "Показать или скрыть этот узел",
+    "Nodes heard straight from, at no hops: {n}. Packets: {total}.": "Узлы, услышанные напрямую, без переходов: {n}. Пакетов: {total}.",
+    "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}.": "Шлюзы, услышавшие этот узел напрямую, без переходов: {n}. Пакетов: {total}."
   }
 }

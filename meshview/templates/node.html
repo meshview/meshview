@@ -62,6 +62,37 @@
 .qr-url { display:block; max-height:80px; overflow:auto; overflow-wrap:anywhere; font:11px/1.6 monospace; color:var(--mesh-muted); }
 .qr-actions { display:flex; justify-content:center; }
 .mesh-data-page .copied { background:#e8f5ee; color:#187346; }
+/* Direct receptions: two toggles over the chart, and a table of the nodes heard below it. */
+.direct-controls { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:14px 20px 0; }
+.direct-toggle { position:relative; z-index:0; display:inline-flex; padding:3px; border:1px solid var(--mesh-border); border-radius:999px; background:var(--mesh-soft); }
+/* The thumb slides to the pressed option; JS gives it that option's place and width. */
+.direct-toggle::before { content:""; position:absolute; z-index:-1; top:3px; bottom:3px; left:0; width:var(--thumb-w,0); transform:translateX(var(--thumb-x,0)); border-radius:999px; background:var(--mesh-primary); box-shadow:0 1px 3px rgba(0,0,0,.18); }
+.direct-toggle.is-ready::before { transition:transform .25s ease, width .25s ease; }
+.mesh-data-page .mesh-content .direct-toggle > button { display:inline-flex; align-items:center; gap:4px; padding:5px 13px; border:0; border-radius:999px; background:transparent; color:var(--mesh-text); transition:color .25s ease; }
+/* Tabler icons leave room inside their box: shift what has one a little left to look centred. */
+.mesh-data-page .mesh-content .direct-toggle > button:has(> .ti) { padding-left:11px; padding-right:15px; }
+.mesh-data-page .mesh-content .direct-toggle > button:hover:not(:disabled) { background:transparent; color:var(--mesh-primary); }
+.mesh-data-page .mesh-content .direct-toggle > button[aria-pressed="true"],
+.mesh-data-page .mesh-content .direct-toggle > button[aria-pressed="true"]:hover { color:var(--mesh-surface); }
+.mesh-data-page .mesh-content .direct-toggle > button:disabled { cursor:default; }
+.direct-toggle:has(> button:disabled) { opacity:.45; }
+@media(prefers-reduced-motion:reduce) { .direct-toggle.is-ready::before,.mesh-data-page .mesh-content .direct-toggle > button { transition:none; } }
+.direct-note { flex:1 1 220px; margin:0; color:var(--mesh-muted); font-size:13px; }
+.direct-empty { display:flex; align-items:center; justify-content:center; min-height:180px; margin:0; padding:20px; color:var(--mesh-muted); text-align:center; }
+#chart_direct[hidden],.direct-empty[hidden],.direct-table-wrap[hidden] { display:none; }
+.direct-period { width:auto; }
+.direct-table-wrap { overflow:auto; padding:0 20px 16px; }
+.direct-table { width:100%; border-collapse:collapse; font-size:13px; }
+.direct-table th,.direct-table td { padding:7px 10px; border-bottom:1px solid var(--mesh-border); text-align:left; white-space:nowrap; }
+.direct-table th { color:var(--mesh-muted); font-weight:600; font-size:12px; }
+.direct-table .is-number { text-align:right; font-variant-numeric:tabular-nums; }
+.direct-table .is-group { text-align:center; }
+.direct-table tbody tr { cursor:pointer; }
+.direct-table tbody tr:hover { background:var(--mesh-soft); }
+.direct-table tbody tr.is-hidden td { opacity:.45; }
+.direct-swatch { display:inline-block; width:10px; height:10px; margin-right:8px; border-radius:2px; vertical-align:middle; }
+.direct-hint { margin:10px 0 0; color:var(--mesh-muted); font-size:12px; }
+@media(max-width:700px) { .direct-controls { padding:12px 12px 0; } .direct-table-wrap { padding:0 12px 12px; } }
 @media(max-width:900px) { .node-info { grid-template-columns:minmax(0,1fr); gap:10px; } }
 @media(max-width:700px) { .chart-header { padding:12px; } #node-packets { gap:8px !important; padding:12px; } #node-packets select { flex:1 1 0; min-width:0; padding-left:8px; padding-right:2px; } #node-packets #packet_port { flex-grow:1.2; } }
 </style>
@@ -216,6 +247,55 @@
     </div>
     <p class="chart-loading is-loading">{{ "Loading..." | tr }}</p>
     <div id="chart_neighbors" style="height:380px;"></div>
+</div>
+
+    <!-- Direct receptions: packets heard at no hops, and their signal. -->
+<div id="direct_container" class="chart-container" style="display:none;">
+    <div class="chart-header">
+        <h2 class="chart-title"><span class="ti ti-wifi" aria-hidden="true"></span> <span>{{ "Direct receptions" | tr }}</span></h2>
+        <div class="chart-actions">
+            <select id="direct_period" class="direct-period" aria-label="{{ "Direct receptions time range" | tr }}">
+                <option value="1">{{ "Last 24 hours" | tr }}</option>
+                <option value="7" selected>{{ "Last 7 days" | tr }}</option>
+                <option value="30">{{ "Last 30 days" | tr }}</option>
+                <option value="">{{ "All time" | tr }}</option>
+            </select>
+            <button type="button" class="chart-tool" onclick="expandChart('direct')" title="{{ "Expand chart" | tr }}" aria-label="{{ "Expand chart" | tr }}"><span class="ti ti-arrows-maximize" aria-hidden="true"></span></button>
+            <button type="button" class="chart-tool" onclick="exportCSV('direct')" title="{{ "Export CSV" | tr }}" aria-label="{{ "Export CSV" | tr }}"><span class="ti ti-download" aria-hidden="true"></span></button>
+        </div>
+    </div>
+    <div class="direct-controls">
+        <div class="direct-toggle" role="group" aria-label="{{ "Direction" | tr }}">
+            <button type="button" data-direction="received" aria-pressed="true"><span class="ti ti-arrow-down" aria-hidden="true"></span> {{ "Received" | tr }}</button>
+            <button type="button" data-direction="transmitted" aria-pressed="false"><span class="ti ti-arrow-up" aria-hidden="true"></span> {{ "Transmitted" | tr }}</button>
+        </div>
+        <div class="direct-toggle" role="group" aria-label="{{ "Signal" | tr }}">
+            <button type="button" data-metric="rssi" aria-pressed="true">RSSI</button>
+            <button type="button" data-metric="snr" aria-pressed="false">SNR</button>
+        </div>
+        <p id="direct_note" class="direct-note"></p>
+    </div>
+    <p class="chart-loading is-loading">{{ "Loading..." | tr }}</p>
+    <p id="direct_empty" class="direct-empty" hidden>{{ "No direct receptions in this period." | tr }}</p>
+    <div id="chart_direct" style="height:380px;"></div>
+    <div class="direct-table-wrap">
+        <table class="direct-table">
+            <thead>
+                <tr>
+                    <th rowspan="2">{{ "Node" | tr }}</th>
+                    <th rowspan="2" class="is-number">{{ "Packets" | tr }}</th>
+                    <th colspan="3" class="is-group">RSSI (dBm)</th>
+                    <th colspan="3" class="is-group">SNR (dB)</th>
+                </tr>
+                <tr>
+                    <th class="is-number">{{ "Avg" | tr }}</th><th class="is-number">{{ "Min" | tr }}</th><th class="is-number">{{ "Max" | tr }}</th>
+                    <th class="is-number">{{ "Avg" | tr }}</th><th class="is-number">{{ "Min" | tr }}</th><th class="is-number">{{ "Max" | tr }}</th>
+                </tr>
+            </thead>
+            <tbody id="direct_table"></tbody>
+        </table>
+        <p class="direct-hint"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Click a node to show or hide it; click a point to open its packet. Scroll on the chart to zoom." | tr }}</p>
+    </div>
 </div>
 
     <!-- Packet Histogram -->
@@ -1468,6 +1548,199 @@ async function loadNeighborTimeSeries() {
 
 
 
+/* ======================================================
+   DIRECT RECEPTIONS: packets heard at no hops, and their signal
+   ====================================================== */
+
+// Series colours, so that each node's swatch in the table matches its line.
+const DIRECT_COLORS = ["#245ea8", "#d9480f", "#2f9e44", "#ae3ec9", "#f59f00", "#0c8599",
+    "#e03131", "#5c7cfa", "#66a80f", "#c2255c", "#1098ad", "#9c6644", "#7048e8", "#868e96"];
+const directState = { direction: "received", metric: "rssi", data: null, hidden: new Set() };
+
+function directLabel(peer) {
+    return peer.long_name || peer.short_name || `!${Number(peer.node_id).toString(16).padStart(8, "0")}`;
+}
+
+async function fetchDirect(direction) {
+    const days = document.getElementById("direct_period").value;
+    const url = new URL(`/api/v1/node/${fromNodeId}/direct_receptions`, window.location.origin);
+    url.searchParams.set("direction", direction);
+    if (days) url.searchParams.set("since", String((Date.now() - Number(days) * 86400000) * 1000));
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`direct_receptions returned ${res.status}`);
+    return res.json();
+}
+
+async function loadDirectReceptions(first = false) {
+    const container = document.getElementById("direct_container");
+    let data = await fetchDirect(directState.direction);
+    // At first, show whichever way has something, and nothing if neither has.
+    if (first && !data.nodes.length) {
+        const other = await fetchDirect("transmitted");
+        if (!other.nodes.length) { container.style.display = "none"; return; }
+        directState.direction = "transmitted";
+        data = other;
+    }
+    container.style.display = "";
+    document.querySelectorAll("#direct_container [data-direction]").forEach(button =>
+        button.setAttribute("aria-pressed", String(button.dataset.direction === directState.direction)));
+    placeDirectThumbs();
+    directState.data = data;
+    directState.hidden.clear();
+    renderDirect();
+}
+
+function renderDirect() {
+    const data = directState.data;
+    const metric = directState.metric;
+    const peers = data?.nodes || [];
+    const chartEl = document.getElementById("chart_direct");
+    const note = document.getElementById("direct_note");
+
+    const received = directState.direction === "received";
+    const total = peers.reduce((sum, peer) => sum + peer.packets, 0);
+    // Nothing heard: a line in the middle of the card instead of an empty
+    // chart, a table and the tools to expand or export them.
+    const empty = !peers.length;
+    chartEl.hidden = empty;
+    document.getElementById("direct_empty").hidden = !empty;
+    document.querySelector("#direct_container .direct-table-wrap").hidden = empty;
+    document.querySelectorAll("#direct_container .chart-tool, #direct_container [data-metric]")
+        .forEach(control => { control.disabled = empty; });
+    note.textContent = empty
+        ? ""
+        : MeshI18n.t(received
+            ? "Nodes heard straight from, at no hops: {n}. Packets: {total}."
+            : "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}.",
+            {n: peers.length, total})
+          + (data.truncated ? " " + MeshI18n.t("Only the latest are shown.") : "");
+
+    // ECharts tells series apart by name: two nodes with the same one get their id.
+    const used = new Set();
+    peers.forEach(peer => {
+        let name = directLabel(peer);
+        if (used.has(name)) name = `${name} (${peer.node_id})`;
+        used.add(name);
+        peer._name = name;
+    });
+
+    if (empty) return;
+    const chart = echarts.getInstanceByDom(chartEl) || initMeshChart(chartEl);
+    // Shown again after being hidden, the chart has to take its size anew.
+    chart.resize();
+    chart.off("click");
+    chart.setOption({
+        legend: { show: false, data: peers.map(peer => peer._name),
+            selected: Object.fromEntries(peers.map(peer => [peer._name, !directState.hidden.has(peer.node_id)])) },
+        grid: { left: 12, right: 12, top: 40, bottom: 8, containLabel: true },
+        tooltip: {
+            trigger: "item",
+            formatter: point => {
+                const r = point.data;
+                return `${point.marker}<strong>${escapeHtml(point.seriesName)}</strong><br>`
+                    + escapeHtml(new Date(r.value[0]).toLocaleString(MeshI18n.language)) + "<br>"
+                    + `RSSI: ${escapeHtml(r.rssi)} dBm · SNR: ${escapeHtml(r.snr ?? MeshI18n.t("N/A"))} dB`;
+            }
+        },
+        dataZoom: [{ type: "inside", filterMode: "none" }],
+        // #dce4ef is a border colour the theme turns dark at night.
+        xAxis: { type: "time", axisLabel: { color: "#64748b", hideOverlap: true },
+            axisLine: { lineStyle: { color: "#dce4ef" } } },
+        yAxis: { type: "value", scale: true, name: metric === "rssi" ? "RSSI (dBm)" : "SNR (dB)",
+            nameTextStyle: { align: "left" }, axisLabel: { color: "#64748b" },
+            splitLine: { lineStyle: { color: "#dce4ef" } } },
+        // Each node keeps its table colour, however often the series are replaced.
+        series: peers.map((peer, i) => ({
+            name: peer._name,
+            type: "line",
+            showSymbol: true,
+            symbolSize: 5,
+            itemStyle: { color: DIRECT_COLORS[i % DIRECT_COLORS.length] },
+            lineStyle: { width: 1, color: DIRECT_COLORS[i % DIRECT_COLORS.length] },
+            emphasis: { focus: "series" },
+            data: peer.receptions
+                .filter(r => (metric === "rssi" ? r.rssi : r.snr) != null)
+                .map(r => ({ value: [r.time_us / 1000, metric === "rssi" ? r.rssi : r.snr],
+                             rssi: r.rssi, snr: r.snr, packet_id: r.packet_id }))
+        }))
+    }, { replaceMerge: ["series"] });
+    chart.on("click", point => {
+        if (point.data?.packet_id) window.location.href = `/packet/${point.data.packet_id}`;
+    });
+
+    const fmt = value => value == null ? "—" : String(value);
+    const body = document.getElementById("direct_table");
+    body.replaceChildren(...peers.map((peer, i) => {
+        const row = document.createElement("tr");
+        row.classList.toggle("is-hidden", directState.hidden.has(peer.node_id));
+        row.title = MeshI18n.t("Show or hide this node");
+        const name = document.createElement("td");
+        const swatch = document.createElement("span");
+        swatch.className = "direct-swatch";
+        swatch.style.background = DIRECT_COLORS[i % DIRECT_COLORS.length];
+        const link = document.createElement("a");
+        link.href = `/node/${peer.node_id}`;
+        link.textContent = peer._name;
+        link.addEventListener("click", event => event.stopPropagation());
+        name.append(swatch, link);
+        row.append(name);
+        for (const value of [peer.packets, peer.rssi_avg, peer.rssi_min, peer.rssi_max,
+                             peer.snr_avg, peer.snr_min, peer.snr_max]) {
+            const cell = document.createElement("td");
+            cell.className = "is-number";
+            cell.textContent = fmt(value);
+            row.append(cell);
+        }
+        row.addEventListener("click", () => {
+            const hidden = directState.hidden.has(peer.node_id);
+            hidden ? directState.hidden.delete(peer.node_id) : directState.hidden.add(peer.node_id);
+            row.classList.toggle("is-hidden", !hidden);
+            chart.dispatchAction({ type: hidden ? "legendSelect" : "legendUnSelect", name: peer._name });
+        });
+        return row;
+    }));
+}
+
+// Put each toggle's thumb under its pressed option; animated only once placed,
+// so that it does not slide in from the left when the card first shows.
+function placeDirectThumbs() {
+    document.querySelectorAll("#direct_container .direct-toggle").forEach(group => {
+        const pressed = group.querySelector('[aria-pressed="true"]');
+        if (!pressed || !pressed.offsetWidth) return;
+        // offsetLeft counts from the group's padding edge, where the thumb starts.
+        group.style.setProperty("--thumb-x", `${pressed.offsetLeft}px`);
+        group.style.setProperty("--thumb-w", `${pressed.offsetWidth}px`);
+        if (!group.classList.contains("is-ready")) requestAnimationFrame(() => group.classList.add("is-ready"));
+    });
+}
+
+function initDirectControls() {
+    document.querySelectorAll("#direct_container [data-direction]").forEach(button =>
+        button.addEventListener("click", () => {
+            if (directState.direction === button.dataset.direction) return;
+            directState.direction = button.dataset.direction;
+            document.querySelectorAll("#direct_container [data-direction]").forEach(other =>
+                other.setAttribute("aria-pressed", String(other === button)));
+            placeDirectThumbs();
+            loadDirectReceptions().catch(error => console.error(error));
+        }));
+    document.querySelectorAll("#direct_container [data-metric]").forEach(button =>
+        button.addEventListener("click", () => {
+            directState.metric = button.dataset.metric;
+            document.querySelectorAll("#direct_container [data-metric]").forEach(other =>
+                other.setAttribute("aria-pressed", String(other === button)));
+            placeDirectThumbs();
+            renderDirect();
+        }));
+    document.getElementById("direct_period").addEventListener("change", () =>
+        loadDirectReceptions().catch(error => console.error(error)));
+    window.addEventListener("resize", () => {
+        echarts.getInstanceByDom(document.getElementById("chart_direct"))?.resize();
+        placeDirectThumbs();
+    });
+    document.fonts?.ready.then(placeDirectThumbs);
+}
+
 async function loadPacketHistogram() {
     const DAYS = 7;
     const now = new Date();
@@ -1580,8 +1853,9 @@ function fitLegend(chart) {
     const labels = legend.data?.length
         ? legend.data.map(item => item?.name ?? item)
         : (option.series || []).map(series => series.name);
-    let rows = 1;
-    if (legend.type !== "scroll") {
+    // A hidden legend (direct receptions, toggled from its table) takes no room.
+    let rows = legend.show === false ? 0 : 1;
+    if (rows && legend.type !== "scroll") {
         legendCanvas.font = "12px Inter, sans-serif";
         let x = 0;
         for (const label of labels) {
@@ -1663,6 +1937,14 @@ function exportCSV(type){
         for (let i = 0; i < chartData.times.length; i++)
             rows.push([chartData.times[i], ...chartData.powerSeries.map(s => isNaN(s.data[i]) ? null : s.data[i])]);
     }
+    else if (type === "direct") {
+        rows[0].push(MeshI18n.t("Node ID"), MeshI18n.t("Node"), MeshI18n.t("Packet ID"), "RSSI (dBm)", "SNR (dB)");
+        const receptions = (directState.data?.nodes || []).flatMap(peer =>
+            peer.receptions.map(r => [r.time_us, peer, r]));
+        receptions.sort((a, b) => a[0] - b[0]);
+        for (const [time, peer, r] of receptions)
+            rows.push([new Date(time / 1000).toISOString(), peer.node_id, peer._name, r.packet_id, r.rssi, r.snr]);
+    }
     else if (type === "neighbors") {
         rows[0] = [MeshI18n.t("Neighbor Node ID"), MeshI18n.t("Neighbor Name"), "SNR (dB)"];
         for (let i = 0; i < neighborData.ids.length; i++) {
@@ -1731,6 +2013,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         await loadTelemetryCharts().finally(settle(["battery_voltage_container",
             "power_chart_container", "air_channel_container", "env_chart_container"]));
         await loadNeighborTimeSeries().finally(settle(["neighbor_chart_container"]));
+        initDirectControls();
+        await loadDirectReceptions(true)
+            .catch(error => {
+                console.error(error);
+                document.getElementById("direct_container").style.display = "none";
+            })
+            .finally(settle(["direct_container"]));
         await loadPacketHistogram().finally(settle(["packet_histogram_container"]));
 
         ensureMapVisible();
