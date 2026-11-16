@@ -1195,9 +1195,9 @@ dependencies = [
 
 [[package]]
 name = "longley-rice"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f7f8a7c3b17409cc3abb4b3b7670dce7ab8164d3d6adfa696f11a7ad04edcfa"
+checksum = "ca0bdb74322e2473fceb3a34a0c07d1b4ef4b2d63065b694223501a413495545"
 
 [[package]]
 name = "matchers"
