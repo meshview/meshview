@@ -307,6 +307,64 @@ async fn direct_receptions_are_those_heard_at_no_hops() {
 }
 
 #[tokio::test]
+async fn packet_counts_are_by_hour_and_port() {
+    let api = api().await;
+    const HOUR: i64 = 3_600_000_000;
+    let now = now_us();
+    let hour = now / HOUR * HOUR;
+    // 10's packets: two telemetry and a text in this hour, one sent to it the
+    // hour before, one with no port, one of another node, and one 40 days
+    // old, past the most the counts go back.
+    for (id, from, to, port, time) in [
+        (1, 10, -1, Some(67), hour + 1),
+        (2, 10, -1, Some(67), hour + 2),
+        (3, 10, -1, Some(1), hour + 3),
+        (4, 20, 10, Some(1), hour - HOUR + 5),
+        (5, 10, -1, None, hour - HOUR + 6),
+        (6, 20, -1, Some(1), hour + 4),
+        (7, 10, -1, Some(1), now - 40 * 24 * HOUR),
+    ] {
+        sqlx::query(
+            "INSERT INTO packet (id, from_node_id, to_node_id, portnum, import_time_us) \
+             VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(id)
+        .bind(from)
+        .bind(to)
+        .bind(port)
+        .bind(time)
+        .execute(&api.pool)
+        .await
+        .unwrap();
+    }
+
+    let (status, body) = api.get("/api/v1/node/10/packet_counts").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body,
+        json!({"node_id": 10, "counts": [
+            {"hour_us": hour - HOUR, "portnum": null, "packets": 1},
+            {"hour_us": hour - HOUR, "portnum": 1, "packets": 1},
+            {"hour_us": hour, "portnum": 1, "packets": 1},
+            {"hour_us": hour, "portnum": 67, "packets": 2},
+        ]})
+    );
+
+    // Since this hour; and asked for further back than 30 days, 30 days.
+    let (_, recent) = api
+        .get(&format!("/api/v1/node/10/packet_counts?since={hour}"))
+        .await;
+    assert_eq!(recent["counts"].as_array().unwrap().len(), 2);
+    let (_, all) = api.get("/api/v1/node/10/packet_counts?since=0").await;
+    assert_eq!(all["counts"], body["counts"]);
+
+    assert_eq!(
+        api.get("/api/v1/node/10/packet_counts?since=x").await.0,
+        StatusCode::BAD_REQUEST
+    );
+}
+
+#[tokio::test]
 async fn unknown_api_addresses_are_json_404s() {
     let api = api().await;
     assert_eq!(

@@ -14,6 +14,7 @@ mod edges;
 mod health;
 pub(crate) mod lang;
 mod nodes;
+mod packet_counts;
 mod packets;
 mod packets_seen;
 mod qr;
@@ -49,6 +50,7 @@ pub fn v1() -> OpenApiRouter<AppState> {
         .routes(routes!(edges::edges))
         .routes(routes!(qr::qr))
         .routes(routes!(direct_receptions::direct_receptions))
+        .routes(routes!(packet_counts::packet_counts))
         .routes(routes!(coverage::coverage))
 }
 

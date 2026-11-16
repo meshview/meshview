@@ -420,5 +420,15 @@
   "`node_id` or `since` is not an integer, or `direction` is neither value": "`node_id` o `since` no es un entero, o `direction` no es ninguno de los dos valores",
   "`received` (the default) is what the node, as an MQTT gateway, heard of other nodes; `transmitted`, what gateways heard of the node. Only what a gateway reported as heard counts: a packet that says how many hops it started with (firmware 2.3 or later) and has taken none, with a signal strength other than 0. A node that is not a gateway has no received ones.": "`received` (por defecto) es lo que el nodo, como gateway MQTT, oyó de otros nodos; `transmitted`, lo que los gateways oyeron del nodo. Solo cuenta lo que un gateway informó como oído: un paquete que dice con cuántos saltos empezó (firmware 2.3 o posterior) y no ha dado ninguno, con una intensidad de señal distinta de 0. Un nodo que no es gateway no tiene recibidas.",
   "`received` (the default) or `transmitted`.": "`received` (por defecto) o `transmitted`.",
-  "`received` or `transmitted`, as asked.": "`received` o `transmitted`, según se pidió."
+  "`received` or `transmitted`, as asked.": "`received` o `transmitted`, según se pidió.",
+  "How many packets from or to a node were stored in each hour, by port, counted by the server: for charting a node's traffic without fetching its packets. Hours are UTC; a client can add them up into its own days.": "Cuántos paquetes de un nodo o hacia él se guardaron en cada hora, por puerto, contados por el servidor: para dibujar el tráfico de un nodo sin pedir sus paquetes. Las horas son UTC; un cliente puede sumarlas en sus propios días.",
+  "How many packets of one port were stored in one hour.": "Cuántos paquetes de un puerto se guardaron en una hora.",
+  "Only packets stored at or after this time, in microseconds since the epoch; no earlier than 30 days ago, which is also the default.": "Solo los paquetes guardados en este momento o después, en microsegundos desde la época Unix; no antes de hace 30 días, que es también el valor por defecto.",
+  "Packets of a node by hour": "Paquetes de un nodo por hora",
+  "The counts go back at most 30 days, as far as `since` asks.": "Los recuentos llegan como mucho a 30 días atrás, hasta donde pida `since`.",
+  "The counts, maybe none": "Los recuentos, quizá ninguno",
+  "The hours that had packets, the earliest first, one entry for each port in each.": "Las horas que tuvieron paquetes, primero la más antigua, una entrada por cada puerto en cada una.",
+  "The port, null for a packet that did not say.": "El puerto, null para un paquete que no lo indicaba.",
+  "The start of the hour, in microseconds since the epoch.": "El comienzo de la hora, en microsegundos desde la época Unix.",
+  "`node_id` or `since` is not an integer": "`node_id` o `since` no es un entero"
 }

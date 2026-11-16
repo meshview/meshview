@@ -327,6 +327,16 @@ impl Reader {
         on!(self, sightings_of(packet_ids))
     }
 
+    /// How many packets from or to a node were stored in each hour since a
+    /// time, by port, the earliest hour first.
+    pub async fn node_packets_per_hour(
+        &self,
+        node_id: i64,
+        since_us: i64,
+    ) -> Result<Vec<HourlyPortCount>> {
+        on!(self, node_packets_per_hour(node_id, since_us))
+    }
+
     /// The packets a node heard straight from other nodes, at no hops, or
     /// those of its own that gateways heard straight from it: the latest
     /// `limit` stored since a time, latest first.
@@ -644,6 +654,15 @@ pub struct JobRun {
     /// JSON, the job's own.
     pub details: Option<String>,
     pub error: Option<String>,
+}
+
+/// How many packets of one port were stored in one hour.
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct HourlyPortCount {
+    /// The hour, as the number of whole hours since the epoch.
+    pub hour: i64,
+    pub portnum: Option<i64>,
+    pub packets: i64,
 }
 
 /// Which way a direct reception goes, seen from the node asked about.

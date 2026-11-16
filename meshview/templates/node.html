@@ -78,9 +78,10 @@
 .direct-toggle:has(> button:disabled) { opacity:.45; }
 @media(prefers-reduced-motion:reduce) { .direct-toggle.is-ready::before,.mesh-data-page .mesh-content .direct-toggle > button { transition:none; } }
 .direct-note { flex:1 1 220px; margin:0; color:var(--mesh-muted); font-size:13px; }
-.direct-empty { display:flex; align-items:center; justify-content:center; min-height:180px; margin:0; padding:20px; color:var(--mesh-muted); text-align:center; }
-#chart_direct[hidden],.direct-empty[hidden],.direct-table-wrap[hidden] { display:none; }
-.direct-period { width:auto; }
+/* A chart with nothing in its period shows a line in the middle of its card instead. */
+.chart-empty { display:flex; align-items:center; justify-content:center; min-height:180px; margin:0; padding:20px; color:var(--mesh-muted); text-align:center; }
+.chart-canvas[hidden],.chart-empty[hidden],.direct-table-wrap[hidden] { display:none; }
+.chart-period { width:auto; }
 .direct-table-wrap { overflow:auto; padding:0 20px 16px; }
 .direct-table { width:100%; border-collapse:collapse; font-size:13px; }
 .direct-table th,.direct-table td { padding:7px 10px; border-bottom:1px solid var(--mesh-border); text-align:left; white-space:nowrap; }
@@ -188,12 +189,18 @@
         <div class="chart-header">
             <h2 class="chart-title"><span class="ti ti-battery-2" aria-hidden="true"></span> <span data-translate-lang="battery_voltage">Battery & Voltage</span></h2>
             <div class="chart-actions">
+                <select class="chart-period" data-chart="battery_voltage" aria-label="{{ "Chart time range" | tr }}">
+                    <option value="1">{{ "Last 24 hours" | tr }}</option>
+                    <option value="7" selected>{{ "Last 7 days" | tr }}</option>
+                    <option value="30">{{ "Last 30 days" | tr }}</option>
+                </select>
                 <button type="button" class="chart-tool" onclick="expandChart('battery_voltage')" title="{{ "Expand chart" | tr }}" aria-label="{{ "Expand chart" | tr }}"><span class="ti ti-arrows-maximize" aria-hidden="true"></span></button>
                 <button type="button" class="chart-tool" onclick="exportCSV('battery_voltage')" title="{{ "Export CSV" | tr }}" aria-label="{{ "Export CSV" | tr }}"><span class="ti ti-download" aria-hidden="true"></span></button>
             </div>
         </div>
         <p class="chart-loading is-loading">{{ "Loading..." | tr }}</p>
-        <div id="chart_battery_voltage" style="height:380px;"></div>
+        <p class="chart-empty" hidden>{{ "No data in this period." | tr }}</p>
+        <div id="chart_battery_voltage" class="chart-canvas" style="height:380px;"></div>
     </div>
 
     <!-- Power Metrics -->
@@ -201,12 +208,18 @@
         <div class="chart-header">
             <h2 class="chart-title"><span class="ti ti-bolt" aria-hidden="true"></span> <span data-translate-lang="power">Power Metrics</span></h2>
             <div class="chart-actions">
+                <select class="chart-period" data-chart="power" aria-label="{{ "Chart time range" | tr }}">
+                    <option value="1">{{ "Last 24 hours" | tr }}</option>
+                    <option value="7" selected>{{ "Last 7 days" | tr }}</option>
+                    <option value="30">{{ "Last 30 days" | tr }}</option>
+                </select>
                 <button type="button" class="chart-tool" onclick="expandChart('power')" title="{{ "Expand chart" | tr }}" aria-label="{{ "Expand chart" | tr }}"><span class="ti ti-arrows-maximize" aria-hidden="true"></span></button>
                 <button type="button" class="chart-tool" onclick="exportCSV('power')" title="{{ "Export CSV" | tr }}" aria-label="{{ "Export CSV" | tr }}"><span class="ti ti-download" aria-hidden="true"></span></button>
             </div>
         </div>
         <p class="chart-loading is-loading">{{ "Loading..." | tr }}</p>
-        <div id="chart_power" style="height:380px;"></div>
+        <p class="chart-empty" hidden>{{ "No data in this period." | tr }}</p>
+        <div id="chart_power" class="chart-canvas" style="height:380px;"></div>
     </div>
 
     <!-- Air/Channel -->
@@ -214,12 +227,18 @@
         <div class="chart-header">
             <h2 class="chart-title"><span class="ti ti-antenna-bars-5" aria-hidden="true"></span> <span data-translate-lang="air_channel">Air & Channel Utilization</span></h2>
             <div class="chart-actions">
+                <select class="chart-period" data-chart="air_channel" aria-label="{{ "Chart time range" | tr }}">
+                    <option value="1">{{ "Last 24 hours" | tr }}</option>
+                    <option value="7" selected>{{ "Last 7 days" | tr }}</option>
+                    <option value="30">{{ "Last 30 days" | tr }}</option>
+                </select>
                 <button type="button" class="chart-tool" onclick="expandChart('air_channel')" title="{{ "Expand chart" | tr }}" aria-label="{{ "Expand chart" | tr }}"><span class="ti ti-arrows-maximize" aria-hidden="true"></span></button>
                 <button type="button" class="chart-tool" onclick="exportCSV('air_channel')" title="{{ "Export CSV" | tr }}" aria-label="{{ "Export CSV" | tr }}"><span class="ti ti-download" aria-hidden="true"></span></button>
             </div>
         </div>
         <p class="chart-loading is-loading">{{ "Loading..." | tr }}</p>
-        <div id="chart_air_channel" style="height:380px;"></div>
+        <p class="chart-empty" hidden>{{ "No data in this period." | tr }}</p>
+        <div id="chart_air_channel" class="chart-canvas" style="height:380px;"></div>
     </div>
 
     <!-- Env Metrics -->
@@ -227,12 +246,18 @@
         <div class="chart-header">
             <h2 class="chart-title"><span class="ti ti-temperature" aria-hidden="true"></span> <span data-translate-lang="environment">Environment Metrics</span></h2>
             <div class="chart-actions">
+                <select class="chart-period" data-chart="environment" aria-label="{{ "Chart time range" | tr }}">
+                    <option value="1">{{ "Last 24 hours" | tr }}</option>
+                    <option value="7" selected>{{ "Last 7 days" | tr }}</option>
+                    <option value="30">{{ "Last 30 days" | tr }}</option>
+                </select>
                 <button type="button" class="chart-tool" onclick="expandChart('environment')" title="{{ "Expand chart" | tr }}" aria-label="{{ "Expand chart" | tr }}"><span class="ti ti-arrows-maximize" aria-hidden="true"></span></button>
                 <button type="button" class="chart-tool" onclick="exportCSV('environment')" title="{{ "Export CSV" | tr }}" aria-label="{{ "Export CSV" | tr }}"><span class="ti ti-download" aria-hidden="true"></span></button>
             </div>
         </div>
         <p class="chart-loading is-loading">{{ "Loading..." | tr }}</p>
-        <div id="chart_environment" style="height:380px;"></div>
+        <p class="chart-empty" hidden>{{ "No data in this period." | tr }}</p>
+        <div id="chart_environment" class="chart-canvas" style="height:380px;"></div>
     </div>
 
     <!-- Neighbor chart -->
@@ -241,12 +266,18 @@
     <div class="chart-header">
         <h2 class="chart-title"><span class="ti ti-affiliate" aria-hidden="true"></span> <span data-translate-lang="neighbors_chart">Neighbors (SNR Over Time)</span></h2>
         <div class="chart-actions">
+                <select class="chart-period" data-chart="neighbors" aria-label="{{ "Chart time range" | tr }}">
+                    <option value="1">{{ "Last 24 hours" | tr }}</option>
+                    <option value="7" selected>{{ "Last 7 days" | tr }}</option>
+                    <option value="30">{{ "Last 30 days" | tr }}</option>
+                </select>
                 <button type="button" class="chart-tool" onclick="expandChart('neighbors')" title="{{ "Expand chart" | tr }}" aria-label="{{ "Expand chart" | tr }}"><span class="ti ti-arrows-maximize" aria-hidden="true"></span></button>
                 <button type="button" class="chart-tool" onclick="exportCSV('neighbors')" title="{{ "Export CSV" | tr }}" aria-label="{{ "Export CSV" | tr }}"><span class="ti ti-download" aria-hidden="true"></span></button>
             </div>
     </div>
     <p class="chart-loading is-loading">{{ "Loading..." | tr }}</p>
-    <div id="chart_neighbors" style="height:380px;"></div>
+    <p class="chart-empty" hidden>{{ "No data in this period." | tr }}</p>
+    <div id="chart_neighbors" class="chart-canvas" style="height:380px;"></div>
 </div>
 
     <!-- Direct receptions: packets heard at no hops, and their signal. -->
@@ -254,12 +285,11 @@
     <div class="chart-header">
         <h2 class="chart-title"><span class="ti ti-wifi" aria-hidden="true"></span> <span>{{ "Direct receptions" | tr }}</span></h2>
         <div class="chart-actions">
-            <select id="direct_period" class="direct-period" aria-label="{{ "Direct receptions time range" | tr }}">
-                <option value="1">{{ "Last 24 hours" | tr }}</option>
-                <option value="7" selected>{{ "Last 7 days" | tr }}</option>
-                <option value="30">{{ "Last 30 days" | tr }}</option>
-                <option value="">{{ "All time" | tr }}</option>
-            </select>
+            <select class="chart-period" data-chart="direct" aria-label="{{ "Chart time range" | tr }}">
+                    <option value="1">{{ "Last 24 hours" | tr }}</option>
+                    <option value="7" selected>{{ "Last 7 days" | tr }}</option>
+                    <option value="30">{{ "Last 30 days" | tr }}</option>
+                </select>
             <button type="button" class="chart-tool" onclick="expandChart('direct')" title="{{ "Expand chart" | tr }}" aria-label="{{ "Expand chart" | tr }}"><span class="ti ti-arrows-maximize" aria-hidden="true"></span></button>
             <button type="button" class="chart-tool" onclick="exportCSV('direct')" title="{{ "Export CSV" | tr }}" aria-label="{{ "Export CSV" | tr }}"><span class="ti ti-download" aria-hidden="true"></span></button>
         </div>
@@ -276,8 +306,8 @@
         <p id="direct_note" class="direct-note"></p>
     </div>
     <p class="chart-loading is-loading">{{ "Loading..." | tr }}</p>
-    <p id="direct_empty" class="direct-empty" hidden>{{ "No direct receptions in this period." | tr }}</p>
-    <div id="chart_direct" style="height:380px;"></div>
+    <p class="chart-empty" hidden>{{ "No direct receptions in this period." | tr }}</p>
+    <div id="chart_direct" class="chart-canvas" style="height:380px;"></div>
     <div class="direct-table-wrap">
         <table class="direct-table">
             <thead>
@@ -303,12 +333,18 @@
     <div class="chart-header">
         <h2 class="chart-title"><span class="ti ti-chart-bar" aria-hidden="true"></span> <span data-translate-lang="packets_per_day">Packets per Day (Last 7 Days)</span></h2>
         <div class="chart-actions">
+                <select class="chart-period" data-chart="packet_histogram" aria-label="{{ "Chart time range" | tr }}">
+                    <option value="1">{{ "Last 24 hours" | tr }}</option>
+                    <option value="7" selected>{{ "Last 7 days" | tr }}</option>
+                    <option value="30">{{ "Last 30 days" | tr }}</option>
+                </select>
                 <button type="button" class="chart-tool" onclick="expandChart('packet_histogram')" title="{{ "Expand chart" | tr }}" aria-label="{{ "Expand chart" | tr }}"><span class="ti ti-arrows-maximize" aria-hidden="true"></span></button>
                 <button type="button" class="chart-tool" onclick="exportCSV('packet_histogram')" title="{{ "Export CSV" | tr }}" aria-label="{{ "Export CSV" | tr }}"><span class="ti ti-download" aria-hidden="true"></span></button>
             </div>
     </div>
     <p class="chart-loading is-loading">{{ "Loading..." | tr }}</p>
-    <div id="chart_packet_histogram" style="height:380px;"></div>
+    <p class="chart-empty" hidden>{{ "No data in this period." | tr }}</p>
+    <div id="chart_packet_histogram" class="chart-canvas" style="height:380px;"></div>
 </div>
 
     <!-- Packet Filters -->
@@ -506,7 +542,7 @@ let currentPacketRows = [];
 
 let map, markers = {};
 let coverageLayer = null;
-let chartData = {}, neighborData = { ids:[], names:[], snrs:[] };
+let neighborData = { ids:[], names:[], snrs:[] };
 
 let fromNodeId = new URLSearchParams(window.location.search).get("from_node_id");
 if (!fromNodeId) {
@@ -1076,18 +1112,116 @@ function packetRowHtml(pkt) {
 
 
 /* ======================================================
+    CHART PERIODS AND ZOOM, shared by the charts below
+   ====================================================== */
+
+// The charts show the latest 24 hours, 7 days or 30 days: no further, to
+// spare the server. Each starts at 7 days, or 30 when 7 have nothing.
+const FINE_POINTER = window.matchMedia("(pointer: fine)").matches;
+
+function chartDays(key) {
+    return Number(document.querySelector(`.chart-period[data-chart="${key}"]`)?.value || 7);
+}
+
+function setChartDays(key, days) {
+    const select = document.querySelector(`.chart-period[data-chart="${key}"]`);
+    if (select) select.value = String(days);
+}
+
+function sinceUs(days) {
+    return (Date.now() - days * 86400000) * 1000;
+}
+
+// Nothing in the period: a line in the middle of the card instead of the
+// chart, and its tools off.
+function showChartEmpty(card, empty) {
+    card.querySelector(".chart-empty").hidden = !empty;
+    card.querySelector(".chart-canvas").hidden = empty;
+    card.querySelectorAll(".chart-tool").forEach(tool => { tool.disabled = empty; });
+}
+
+// With a mouse, dragging selects the span to zoom into and the wheel moves
+// along time; on a touch screen, pinch and drag as usual. The box zoom only
+// works with its toolbox shown: it is, out of sight.
+function spanZoomOption() {
+    return {
+        toolbox: { show: true, left: -1000, top: -1000, showTitle: false,
+            feature: { dataZoom: { yAxisIndex: "none" } } },
+        dataZoom: [{ type: "inside", xAxisIndex: 0, filterMode: "none",
+            ...(FINE_POINTER ? { zoomOnMouseWheel: false, moveOnMouseWheel: true, moveOnMouseMove: false } : {}) }]
+    };
+}
+
+// The box zoom always on, and a double click to see it all again.
+function enableSpanZoom(chart) {
+    if (!FINE_POINTER) return;
+    chart.dispatchAction({ type: "takeGlobalCursor", key: "dataZoomSelect", dataZoomSelectActive: true });
+    chart.getZr().off("dblclick");
+    chart.getZr().on("dblclick", () => chart.dispatchAction({ type: "dataZoom", start: 0, end: 100 }));
+}
+
+// A chart drawn into its card, with the option replacing what was there.
+function drawChart(el, option, zoom = true) {
+    const chart = echarts.getInstanceByDom(el) || initMeshChart(el);
+    // Shown again after being hidden, the chart has to take its size anew.
+    chart.resize();
+    chart.setOption(option, { replaceMerge: ["series", "xAxis", "yAxis", "legend"] });
+    fitLegend(chart);
+    if (zoom) enableSpanZoom(chart);
+    return chart;
+}
+
+// The node's packets of a port in the latest days, latest first: pages of
+// 1000, up to ten, and each period asked for once.
+const nodePacketLoads = new Map();
+function fetchNodePackets(portnum, days) {
+    const key = `${portnum}/${days}`;
+    if (!nodePacketLoads.has(key)) {
+        const load = (async () => {
+            const since = sinceUs(days);
+            const packets = [];
+            let before = null;
+            for (let page = 0; page < 10; page++) {
+                const url = new URL("/api/v1/packets", window.location.origin);
+                url.searchParams.set("portnum", portnum);
+                url.searchParams.set("from_node_id", fromNodeId);
+                url.searchParams.set("since", since);
+                url.searchParams.set("limit", 1000);
+                if (before) url.searchParams.set("before", before);
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`/api/v1/packets returned ${res.status}`);
+                const data = await res.json();
+                packets.push(...(data.packets || []));
+                if (!data.next_before) break;
+                before = data.next_before;
+            }
+            return packets.filter(p => (p.import_time_us || 0) >= since);
+        })();
+        load.catch(() => nodePacketLoads.delete(key));
+        nodePacketLoads.set(key, load);
+    }
+    return nodePacketLoads.get(key);
+}
+
+/* ======================================================
     TELEMETRY CHARTS (portnum=67)
    ====================================================== */
 
-async function loadTelemetryCharts(){
-    const url = `/api/v1/packets?portnum=67&from_node_id=${fromNodeId}`;
-    const res = await fetch(url);
-    if (!res.ok) return;
+const TELEMETRY_CONTAINERS = {
+    battery_voltage: "battery_voltage_container",
+    power: "power_chart_container",
+    air_channel: "air_channel_container",
+    environment: "env_chart_container"
+};
+// What each telemetry chart shows, for its CSV.
+const telemetrySets = {};
+const parsedTelemetry = new WeakMap();
 
-    const data = await res.json();
-    const packets = data.packets || [];
-    chartData = {
-        times: [],
+// The readings of telemetry packets, the earliest first.
+function parseTelemetry(packets) {
+    if (parsedTelemetry.has(packets)) return parsedTelemetry.get(packets);
+    const data = {
+        ts: [],
         battery: [], voltage: [],
         airUtil: [], chanUtil: [],
         temperature: [], humidity: [], pressure: [],
@@ -1097,11 +1231,11 @@ async function loadTelemetryCharts(){
     };
     const POWER_CHANNELS = [1, 2, 3, 4, 5, 6, 7, 8];
     for (const ch of POWER_CHANNELS) {
-        chartData.power[`ch${ch}_voltage`] = [];
-        chartData.power[`ch${ch}_current`] = [];
+        data.power[`ch${ch}_voltage`] = [];
+        data.power[`ch${ch}_current`] = [];
     }
-    chartData.power.env_voltage = [];
-    chartData.power.env_current = [];
+    data.power.env_voltage = [];
+    data.power.env_current = [];
 
     // Return the body of a "name { ... }" block from the text-format payload.
     // Several telemetry variants share field names (voltage, temperature...),
@@ -1116,53 +1250,84 @@ async function loadTelemetryCharts(){
         return m ? parseFloat(m[1]) : NaN;
     };
 
-    for (const pkt of packets.reverse()) {
+    for (const pkt of [...packets].reverse()) {
         const pl = pkt.payload || "";
-        const t  = new Date(pkt.import_time_us / 1000);
-        chartData.times.push(
-            t.toLocaleString(MeshI18n.language, { month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" })
-        );
+        data.ts.push(pkt.import_time_us / 1000);
 
         const dev = metricsBlock(pl, "device_metrics");
         const env = metricsBlock(pl, "environment_metrics");
         const pwr = metricsBlock(pl, "power_metrics");
 
         for (const ch of POWER_CHANNELS) {
-            chartData.power[`ch${ch}_voltage`].push(metricField(pwr, `ch${ch}_voltage`));
-            chartData.power[`ch${ch}_current`].push(metricField(pwr, `ch${ch}_current`));
+            data.power[`ch${ch}_voltage`].push(metricField(pwr, `ch${ch}_voltage`));
+            data.power[`ch${ch}_current`].push(metricField(pwr, `ch${ch}_current`));
         }
-        chartData.power.env_voltage.push(metricField(env, "voltage"));
-        chartData.power.env_current.push(metricField(env, "current"));
+        data.power.env_voltage.push(metricField(env, "voltage"));
+        data.power.env_current.push(metricField(env, "current"));
 
-        chartData.battery.push(metricField(dev, "battery_level"));
-        chartData.voltage.push(metricField(dev, "voltage"));
-        chartData.airUtil.push(metricField(dev, "air_util_tx"));
-        chartData.chanUtil.push(metricField(dev, "channel_utilization"));
-        chartData.temperature.push(metricField(env, "temperature"));
-        chartData.humidity.push(metricField(env, "relative_humidity"));
-        chartData.pressure.push(metricField(env, "barometric_pressure"));
+        data.battery.push(metricField(dev, "battery_level"));
+        data.voltage.push(metricField(dev, "voltage"));
+        data.airUtil.push(metricField(dev, "air_util_tx"));
+        data.chanUtil.push(metricField(dev, "channel_utilization"));
+        data.temperature.push(metricField(env, "temperature"));
+        data.humidity.push(metricField(env, "relative_humidity"));
+        data.pressure.push(metricField(env, "barometric_pressure"));
     }
 
-    const hasBattery = chartData.battery.some(v => !isNaN(v));
-    const hasVoltage = chartData.voltage.some(v => !isNaN(v));
-    const hasAir     = chartData.airUtil.some(v => !isNaN(v));
-    const hasChan    = chartData.chanUtil.some(v => !isNaN(v));
-    const hasEnv     =
-        chartData.temperature.some(v => !isNaN(v)) ||
-        chartData.humidity.some(v => !isNaN(v))   ||
-        chartData.pressure.some(v => !isNaN(v));
+    // Power: one voltage (left axis) and one current (right axis) series per
+    // channel that reported data.
+    const POWER_COLORS = [
+        'rgba(79,155,255,1)', 'rgba(255,214,82,1)', 'rgba(138,255,108,1)',
+        'rgba(255,102,204,1)', 'rgba(255,138,82,1)', 'rgba(0,212,212,1)',
+        'rgba(178,132,255,1)', 'rgba(200,200,200,1)'
+    ];
+    const sources = [
+        ...POWER_CHANNELS.map(ch => ({
+            key: `ch${ch}`,
+            color: POWER_COLORS[ch - 1],
+            voltageLabel: MeshI18n.t("Ch{n} voltage (V)", {n: ch}),
+            currentLabel: MeshI18n.t("Ch{n} current (mA)", {n: ch})
+        })),
+        {
+            key: "env",
+            color: 'rgba(255,80,80,1)',
+            voltageLabel: MeshI18n.t("Environment voltage (V)"),
+            currentLabel: MeshI18n.t("Environment current (mA)")
+        }
+    ];
+    const hasData = values => values.some(v => !isNaN(v));
+    for (const src of sources) {
+        const voltage = data.power[`${src.key}_voltage`];
+        const current = data.power[`${src.key}_current`];
+        if (hasData(voltage))
+            data.powerSeries.push({ label: src.voltageLabel, color: src.color, data: voltage, axis: 0 });
+        if (hasData(current))
+            data.powerSeries.push({ label: src.currentLabel, color: src.color, data: current, axis: 1 });
+    }
+    parsedTelemetry.set(packets, data);
+    return data;
+}
 
-    const batteryContainer = document.getElementById("battery_voltage_container");
-    const airContainer     = document.getElementById("air_channel_container");
-    const envContainer     = document.getElementById("env_chart_container");
+function telemetryHasData(key, data) {
+    const any = values => values.some(v => !isNaN(v));
+    switch (key) {
+        case "battery_voltage": return any(data.battery) || any(data.voltage);
+        case "air_channel": return any(data.airUtil) || any(data.chanUtil);
+        case "environment": return any(data.temperature) || any(data.humidity) || any(data.pressure);
+        case "power": return data.powerSeries.length > 0;
+    }
+    return false;
+}
 
-    const makeLine = (name, color, data, yAxisIndex = 0) => ({
+function telemetryLine(ts, name, color, values, yAxisIndex = 0) {
+    return {
         name,
         type: 'line',
         smooth: true,
         connectNulls: true,
         yAxisIndex,
-        showSymbol: true,
+        // Points only while there are few enough to tell apart.
+        showSymbol: ts.length <= 200,
         symbol: 'circle',
         symbolSize: 8,
         lineStyle: {
@@ -1184,141 +1349,101 @@ async function loadTelemetryCharts(){
                 { offset: 1,   color: 'rgba(0,0,0,0)' }
             ])
         },
-        data: data.map(v => isNaN(v) ? null : v)
-    });
+        data: ts.map((t, i) => [t, isNaN(values[i]) ? null : values[i]])
+    };
+}
 
-    let chart1 = null, chart2 = null, chart3 = null;
-
-    // Battery / Voltage chart
-    if (hasBattery || hasVoltage) {
-        batteryContainer.style.display = "block";
-        chart1 = initMeshChart(document.getElementById('chart_battery_voltage'));
-        chart1.setOption({
-            tooltip: { trigger:'axis' },
-            legend: { data:[MeshI18n.t("Battery Level"),MeshI18n.t("Voltage")], textStyle:{ color:'#64748b' } },
-            xAxis: { type:'category', data:chartData.times, axisLabel:{ color:'#64748b' } },
+function renderTelemetry(key, data) {
+    const axisLabel = { color: '#64748b' };
+    const timeAxis = { type: 'time', axisLabel: { ...axisLabel, hideOverlap: true } };
+    const line = (name, color, values, axis) => telemetryLine(data.ts, name, color, values, axis);
+    let option;
+    if (key === "battery_voltage") {
+        option = {
+            legend: { data: [MeshI18n.t("Battery Level"), MeshI18n.t("Voltage")], textStyle: axisLabel },
             yAxis: [
-                { type:'value', name:MeshI18n.t("Battery (%)"), axisLabel:{ color:'#64748b' } },
-                { type:'value', name:MeshI18n.t("Voltage (V)"), axisLabel:{ color:'#64748b' } }
+                { type: 'value', name: MeshI18n.t("Battery (%)"), axisLabel },
+                { type: 'value', name: MeshI18n.t("Voltage (V)"), axisLabel }
             ],
             series: [
-                makeLine(MeshI18n.t("Battery Level"), 'rgba(255,214,82,1)', chartData.battery),
-                makeLine(MeshI18n.t("Voltage"), 'rgba(79,155,255,1)', chartData.voltage, 1)
+                line(MeshI18n.t("Battery Level"), 'rgba(255,214,82,1)', data.battery),
+                line(MeshI18n.t("Voltage"), 'rgba(79,155,255,1)', data.voltage, 1)
             ]
-        });
-    } else {
-        batteryContainer.style.display = "none";
-    }
-
-    // Air / Channel chart
-    if (hasAir || hasChan) {
-        airContainer.style.display = "block";
-        chart2 = initMeshChart(document.getElementById('chart_air_channel'));
-        chart2.setOption({
-            tooltip: { trigger:'axis' },
-            legend: { data:[MeshI18n.t("Air Util Tx"),MeshI18n.t("Channel Utilization")], textStyle:{ color:'#64748b' } },
-            xAxis: { type:'category', data:chartData.times, axisLabel:{ color:'#64748b' } },
-            yAxis: { type:'value', name:'%', axisLabel:{ color:'#64748b' } },
+        };
+    } else if (key === "air_channel") {
+        option = {
+            legend: { data: [MeshI18n.t("Air Util Tx"), MeshI18n.t("Channel Utilization")], textStyle: axisLabel },
+            yAxis: { type: 'value', name: '%', axisLabel },
             series: [
-                makeLine(MeshI18n.t("Air Util Tx"), 'rgba(138,255,108,1)', chartData.airUtil),
-                makeLine(MeshI18n.t("Channel Utilization"), 'rgba(255,102,204,1)', chartData.chanUtil)
+                line(MeshI18n.t("Air Util Tx"), 'rgba(138,255,108,1)', data.airUtil),
+                line(MeshI18n.t("Channel Utilization"), 'rgba(255,102,204,1)', data.chanUtil)
             ]
-        });
-    } else {
-        airContainer.style.display = "none";
-    }
-
-    // Environment chart
-    if (hasEnv) {
-        envContainer.style.display = "block";
-        chart3 = initMeshChart(document.getElementById('chart_environment'));
-        chart3.setOption({
-            tooltip: { trigger:'axis' },
-            legend: { data:[MeshI18n.t("Temperature (°C)"),MeshI18n.t("Humidity (%)"),MeshI18n.t("Pressure (hPa)")], textStyle:{ color:'#64748b' } },
-            xAxis: { type:'category', data:chartData.times, axisLabel:{ color:'#64748b' } },
+        };
+    } else if (key === "environment") {
+        option = {
+            legend: { data: [MeshI18n.t("Temperature (°C)"), MeshI18n.t("Humidity (%)"), MeshI18n.t("Pressure (hPa)")], textStyle: axisLabel },
             yAxis: [
-                { type:'value', name:'°C / %', axisLabel:{ color:'#64748b' } },
-                { type:'value', name:'hPa', axisLabel:{ color:'#64748b' } }
+                { type: 'value', name: '°C / %', axisLabel },
+                { type: 'value', name: 'hPa', axisLabel }
             ],
             series: [
-                makeLine(MeshI18n.t("Temperature (°C)"), 'rgba(255,138,82,1)', chartData.temperature),
-                makeLine(MeshI18n.t("Humidity (%)"), 'rgba(138,255,108,1)', chartData.humidity),
-                makeLine(MeshI18n.t("Pressure (hPa)"), 'rgba(79,155,255,1)', chartData.pressure, 1)
+                line(MeshI18n.t("Temperature (°C)"), 'rgba(255,138,82,1)', data.temperature),
+                line(MeshI18n.t("Humidity (%)"), 'rgba(138,255,108,1)', data.humidity),
+                line(MeshI18n.t("Pressure (hPa)"), 'rgba(79,155,255,1)', data.pressure, 1)
             ]
-        });
+        };
     } else {
-        envContainer.style.display = "none";
-    }
-
-    // Power chart: one voltage (left axis) and one current (right axis) series
-    // per channel that reported data. Current is dashed and unfilled so up to
-    // 18 series stay readable.
-    const POWER_COLORS = [
-        'rgba(79,155,255,1)', 'rgba(255,214,82,1)', 'rgba(138,255,108,1)',
-        'rgba(255,102,204,1)', 'rgba(255,138,82,1)', 'rgba(0,212,212,1)',
-        'rgba(178,132,255,1)', 'rgba(200,200,200,1)'
-    ];
-    const ENV_POWER_COLOR = 'rgba(255,80,80,1)';
-    const powerSources = [
-        ...POWER_CHANNELS.map(ch => ({
-            key: `ch${ch}`,
-            color: POWER_COLORS[ch - 1],
-            voltageLabel: MeshI18n.t("Ch{n} voltage (V)", {n: ch}),
-            currentLabel: MeshI18n.t("Ch{n} current (mA)", {n: ch})
-        })),
-        {
-            key: "env",
-            color: ENV_POWER_COLOR,
-            voltageLabel: MeshI18n.t("Environment voltage (V)"),
-            currentLabel: MeshI18n.t("Environment current (mA)")
-        }
-    ];
-    const hasData = values => values.some(v => !isNaN(v));
-    for (const src of powerSources) {
-        const voltage = chartData.power[`${src.key}_voltage`];
-        const current = chartData.power[`${src.key}_current`];
-        if (hasData(voltage))
-            chartData.powerSeries.push({ label: src.voltageLabel, color: src.color, data: voltage, axis: 0 });
-        if (hasData(current))
-            chartData.powerSeries.push({ label: src.currentLabel, color: src.color, data: current, axis: 1 });
-    }
-
-    const powerContainer = document.getElementById("power_chart_container");
-    let chart4 = null;
-    if (chartData.powerSeries.length) {
-        powerContainer.style.display = "block";
-        chart4 = initMeshChart(document.getElementById('chart_power'));
-        chart4.setOption({
-            tooltip: { trigger:'axis' },
-            legend: {
-                type: 'scroll',
-                data: chartData.powerSeries.map(s => s.label),
-                textStyle:{ color:'#64748b' }
-            },
-            xAxis: { type:'category', data:chartData.times, axisLabel:{ color:'#64748b' } },
+        // Current is dashed and unfilled so up to 18 series stay readable.
+        option = {
+            legend: { type: 'scroll', data: data.powerSeries.map(s => s.label), textStyle: axisLabel },
             yAxis: [
-                { type:'value', name:MeshI18n.t("Voltage (V)"), axisLabel:{ color:'#64748b' } },
-                { type:'value', name:MeshI18n.t("Current (mA)"), axisLabel:{ color:'#64748b' } }
+                { type: 'value', name: MeshI18n.t("Voltage (V)"), axisLabel },
+                { type: 'value', name: MeshI18n.t("Current (mA)"), axisLabel }
             ],
-            series: chartData.powerSeries.map(s => {
-                const line = makeLine(s.label, s.color, s.data, s.axis);
+            series: data.powerSeries.map(s => {
+                const series = line(s.label, s.color, s.data, s.axis);
                 if (s.axis === 1) {
-                    delete line.areaStyle;
-                    line.lineStyle = { ...line.lineStyle, type: 'dashed' };
-                    line.symbol = 'triangle';
+                    delete series.areaStyle;
+                    series.lineStyle = { ...series.lineStyle, type: 'dashed' };
+                    series.symbol = 'triangle';
                 }
-                return line;
+                return series;
             })
-        });
-    } else {
-        powerContainer.style.display = "none";
+        };
     }
+    drawChart(document.getElementById(`chart_${key}`),
+        { tooltip: { trigger: 'axis' }, xAxis: timeAxis, ...spanZoomOption(), ...option });
+}
 
-    // Resize charts that exist
-    [chart1, chart2, chart3, chart4].forEach(c => { if (c) fitLegend(c); });
-    window.addEventListener("resize", () => {
-        [chart1, chart2, chart3, chart4].forEach(c => { if (c) { c.resize(); fitLegend(c); } });
-    });
+async function loadTelemetry(key, first = false) {
+    const card = document.getElementById(TELEMETRY_CONTAINERS[key]);
+    let days = chartDays(key);
+    let packets = await fetchNodePackets(67, days);
+    // A month is asked for only when the week had no telemetry at all: a node
+    // that reports some but never this kind would only load it for nothing.
+    if (first && !packets.length && days < 30) {
+        days = 30;
+        setChartDays(key, days);
+        packets = await fetchNodePackets(67, days);
+    }
+    const data = parseTelemetry(packets);
+    if (first && !telemetryHasData(key, data)) {
+        card.style.display = "none";
+        return;
+    }
+    card.style.display = "block";
+    telemetrySets[key] = data;
+    const empty = !telemetryHasData(key, data);
+    showChartEmpty(card, empty);
+    if (!empty) renderTelemetry(key, data);
+}
+
+async function loadTelemetryCharts() {
+    await Promise.all(Object.keys(TELEMETRY_CONTAINERS).map(key =>
+        loadTelemetry(key, true).catch(error => {
+            console.error(error);
+            document.getElementById(TELEMETRY_CONTAINERS[key]).style.display = "none";
+        })));
 }
 
 
@@ -1350,95 +1475,62 @@ async function loadLatestNeighborIds() {
 /* ======================================================
     NEIGHBOR CHART (portnum=71)
 
-    The request is bounded to NEIGHBOR_WINDOW_DAYS through the
-    API's `since` parameter, and only the NEIGHBOR_MAX_SERIES
-    neighbors with the most data points in that window are
-    drawn. Without both limits a busy node produces hundreds of
-    legend entries covering weeks of history.
+    The NEIGHBOR_MAX_SERIES neighbors with the most data points in
+    the period are drawn: a busy node has many more.
    ====================================================== */
 
-const NEIGHBOR_WINDOW_DAYS = 7;
-const NEIGHBOR_MAX_SERIES  = 15;
+const NEIGHBOR_MAX_SERIES = 15;
+const neighborNames = new Map();
 
-async function loadNeighborTimeSeries() {
+async function loadNeighborTimeSeries(first = false) {
     const container = document.getElementById("neighbor_chart_container");
     const chartEl   = document.getElementById("chart_neighbors");
 
-    // Start of the window, in microseconds (import_time_us is epoch-us).
-    const sinceUs = (Date.now() - NEIGHBOR_WINDOW_DAYS * 86400 * 1000) * 1000;
-
-    const url = `/api/v1/packets?portnum=71&from_node_id=${fromNodeId}`
-              + `&since=${sinceUs}&limit=500`;
-    const res = await fetch(url);
-
-    if (!res.ok) {
+    let days = chartDays("neighbors");
+    let packets = await fetchNodePackets(71, days);
+    if (first && !packets.length && days < 30) {
+        days = 30;
+        setChartDays("neighbors", days);
+        packets = await fetchNodePackets(71, days);
+    }
+    if (first && !packets.length) {
         container.style.display = "none";
         return;
     }
+    container.style.display = "";
 
-    const data = await res.json();
-
-    // Re-apply the window here too, so the chart cannot drift past
-    // it if the packet source ever returns something older.
-    const packets = (data.packets || [])
-        .filter(p => (p.import_time_us || 0) >= sinceUs);
-
-    if (!packets.length) {
-        container.style.display = "none";
-        return;
-    }
-
-    // Sort packets chronologically (microseconds)
-    packets.sort((a, b) => (a.import_time_us || 0) - (b.import_time_us || 0));
-
-    // --- Pass 1: collect the readings, without looking up names yet ---
+    // --- Pass 1: collect the readings, the earliest first ---
     const neighborHistory = {}; // node_id -> { times[], snr[] }
-
-    for (const pkt of packets) {
+    for (const pkt of [...packets].reverse()) {
         if (!pkt.import_time_us || !pkt.payload) continue;
-
-        const ts = pkt.import_time_us; // KEEP NUMERIC TIMESTAMP
-
         const blockRe = /neighbors\s*\{([^}]+)\}/g;
         let m;
-
         while ((m = blockRe.exec(pkt.payload)) !== null) {
-            const block = m[1];
-
-            const idMatch  = block.match(/node_id:\s*(\d+)/);
-            const snrMatch = block.match(/snr:\s*(-?\d+(?:\.\d+)?)/);
-
+            const idMatch  = m[1].match(/node_id:\s*(\d+)/);
+            const snrMatch = m[1].match(/snr:\s*(-?\d+(?:\.\d+)?)/);
             if (!idMatch || !snrMatch) continue;
-
             const nid = parseInt(idMatch[1], 10);
-
-            if (!neighborHistory[nid]) {
-                neighborHistory[nid] = { times: [], snr: [] };
-            }
-
-            neighborHistory[nid].times.push(ts);
+            neighborHistory[nid] ??= { times: [], snr: [] };
+            neighborHistory[nid].times.push(pkt.import_time_us / 1000);
             neighborHistory[nid].snr.push(parseFloat(snrMatch[1]));
         }
     }
 
-    // --- Keep the neighbors with the most data points in the window ---
+    // --- Keep the neighbors with the most data points in the period ---
     const ranked = Object.entries(neighborHistory)
         .sort((a, b) => b[1].times.length - a[1].times.length);
-
-    const kept    = ranked.slice(0, NEIGHBOR_MAX_SERIES);
-    const dropped = ranked.length - kept.length;
-
-    if (!kept.length) {
-        container.style.display = "none";
-        return;
-    }
+    const kept = ranked.slice(0, NEIGHBOR_MAX_SERIES);
+    neighborData = { ids: [], names: [], snrs: [] };
+    showChartEmpty(container, !kept.length);
+    if (!kept.length) return;
 
     // --- Pass 2: names, only for the series that are drawn ---
     await Promise.all(kept.map(async ([nid, entry]) => {
-        const neighbor = await fetchNodeFromApi(nid);
-        entry.name = neighbor?.short_name ||
-                     neighbor?.long_name  ||
-                     `Node ${nid}`;
+        if (!neighborNames.has(nid)) {
+            const neighbor = await fetchNodeFromApi(nid);
+            neighborNames.set(nid, neighbor?.short_name || neighbor?.long_name || `Node ${nid}`);
+        }
+        entry.name = neighborNames.get(nid);
     }));
 
     // ECharts identifies a series by its name, so two neighbors sharing
@@ -1449,32 +1541,8 @@ async function loadNeighborTimeSeries() {
         usedNames.add(entry.name);
     }
 
-    // Timestamps across the series that are drawn
-    const xTimes = Array.from(
-        new Set(kept.flatMap(([, entry]) => entry.times))
-    ).sort((a, b) => a - b);
-
-    const legend = [];
-    const series = [];
-
-    for (const [, entry] of kept) {
-        const byTime = new Map();
-        entry.times.forEach((t, i) => byTime.set(t, entry.snr[i]));
-
-        legend.push(entry.name);
-
-        series.push({
-            name: entry.name,
-            type: "line",
-            smooth: true,
-            connectNulls: true,
-            showSymbol: false,
-            data: xTimes.map(t => (byTime.has(t) ? byTime.get(t) : null))
-        });
-    }
-
-    // Values behind the "Export CSV" button: the most recent SNR
-    // in the window, per neighbor.
+    // Values behind the "Export CSV" button: the most recent SNR in the
+    // period, per neighbor.
     neighborData = {
         ids:   kept.map(([nid]) => nid),
         names: kept.map(([, entry]) => entry.name),
@@ -1482,68 +1550,50 @@ async function loadNeighborTimeSeries() {
     };
 
     // Say which neighbors are on screen, so a missing line is not a mystery.
-    const subtextTemplate = dropped > 0
+    const dropped = ranked.length - kept.length;
+    const subtext = (dropped > 0
         ? (nodeTranslations.neighbors_chart_subtitle_capped ||
-           MeshI18n.t("Last {days} days — the {n} neighbors with the most data points, of {total}"))
+           MeshI18n.t("The {n} neighbors with the most data points, of {total}"))
         : (nodeTranslations.neighbors_chart_subtitle ||
-           MeshI18n.t("Last {days} days — {n} neighbors"));
-
-    const subtext = subtextTemplate
-        .replace("{days}",  NEIGHBOR_WINDOW_DAYS)
-        .replace("{n}",     kept.length)
+           MeshI18n.t("{n} neighbors")))
+        .replace("{n}", kept.length)
         .replace("{total}", ranked.length);
 
-    const chart = initMeshChart(chartEl);
-
-    chart.setOption({
+    drawChart(chartEl, {
         title: {
             subtext,
             left: "center",
             bottom: 0,
             subtextStyle: { color: "#888", fontSize: 11 }
         },
-        grid: { bottom: 60 },
         tooltip: {
             trigger: "axis",
             axisPointer: { type: "line" },
             formatter: params => {
                 if (!params.length) return "";
-                const timestamp = Number(params[0].axisValue);
-                const heading = new Date(timestamp / 1000).toLocaleString(MeshI18n.language);
+                const heading = new Date(Number(params[0].axisValue)).toLocaleString(MeshI18n.language);
                 return escapeHtml(heading) + "<br>" + params.map(point =>
-                    `${point.marker}${escapeHtml(point.seriesName)}: ${escapeHtml(point.value ?? MeshI18n.t("N/A"))}`
+                    `${point.marker}${escapeHtml(point.seriesName)}: ${escapeHtml(point.value?.[1] ?? MeshI18n.t("N/A"))}`
                 ).join("<br>");
             }
         },
         legend: {
             type: "scroll",
-            data: legend,
+            data: kept.map(([, entry]) => entry.name),
             textStyle: { color: "#64748b" }
         },
-        xAxis: {
-            type: "category",
-            data: xTimes,
-            axisLabel: {
-                color: "#64748b",
-                formatter: value =>
-                    new Date(value / 1000).toLocaleString(MeshI18n.language, {
-                        month: "2-digit",
-                        day: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit"
-                    })
-            }
-        },
-        yAxis: {
-            type: "value",
-            name: "SNR",
-            axisLabel: { color: "#64748b" }
-        },
-        series
+        xAxis: { type: "time", axisLabel: { color: "#64748b", hideOverlap: true } },
+        yAxis: { type: "value", name: "SNR", axisLabel: { color: "#64748b" } },
+        ...spanZoomOption(),
+        series: kept.map(([, entry]) => ({
+            name: entry.name,
+            type: "line",
+            smooth: true,
+            connectNulls: true,
+            showSymbol: false,
+            data: entry.times.map((t, i) => [t, entry.snr[i]])
+        }))
     });
-
-    fitLegend(chart);
-    window.addEventListener("resize", () => { chart.resize(); fitLegend(chart); });
 }
 
 
@@ -1557,26 +1607,14 @@ const DIRECT_COLORS = ["#245ea8", "#d9480f", "#2f9e44", "#ae3ec9", "#f59f00", "#
     "#e03131", "#5c7cfa", "#66a80f", "#c2255c", "#1098ad", "#9c6644", "#7048e8", "#868e96"];
 const directState = { direction: "received", metric: "rssi", data: null, hidden: new Set() };
 
-const DIRECT_FINE_POINTER = window.matchMedia("(pointer: fine)").matches;
-
-// Drag to select a span (the toolbox's box zoom, always on) and double-click
-// to see it all again.
-function enableDirectZoom(chart) {
-    if (!DIRECT_FINE_POINTER) return;
-    chart.dispatchAction({ type: "takeGlobalCursor", key: "dataZoomSelect", dataZoomSelectActive: true });
-    chart.getZr().off("dblclick");
-    chart.getZr().on("dblclick", () => chart.dispatchAction({ type: "dataZoom", start: 0, end: 100 }));
-}
-
 function directLabel(peer) {
     return peer.long_name || peer.short_name || `!${Number(peer.node_id).toString(16).padStart(8, "0")}`;
 }
 
 async function fetchDirect(direction) {
-    const days = document.getElementById("direct_period").value;
     const url = new URL(`/api/v1/node/${fromNodeId}/direct_receptions`, window.location.origin);
     url.searchParams.set("direction", direction);
-    if (days) url.searchParams.set("since", String((Date.now() - Number(days) * 86400000) * 1000));
+    url.searchParams.set("since", String(sinceUs(chartDays("direct"))));
     const res = await fetch(url);
     if (!res.ok) throw new Error(`direct_receptions returned ${res.status}`);
     return res.json();
@@ -1585,12 +1623,18 @@ async function fetchDirect(direction) {
 async function loadDirectReceptions(first = false) {
     const container = document.getElementById("direct_container");
     let data = await fetchDirect(directState.direction);
-    // At first, show whichever way has something, and nothing if neither has.
+    // At first, show whichever way has something, in 7 days or else in 30,
+    // and nothing if neither has.
     if (first && !data.nodes.length) {
-        const other = await fetchDirect("transmitted");
-        if (!other.nodes.length) { container.style.display = "none"; return; }
-        directState.direction = "transmitted";
-        data = other;
+        let found = null;
+        for (const [days, direction] of [[7, "transmitted"], [30, "received"], [30, "transmitted"]]) {
+            setChartDays("direct", days);
+            const other = await fetchDirect(direction);
+            if (other.nodes.length) { found = { direction, data: other }; break; }
+        }
+        if (!found) { container.style.display = "none"; return; }
+        directState.direction = found.direction;
+        data = found.data;
     }
     container.style.display = "";
     document.querySelectorAll("#direct_container [data-direction]").forEach(button =>
@@ -1613,10 +1657,9 @@ function renderDirect() {
     // Nothing heard: a line in the middle of the card instead of an empty
     // chart, a table and the tools to expand or export them.
     const empty = !peers.length;
-    chartEl.hidden = empty;
-    document.getElementById("direct_empty").hidden = !empty;
+    showChartEmpty(document.getElementById("direct_container"), empty);
     document.querySelector("#direct_container .direct-table-wrap").hidden = empty;
-    document.querySelectorAll("#direct_container .chart-tool, #direct_container [data-metric]")
+    document.querySelectorAll("#direct_container [data-metric]")
         .forEach(control => { control.disabled = empty; });
     note.textContent = empty
         ? ""
@@ -1653,13 +1696,7 @@ function renderDirect() {
                     + `RSSI: ${escapeHtml(r.rssi)} dBm · SNR: ${escapeHtml(r.snr ?? MeshI18n.t("N/A"))} dB`;
             }
         },
-        // With a mouse, dragging selects the span to zoom into and the wheel
-        // moves along time; on a touch screen, pinch and drag as usual.
-        // The box zoom only works with its toolbox shown: it is, out of sight.
-        toolbox: { show: true, left: -1000, top: -1000, showTitle: false,
-            feature: { dataZoom: { yAxisIndex: "none" } } },
-        dataZoom: [{ type: "inside", xAxisIndex: 0, filterMode: "none",
-            ...(DIRECT_FINE_POINTER ? { zoomOnMouseWheel: false, moveOnMouseWheel: true, moveOnMouseMove: false } : {}) }],
+        ...spanZoomOption(),
         // #dce4ef is a border colour the theme turns dark at night.
         xAxis: { type: "time", axisLabel: { color: "#64748b", hideOverlap: true },
             axisLine: { lineStyle: { color: "#dce4ef" } } },
@@ -1684,7 +1721,7 @@ function renderDirect() {
     chart.on("click", point => {
         if (point.data?.packet_id) window.location.href = `/packet/${point.data.packet_id}`;
     });
-    enableDirectZoom(chart);
+    enableSpanZoom(chart);
 
     const fmt = value => value == null ? "—" : String(value);
     const body = document.getElementById("direct_table");
@@ -1750,8 +1787,6 @@ function initDirectControls() {
             placeDirectThumbs();
             renderDirect();
         }));
-    document.getElementById("direct_period").addEventListener("change", () =>
-        loadDirectReceptions().catch(error => console.error(error)));
     window.addEventListener("resize", () => {
         echarts.getInstanceByDom(document.getElementById("chart_direct"))?.resize();
         placeDirectThumbs();
@@ -1759,102 +1794,86 @@ function initDirectControls() {
     document.fonts?.ready.then(placeDirectThumbs);
 }
 
-async function loadPacketHistogram() {
-    const DAYS = 7;
-    const now = new Date();
-
-    const dayKeyFromDate = (d) => {
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        return `${y}-${m}-${day}`;
+async function loadPacketHistogram(first = false) {
+    const container = document.getElementById("packet_histogram_container");
+    const fetchCounts = async days => {
+        const url = new URL(`/api/v1/node/${fromNodeId}/packet_counts`, window.location.origin);
+        url.searchParams.set("since", String(sinceUs(days)));
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`packet_counts returned ${res.status}`);
+        return (await res.json()).counts || [];
     };
 
-    const dayKeys = [];
-    const dayLabels = [];
-
-    for (let i = DAYS - 1; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(d.getDate() - i);
-        dayKeys.push(dayKeyFromDate(d));
-        dayLabels.push(
-            d.toLocaleDateString(MeshI18n.language, { month: "short", day: "numeric" })
-        );
+    let days = chartDays("packet_histogram");
+    let counts = await fetchCounts(days);
+    if (first && !counts.length && days < 30) {
+        days = 30;
+        setChartDays("packet_histogram", days);
+        counts = await fetchCounts(days);
     }
-
-    const url = new URL("/api/v1/packets", window.location.origin);
-    url.searchParams.set("node_id", fromNodeId);
-
-    // last 7 days only (microseconds)
-    const sinceUs = Date.now() * 1000 - (7 * 24 * 60 * 60 * 1_000_000);
-    url.searchParams.set("since", sinceUs);
-
-    // modest safety limit (still applies after server-side filter)
-    url.searchParams.set("limit", 2000);
-
-
-    const res = await fetch(url);
-    if (!res.ok) return;
-
-    const packets = (await res.json()).packets || [];
-
-    const counts = {};   // { port: { day: count } }
-    const ports = new Set();
-
-    for (const pkt of packets) {
-        if (!pkt.import_time_us) continue;
-
-        const day = dayKeyFromDate(new Date(pkt.import_time_us / 1000));
-
-        if (!dayKeys.includes(day)) continue;
-
-        const port = pkt.portnum ?? 0;
-        ports.add(port);
-
-        counts[port] ??= {};
-        counts[port][day] = (counts[port][day] || 0) + 1;
-    }
-
-    if (!ports.size) {
-        document.getElementById("packet_histogram_container").style.display = "none";
+    if (first && !counts.length) {
+        container.style.display = "none";
         return;
     }
+    container.style.display = "";
+    showChartEmpty(container, !counts.length);
+    if (!counts.length) return;
 
-    const series = Array.from(ports)
+    // A bar for each hour of the latest day, or for each local day.
+    const HOUR = 3600000;
+    const hourly = days === 1;
+    const dayKeyFromDate = d =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const keys = [];
+    const labels = [];
+    if (hourly) {
+        const latest = Math.floor(Date.now() / HOUR) * HOUR;
+        for (let i = 23; i >= 0; i--) {
+            const start = latest - i * HOUR;
+            keys.push(String(start));
+            labels.push(new Date(start).toLocaleTimeString(MeshI18n.language, { hour: "2-digit", minute: "2-digit" }));
+        }
+    } else {
+        for (let i = days - 1; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            keys.push(dayKeyFromDate(d));
+            labels.push(d.toLocaleDateString(MeshI18n.language, { month: "short", day: "numeric" }));
+        }
+    }
+    const bucketOf = hourUs => {
+        const ms = hourUs / 1000;
+        return hourly ? String(Math.floor(ms / HOUR) * HOUR) : dayKeyFromDate(new Date(ms));
+    };
+
+    const byPort = {};   // { port: { bucket: count } }
+    for (const row of counts) {
+        const port = row.portnum ?? 0;
+        const bucket = bucketOf(row.hour_us);
+        byPort[port] ??= {};
+        byPort[port][bucket] = (byPort[port][bucket] || 0) + row.packets;
+    }
+
+    const series = Object.keys(byPort)
+        .map(Number)
         .sort((a, b) => a - b)
         .map(port => ({
             name: PORT_LABEL_MAP[port] || `Port ${port}`,
             type: "bar",
             stack: "total",
             barMaxWidth: 42,
-            itemStyle: {
-                color: PORT_COLOR_MAP[port] || "#888"
-            },
-            data: dayKeys.map(d => counts[port]?.[d] || 0)
+            itemStyle: { color: PORT_COLOR_MAP[port] || "#888" },
+            data: keys.map(key => byPort[port][key] || 0)
         }));
 
-    const chart = initMeshChart(
-        document.getElementById("chart_packet_histogram")
-    );
-
-    chart.setOption({
+    drawChart(document.getElementById("chart_packet_histogram"), {
         animation: false,
         tooltip: { trigger: "axis" },
         legend: { textStyle: { color: "#64748b" } },
-        xAxis: {
-            type: "category",
-            data: dayLabels,
-            axisLabel: { color: "#64748b" }
-        },
-        yAxis: {
-            type: "value",
-            axisLabel: { color: "#64748b" }
-        },
+        xAxis: { type: "category", data: labels, axisLabel: { color: "#64748b" } },
+        yAxis: { type: "value", axisLabel: { color: "#64748b" } },
         series
-    });
-
-    fitLegend(chart);
-    window.addEventListener("resize", () => { chart.resize(); fitLegend(chart); });
+    }, false);
 }
 
 
@@ -1914,7 +1933,8 @@ function expandChart(type){
     modalChart.setOption(sourceChart.getOption());
     modalChart.resize();
     fitLegend(modalChart);
-    if (type === "direct") enableDirectZoom(modalChart);
+    // Every chart over time zooms as on the page; the bars do not.
+    if (type !== "packet_histogram") enableSpanZoom(modalChart);
 }
 // The modal chart follows its box, e.g. when a phone is rotated.
 new ResizeObserver(() => {
@@ -1930,31 +1950,28 @@ function closeModal(){
 
 function exportCSV(type){
     const rows = [[MeshI18n.t("Time")]];
+    const set = telemetrySets[type];
+    const time = i => new Date(set.ts[i]).toISOString();
 
     if (type === "battery_voltage") {
         rows[0].push(MeshI18n.t("Battery Level"), MeshI18n.t("Voltage"));
-        for (let i = 0; i < chartData.times.length; i++)
-            rows.push([chartData.times[i], chartData.battery[i], chartData.voltage[i]]);
+        for (let i = 0; i < set.ts.length; i++)
+            rows.push([time(i), set.battery[i], set.voltage[i]]);
     }
     else if (type === "air_channel") {
         rows[0].push(MeshI18n.t("Air Util Tx"), MeshI18n.t("Channel Utilization"));
-        for (let i = 0; i < chartData.times.length; i++)
-            rows.push([chartData.times[i], chartData.airUtil[i], chartData.chanUtil[i]]);
+        for (let i = 0; i < set.ts.length; i++)
+            rows.push([time(i), set.airUtil[i], set.chanUtil[i]]);
     }
     else if (type === "environment") {
         rows[0].push(MeshI18n.t("Temperature"), MeshI18n.t("Humidity"), MeshI18n.t("Pressure"));
-        for (let i = 0; i < chartData.times.length; i++)
-            rows.push([
-                chartData.times[i],
-                chartData.temperature[i],
-                chartData.humidity[i],
-                chartData.pressure[i]
-            ]);
+        for (let i = 0; i < set.ts.length; i++)
+            rows.push([time(i), set.temperature[i], set.humidity[i], set.pressure[i]]);
     }
     else if (type === "power") {
-        rows[0].push(...chartData.powerSeries.map(s => s.label));
-        for (let i = 0; i < chartData.times.length; i++)
-            rows.push([chartData.times[i], ...chartData.powerSeries.map(s => isNaN(s.data[i]) ? null : s.data[i])]);
+        rows[0].push(...set.powerSeries.map(s => s.label));
+        for (let i = 0; i < set.ts.length; i++)
+            rows.push([time(i), ...set.powerSeries.map(s => isNaN(s.data[i]) ? null : s.data[i])]);
     }
     else if (type === "direct") {
         rows[0].push(MeshI18n.t("Node ID"), MeshI18n.t("Node"), MeshI18n.t("Packet ID"), "RSSI (dBm)", "SNR (dB)");
@@ -1981,6 +1998,28 @@ function exportCSV(type){
     link.href = URL.createObjectURL(blob);
     link.download = `${type}_${fromNodeId}.csv`;
     link.click();
+}
+
+// A chart's period changed: it loads again, for that period.
+function initChartPeriods() {
+    const loaders = {
+        neighbors: () => loadNeighborTimeSeries(),
+        direct: () => loadDirectReceptions(),
+        packet_histogram: () => loadPacketHistogram()
+    };
+    document.querySelectorAll(".chart-period").forEach(select =>
+        select.addEventListener("change", () => {
+            const key = select.dataset.chart;
+            const load = loaders[key] || (() => loadTelemetry(key));
+            load().catch(error => console.error(error));
+        }));
+    // One handler for every chart on the page.
+    window.addEventListener("resize", () => {
+        document.querySelectorAll(".chart-canvas").forEach(el => {
+            const chart = echarts.getInstanceByDom(el);
+            if (chart && !el.hidden) { chart.resize(); fitLegend(chart); }
+        });
+    });
 }
 
 /* ======================================================
@@ -2031,7 +2070,12 @@ document.addEventListener("DOMContentLoaded", async () => {
             document.querySelector(`#${id} .chart-loading`)?.remove());
         await loadTelemetryCharts().finally(settle(["battery_voltage_container",
             "power_chart_container", "air_channel_container", "env_chart_container"]));
-        await loadNeighborTimeSeries().finally(settle(["neighbor_chart_container"]));
+        await loadNeighborTimeSeries(true)
+            .catch(error => {
+                console.error(error);
+                document.getElementById("neighbor_chart_container").style.display = "none";
+            })
+            .finally(settle(["neighbor_chart_container"]));
         initDirectControls();
         await loadDirectReceptions(true)
             .catch(error => {
@@ -2039,7 +2083,13 @@ document.addEventListener("DOMContentLoaded", async () => {
                 document.getElementById("direct_container").style.display = "none";
             })
             .finally(settle(["direct_container"]));
-        await loadPacketHistogram().finally(settle(["packet_histogram_container"]));
+        await loadPacketHistogram(true)
+            .catch(error => {
+                console.error(error);
+                document.getElementById("packet_histogram_container").style.display = "none";
+            })
+            .finally(settle(["packet_histogram_container"]));
+        initChartPeriods();
 
         ensureMapVisible();
         setTimeout(ensureMapVisible, 1000);

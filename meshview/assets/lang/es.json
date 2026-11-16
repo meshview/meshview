@@ -249,8 +249,8 @@
     "environment": "Métricas ambientales",
     "power": "Métricas de potencia",
     "neighbors_chart": "Vecinos (relación señal/ruido)",
-    "neighbors_chart_subtitle": "Últimos {days} días — {n} vecinos",
-    "neighbors_chart_subtitle_capped": "Últimos {days} días — los {n} vecinos con más datos, de {total}",
+    "neighbors_chart_subtitle": "{n} vecinos",
+    "neighbors_chart_subtitle_capped": "Los {n} vecinos con más datos, de {total}",
     "time": "Hora",
     "packet_id": "ID del paquete",
     "from": "De",
@@ -275,7 +275,7 @@
     "qr_no_public_key": "Aún no se ha recibido la clave pública de este nodo, por lo que no se puede compartir como contacto.",
     "qr_key_conflict": "Este nodo ha informado más de una clave pública, por lo que no se comparte como contacto.",
     "id": "ID hexadecimal",
-    "packets_per_day": "Paquetes por día (últimos 7 días)",
+    "packets_per_day": "Paquetes por puerto",
     "size": "Tamaño"
   },
   "packet": {
@@ -1097,7 +1097,6 @@
     "Environmental factors can cause large real-world deviations.": "Los factores del entorno pueden provocar grandes desviaciones en la realidad.",
     "{min} to {max}": "{min} a {max}",
     "Direct receptions": "Recepciones directas",
-    "Direct receptions time range": "Periodo de las recepciones directas",
     "Last 30 days": "Últimos 30 días",
     "Direction": "Dirección",
     "Received": "Recibidas",
@@ -1110,6 +1109,10 @@
     "Show or hide this node": "Mostrar u ocultar este nodo",
     "Nodes heard straight from, at no hops: {n}. Packets: {total}.": "Nodos oídos directamente, sin saltos: {n}. Paquetes: {total}.",
     "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}.": "Gateways que oyeron este nodo directamente, sin saltos: {n}. Paquetes: {total}.",
-    "Click a node to show or hide it, and a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click to see it all.": "Pulsa un nodo para mostrarlo u ocultarlo, y un punto para abrir su paquete. Arrastra sobre el gráfico para ampliar un tramo, usa la rueda para desplazarte y haz doble clic para verlo todo."
+    "Click a node to show or hide it, and a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click to see it all.": "Pulsa un nodo para mostrarlo u ocultarlo, y un punto para abrir su paquete. Arrastra sobre el gráfico para ampliar un tramo, usa la rueda para desplazarte y haz doble clic para verlo todo.",
+    "Chart time range": "Periodo del gráfico",
+    "No data in this period.": "No hay datos en este periodo.",
+    "{n} neighbors": "{n} vecinos",
+    "The {n} neighbors with the most data points, of {total}": "Los {n} vecinos con más datos, de {total}"
   }
 }

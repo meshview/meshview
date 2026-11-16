@@ -420,5 +420,15 @@
   "`node_id` or `since` is not an integer, or `direction` is neither value": "`node_id` или `since` не является целым числом, или `direction` не принимает ни одно из двух значений",
   "`received` (the default) is what the node, as an MQTT gateway, heard of other nodes; `transmitted`, what gateways heard of the node. Only what a gateway reported as heard counts: a packet that says how many hops it started with (firmware 2.3 or later) and has taken none, with a signal strength other than 0. A node that is not a gateway has no received ones.": "`received` (по умолчанию) — то, что узел как MQTT-шлюз услышал от других узлов; `transmitted` — то, что шлюзы услышали от узла. Учитывается только то, что шлюз сообщил как услышанное: пакет, который указывает, со сколькими переходами начал (прошивка 2.3 или новее), и не сделал ни одного, с уровнем сигнала, отличным от 0. У узла, не являющегося шлюзом, принятых нет.",
   "`received` (the default) or `transmitted`.": "`received` (по умолчанию) или `transmitted`.",
-  "`received` or `transmitted`, as asked.": "`received` или `transmitted`, как запрошено."
+  "`received` or `transmitted`, as asked.": "`received` или `transmitted`, как запрошено.",
+  "How many packets from or to a node were stored in each hour, by port, counted by the server: for charting a node's traffic without fetching its packets. Hours are UTC; a client can add them up into its own days.": "Сколько пакетов от узла или к нему было сохранено за каждый час, по портам, по подсчёту сервера: чтобы строить график трафика узла, не запрашивая сами пакеты. Часы в UTC; клиент может сложить их в свои сутки.",
+  "How many packets of one port were stored in one hour.": "Сколько пакетов одного порта было сохранено за один час.",
+  "Only packets stored at or after this time, in microseconds since the epoch; no earlier than 30 days ago, which is also the default.": "Только пакеты, сохранённые в этот момент или позже, в микросекундах с начала эпохи Unix; не раньше чем 30 дней назад, это же значение по умолчанию.",
+  "Packets of a node by hour": "Пакеты узла по часам",
+  "The counts go back at most 30 days, as far as `since` asks.": "Подсчёт охватывает не более 30 дней назад, насколько запрашивает `since`.",
+  "The counts, maybe none": "Подсчёты, возможно ни одного",
+  "The hours that had packets, the earliest first, one entry for each port in each.": "Часы, в которые были пакеты, сначала самый ранний, по записи на каждый порт в каждом.",
+  "The port, null for a packet that did not say.": "Порт; null для пакета, который его не указал.",
+  "The start of the hour, in microseconds since the epoch.": "Начало часа, в микросекундах с начала эпохи Unix.",
+  "`node_id` or `since` is not an integer": "`node_id` или `since` не является целым числом"
 }

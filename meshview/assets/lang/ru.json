@@ -241,8 +241,8 @@
     "environment": "Метрики среды",
     "power": "Метрики питания",
     "neighbors_chart": "Соседи (соотношение сигнал/шум)",
-    "neighbors_chart_subtitle": "Последние {days} дн. — {n} соседей",
-    "neighbors_chart_subtitle_capped": "Последние {days} дн. — {n} соседей с наибольшим числом точек, из {total}",
+    "neighbors_chart_subtitle": "{n} соседей",
+    "neighbors_chart_subtitle_capped": "{n} соседей с наибольшим числом точек, из {total}",
     "time": "Время",
     "packet_id": "ID пакета",
     "from": "От",
@@ -267,7 +267,7 @@
     "qr_no_public_key": "Открытый ключ этой ноды ещё не получен, поэтому её нельзя отправить как контакт.",
     "qr_key_conflict": "Эта нода сообщила более одного открытого ключа, поэтому она не отправляется как контакт.",
     "id": "ID в шестнадцатеричном виде",
-    "packets_per_day": "Пакеты в день (за последние 7 дней)",
+    "packets_per_day": "Пакеты по портам",
     "size": "Размер"
   },
   "packet": {
@@ -1089,7 +1089,6 @@
     "Environmental factors can cause large real-world deviations.": "Условия окружающей среды могут сильно отличать реальность от прогноза.",
     "{min} to {max}": "от {min} до {max}",
     "Direct receptions": "Прямые приёмы",
-    "Direct receptions time range": "Период прямых приёмов",
     "Last 30 days": "Последние 30 дней",
     "Direction": "Направление",
     "Received": "Принятые",
@@ -1102,6 +1101,10 @@
     "Show or hide this node": "Показать или скрыть этот узел",
     "Nodes heard straight from, at no hops: {n}. Packets: {total}.": "Узлы, услышанные напрямую, без переходов: {n}. Пакетов: {total}.",
     "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}.": "Шлюзы, услышавшие этот узел напрямую, без переходов: {n}. Пакетов: {total}.",
-    "Click a node to show or hide it, and a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click to see it all.": "Нажмите на узел, чтобы показать или скрыть его, и на точку, чтобы открыть её пакет. Выделите участок графика, чтобы увеличить его, прокручивайте колесом для перемещения и дважды щёлкните, чтобы увидеть всё."
+    "Click a node to show or hide it, and a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click to see it all.": "Нажмите на узел, чтобы показать или скрыть его, и на точку, чтобы открыть её пакет. Выделите участок графика, чтобы увеличить его, прокручивайте колесом для перемещения и дважды щёлкните, чтобы увидеть всё.",
+    "Chart time range": "Период графика",
+    "No data in this period.": "За этот период данных нет.",
+    "{n} neighbors": "{n} соседей",
+    "The {n} neighbors with the most data points, of {total}": "{n} соседей с наибольшим числом точек, из {total}"
   }
 }

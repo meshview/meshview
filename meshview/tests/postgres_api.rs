@@ -632,6 +632,8 @@ const URIS: &[&str] = &[
     "/api/v1/node/257/direct_receptions?since=1",
     "/api/v1/node/256/direct_receptions?direction=transmitted",
     "/api/v1/node/258/direct_receptions?direction=sideways",
+    "/api/v1/node/256/packet_counts",
+    "/api/v1/node/257/packet_counts?since=0",
     "/api/v1/stats",
     "/api/v1/stats?period_type=day&length=14",
     "/api/v1/stats?period_type=hour&length=24&portnum=1",

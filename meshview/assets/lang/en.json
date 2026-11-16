@@ -241,8 +241,8 @@
     "environment": "Environment Metrics",
     "power": "Power Metrics",
     "neighbors_chart": "Neighbors (Signal-to-Noise)",
-    "neighbors_chart_subtitle": "Last {days} days — {n} neighbors",
-    "neighbors_chart_subtitle_capped": "Last {days} days — the {n} neighbors with the most data points, of {total}",
+    "neighbors_chart_subtitle": "{n} neighbors",
+    "neighbors_chart_subtitle_capped": "The {n} neighbors with the most data points, of {total}",
     "time": "Time",
     "packet_id": "Packet ID",
     "from": "From",
@@ -267,7 +267,7 @@
     "qr_no_public_key": "No public key heard from this node yet, so it cannot be shared as a contact.",
     "qr_key_conflict": "This node has reported more than one public key, so it is not shared as a contact.",
     "id": "Hex ID",
-    "packets_per_day": "Packets per Day (Last 7 Days)",
+    "packets_per_day": "Packets by Port",
     "size": "Size"
   },
   "packet": {
@@ -1089,7 +1089,6 @@
     "Environmental factors can cause large real-world deviations.": "Environmental factors can cause large real-world deviations.",
     "{min} to {max}": "{min} to {max}",
     "Direct receptions": "Direct receptions",
-    "Direct receptions time range": "Direct receptions time range",
     "Last 30 days": "Last 30 days",
     "Direction": "Direction",
     "Received": "Received",
@@ -1102,6 +1101,10 @@
     "Show or hide this node": "Show or hide this node",
     "Nodes heard straight from, at no hops: {n}. Packets: {total}.": "Nodes heard straight from, at no hops: {n}. Packets: {total}.",
     "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}.": "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}.",
-    "Click a node to show or hide it, and a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click to see it all.": "Click a node to show or hide it, and a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click to see it all."
+    "Click a node to show or hide it, and a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click to see it all.": "Click a node to show or hide it, and a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click to see it all.",
+    "Chart time range": "Chart time range",
+    "No data in this period.": "No data in this period.",
+    "{n} neighbors": "{n} neighbors",
+    "The {n} neighbors with the most data points, of {total}": "The {n} neighbors with the most data points, of {total}"
   }
 }

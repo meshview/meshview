@@ -9,7 +9,7 @@ use crate::db::{
     DailySnapshot, DirectReception, Direction, Facet, JobRun, Node, NodeFacet, NodeFilter,
     NodeQuery, PacketFilter, PacketSeen, Period, PeriodCount, SightingsOf, TopNode, TopQuery,
 };
-use crate::db::{PacketQuery, PacketRow, TracerouteHop, TracerouteRow};
+use crate::db::{HourlyPortCount, PacketQuery, PacketRow, TracerouteHop, TracerouteRow};
 use anyhow::{Context, Result};
 use sqlx::SqlitePool;
 use sqlx::{QueryBuilder, Sqlite};
@@ -79,6 +79,25 @@ pub async fn sightings_of(pool: &SqlitePool, packet_ids: &[i64]) -> Result<Vec<P
         .fetch_all(pool)
         .await
         .context("listing the sightings of packets")
+}
+
+pub async fn node_packets_per_hour(
+    pool: &SqlitePool,
+    node_id: i64,
+    since_us: i64,
+) -> Result<Vec<HourlyPortCount>> {
+    sqlx::query_as(
+        "SELECT import_time_us / 3600000000 AS hour, portnum, count(*) AS packets \
+         FROM packet \
+         WHERE (from_node_id = ? OR to_node_id = ?) AND import_time_us >= ? \
+         GROUP BY 1, 2 ORDER BY 1, 2",
+    )
+    .bind(node_id)
+    .bind(node_id)
+    .bind(since_us)
+    .fetch_all(pool)
+    .await
+    .context("counting a node's packets by hour")
 }
 
 pub async fn direct_receptions(
