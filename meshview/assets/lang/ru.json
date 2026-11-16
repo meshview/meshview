@@ -1097,11 +1097,11 @@
     "Avg": "Сред.",
     "Min": "Мин.",
     "Max": "Макс.",
-    "Click a node to show or hide it; click a point to open its packet. Scroll on the chart to zoom.": "Нажмите на узел, чтобы показать или скрыть его; нажмите на точку, чтобы открыть её пакет. Прокрутка над графиком меняет масштаб.",
     "No direct receptions in this period.": "За этот период прямых приёмов нет.",
     "Only the latest are shown.": "Показаны только последние.",
     "Show or hide this node": "Показать или скрыть этот узел",
     "Nodes heard straight from, at no hops: {n}. Packets: {total}.": "Узлы, услышанные напрямую, без переходов: {n}. Пакетов: {total}.",
-    "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}.": "Шлюзы, услышавшие этот узел напрямую, без переходов: {n}. Пакетов: {total}."
+    "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}.": "Шлюзы, услышавшие этот узел напрямую, без переходов: {n}. Пакетов: {total}.",
+    "Click a node to show or hide it, and a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click to see it all.": "Нажмите на узел, чтобы показать или скрыть его, и на точку, чтобы открыть её пакет. Выделите участок графика, чтобы увеличить его, прокручивайте колесом для перемещения и дважды щёлкните, чтобы увидеть всё."
   }
 }

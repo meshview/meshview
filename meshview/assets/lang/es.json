@@ -1105,11 +1105,11 @@
     "Avg": "Media",
     "Min": "Mín.",
     "Max": "Máx.",
-    "Click a node to show or hide it; click a point to open its packet. Scroll on the chart to zoom.": "Pulsa un nodo para mostrarlo u ocultarlo; pulsa un punto para abrir su paquete. Desplaza sobre el gráfico para ampliar.",
     "No direct receptions in this period.": "No hay recepciones directas en este periodo.",
     "Only the latest are shown.": "Solo se muestran los más recientes.",
     "Show or hide this node": "Mostrar u ocultar este nodo",
     "Nodes heard straight from, at no hops: {n}. Packets: {total}.": "Nodos oídos directamente, sin saltos: {n}. Paquetes: {total}.",
-    "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}.": "Gateways que oyeron este nodo directamente, sin saltos: {n}. Paquetes: {total}."
+    "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}.": "Gateways que oyeron este nodo directamente, sin saltos: {n}. Paquetes: {total}.",
+    "Click a node to show or hide it, and a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click to see it all.": "Pulsa un nodo para mostrarlo u ocultarlo, y un punto para abrir su paquete. Arrastra sobre el gráfico para ampliar un tramo, usa la rueda para desplazarte y haz doble clic para verlo todo."
   }
 }

@@ -294,7 +294,7 @@
             </thead>
             <tbody id="direct_table"></tbody>
         </table>
-        <p class="direct-hint"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Click a node to show or hide it; click a point to open its packet. Scroll on the chart to zoom." | tr }}</p>
+        <p class="direct-hint"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Click a node to show or hide it, and a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click to see it all." | tr }}</p>
     </div>
 </div>
 
@@ -1557,6 +1557,17 @@ const DIRECT_COLORS = ["#245ea8", "#d9480f", "#2f9e44", "#ae3ec9", "#f59f00", "#
     "#e03131", "#5c7cfa", "#66a80f", "#c2255c", "#1098ad", "#9c6644", "#7048e8", "#868e96"];
 const directState = { direction: "received", metric: "rssi", data: null, hidden: new Set() };
 
+const DIRECT_FINE_POINTER = window.matchMedia("(pointer: fine)").matches;
+
+// Drag to select a span (the toolbox's box zoom, always on) and double-click
+// to see it all again.
+function enableDirectZoom(chart) {
+    if (!DIRECT_FINE_POINTER) return;
+    chart.dispatchAction({ type: "takeGlobalCursor", key: "dataZoomSelect", dataZoomSelectActive: true });
+    chart.getZr().off("dblclick");
+    chart.getZr().on("dblclick", () => chart.dispatchAction({ type: "dataZoom", start: 0, end: 100 }));
+}
+
 function directLabel(peer) {
     return peer.long_name || peer.short_name || `!${Number(peer.node_id).toString(16).padStart(8, "0")}`;
 }
@@ -1642,7 +1653,13 @@ function renderDirect() {
                     + `RSSI: ${escapeHtml(r.rssi)} dBm · SNR: ${escapeHtml(r.snr ?? MeshI18n.t("N/A"))} dB`;
             }
         },
-        dataZoom: [{ type: "inside", filterMode: "none" }],
+        // With a mouse, dragging selects the span to zoom into and the wheel
+        // moves along time; on a touch screen, pinch and drag as usual.
+        // The box zoom only works with its toolbox shown: it is, out of sight.
+        toolbox: { show: true, left: -1000, top: -1000, showTitle: false,
+            feature: { dataZoom: { yAxisIndex: "none" } } },
+        dataZoom: [{ type: "inside", xAxisIndex: 0, filterMode: "none",
+            ...(DIRECT_FINE_POINTER ? { zoomOnMouseWheel: false, moveOnMouseWheel: true, moveOnMouseMove: false } : {}) }],
         // #dce4ef is a border colour the theme turns dark at night.
         xAxis: { type: "time", axisLabel: { color: "#64748b", hideOverlap: true },
             axisLine: { lineStyle: { color: "#dce4ef" } } },
@@ -1667,6 +1684,7 @@ function renderDirect() {
     chart.on("click", point => {
         if (point.data?.packet_id) window.location.href = `/packet/${point.data.packet_id}`;
     });
+    enableDirectZoom(chart);
 
     const fmt = value => value == null ? "—" : String(value);
     const body = document.getElementById("direct_table");
@@ -1896,6 +1914,7 @@ function expandChart(type){
     modalChart.setOption(sourceChart.getOption());
     modalChart.resize();
     fitLegend(modalChart);
+    if (type === "direct") enableDirectZoom(modalChart);
 }
 // The modal chart follows its box, e.g. when a phone is rotated.
 new ResizeObserver(() => {

@@ -1097,11 +1097,11 @@
     "Avg": "Avg",
     "Min": "Min",
     "Max": "Max",
-    "Click a node to show or hide it; click a point to open its packet. Scroll on the chart to zoom.": "Click a node to show or hide it; click a point to open its packet. Scroll on the chart to zoom.",
     "No direct receptions in this period.": "No direct receptions in this period.",
     "Only the latest are shown.": "Only the latest are shown.",
     "Show or hide this node": "Show or hide this node",
     "Nodes heard straight from, at no hops: {n}. Packets: {total}.": "Nodes heard straight from, at no hops: {n}. Packets: {total}.",
-    "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}.": "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}."
+    "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}.": "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}.",
+    "Click a node to show or hide it, and a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click to see it all.": "Click a node to show or hide it, and a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click to see it all."
   }
 }
