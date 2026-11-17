@@ -24,6 +24,20 @@
 .radio-node a:hover { text-decoration:underline; }
 .radio-hex { color:var(--mesh-muted); font-size:13px; font-weight:400; white-space:nowrap; }
 .mesh-data-page .radio-controls select { width:100%; min-width:160px; height:38px; padding:0 10px; font-size:14px; }
+/* The links map: a line from the node to each one it is linked with, its
+   style the kind of link and its colour the mean SNR. */
+.radio-map { width:100%; height:440px; background:var(--mesh-stripe); }
+.radio-map-legend { display:flex; flex-wrap:wrap; align-items:center; gap:8px 18px; padding:12px 20px; border-top:1px solid var(--mesh-border); font-size:13px; }
+.radio-map-legend label { display:inline-flex; align-items:center; gap:6px; margin:0; cursor:pointer; }
+.link-swatch { display:inline-block; width:26px; height:0; border-top:3px solid var(--mesh-text); }
+.link-swatch.is-relay { border-top-style:dashed; }
+.link-swatch.is-neighbor { border-top-style:dotted; }
+.snr-scale { display:inline-flex; flex-wrap:wrap; align-items:center; gap:4px; margin-left:auto; color:var(--mesh-muted); font-size:12px; font-variant-numeric:tabular-nums; }
+.snr-scale > span { margin-right:2px; }
+.snr-scale i { display:inline-block; width:10px; height:10px; margin-left:6px; border-radius:2px; }
+.radio-map-note { margin:0; padding:0 20px 12px; color:var(--mesh-muted); font-size:12px; }
+.radio-map-note[hidden] { display:none; }
+.radio-map-node { width:30px; height:30px; border:2px solid #fff; border-radius:50%; background:#111827; color:#fff; display:flex; align-items:center; justify-content:center; font-size:15px; box-shadow:0 2px 8px #0003; }
 /* Rows that show or hide their node in the chart above them. */
 .signal-table.is-toggling tbody tr { cursor:pointer; }
 .signal-table.is-toggling tbody tr:hover { background:var(--mesh-soft); }
@@ -51,6 +65,10 @@
   #neighbor_chart_container .chart-hint { padding:0 12px 12px; }
   .signal-table tbody tr { touch-action:manipulation; }
   .relay-candidates { margin-top:2px; }
+  .radio-map { height:340px; }
+  .radio-map-legend { padding:10px 12px; gap:6px 14px; }
+  .radio-map-note { padding:0 12px 10px; }
+  .snr-scale { margin-left:0; }
 }
 </style>
 {% endblock %}
@@ -75,6 +93,28 @@
                 <option value="30">{{ "Last 30 days" | tr }}</option>
             </select>
         </div>
+    </div>
+
+    <!-- The node and its links on a map: what the sections below show, as they show it. -->
+    <div id="links_container" class="chart-container">
+        <div class="chart-header">
+            <h2 class="chart-title"><span class="ti ti-map-2" aria-hidden="true"></span> <span>{{ "Links map" | tr }}</span></h2>
+        </div>
+        <div id="radio-map" class="radio-map"></div>
+        <div class="radio-map-legend">
+            <label><input type="checkbox" data-link-layer="direct" checked> <span class="link-swatch is-direct" aria-hidden="true"></span> {{ "Direct receptions" | tr }}</label>
+            <label><input type="checkbox" data-link-layer="relay" checked> <span class="link-swatch is-relay" aria-hidden="true"></span> {{ "Relays" | tr }}</label>
+            <label><input type="checkbox" data-link-layer="neighbor" checked> <span class="link-swatch is-neighbor" aria-hidden="true"></span> {{ "Neighbors" | tr }}</label>
+            <span class="snr-scale" aria-label="{{ "Mean SNR" | tr }}">
+                <span>SNR</span>
+                <i style="background:#22c55e"></i>≥ 5
+                <i style="background:#84cc16"></i>≥ 0
+                <i style="background:#eab308"></i>≥ −5
+                <i style="background:#f97316"></i>≥ −10
+                <i style="background:#ef4444"></i>&lt; −10
+            </span>
+        </div>
+        <p class="radio-map-note" id="radio-map-note" hidden></p>
     </div>
 
     <p class="radio-missing chart-empty" id="radio-missing" hidden>{{ "Choose a node from the node list to see its radio links." | tr }}</p>
@@ -265,6 +305,7 @@ async function loadDirectReceptions(first = false) {
     directState.data = data;
     directState.hidden.clear();
     renderDirect();
+    scheduleRadioMap();
 }
 
 function renderDirect() {
@@ -477,6 +518,7 @@ async function loadRelays(first = false) {
     placeToggleThumbs(document.getElementById("relays_container"));
     relayState.data = data;
     renderRelays();
+    scheduleRadioMap();
 }
 
 function renderRelays() {
@@ -652,6 +694,7 @@ async function loadNeighborTimeSeries() {
     const kept = ranked.slice(0, NEIGHBOR_MAX_SERIES);
     neighborData = { ids: [], names: [], snrs: [] };
     showChartEmpty(container, !kept.length);
+    scheduleRadioMap();
     if (!kept.length) return;
 
     // --- Pass 2: names, only for the series that are drawn ---
@@ -675,6 +718,7 @@ async function loadNeighborTimeSeries() {
         names: kept.map(([, entry]) => entry.name),
         snrs:  kept.map(([, entry]) => entry.snr[entry.snr.length - 1])
     };
+    scheduleRadioMap();
 
     // Say which neighbors are on screen, so a missing line is not a mystery.
     const subtext = ranked.length > kept.length
@@ -725,6 +769,206 @@ function exportNeighborsCSV() {
     const rows = [[MeshI18n.t("Neighbor Node ID"), MeshI18n.t("Neighbor Name"), "SNR (dB)"]];
     neighborData.ids.forEach((id, i) => rows.push([id, neighborData.names[i], neighborData.snrs[i]]));
     downloadCsv(rows, `neighbors_${radioNodeId}.csv`);
+}
+
+/* ======================================================
+    LINKS MAP: the node and those it is linked with, as the
+    sections show them
+   ====================================================== */
+
+const LINK_DASHES = { direct: null, relay: "8 6", neighbor: "2 6" };
+// Direct receptions go straight, relays bend to one side and neighbors to the
+// other, so that two kinds of link between the same nodes do not hide each other.
+const LINK_BENDS = { direct: 0, relay: 0.12, neighbor: -0.12 };
+
+// The points of a link from one node to another, bent sideways by that part
+// of its length at its middle: a quadratic curve, flat enough on a map's scale.
+function linkPath(from, to, bend) {
+    if (!bend) return [from, to];
+    const [lat1, lon1] = from;
+    const [lat2, lon2] = to;
+    const control = [(lat1 + lat2) / 2 - (lon2 - lon1) * bend, (lon1 + lon2) / 2 + (lat2 - lat1) * bend];
+    const points = [];
+    for (let i = 0; i <= 16; i++) {
+        const t = i / 16;
+        const a = (1 - t) * (1 - t), b = 2 * (1 - t) * t, c = t * t;
+        points.push([a * lat1 + b * control[0] + c * lat2, a * lon1 + b * control[1] + c * lon2]);
+    }
+    return points;
+}
+let radioMap = null;
+let radioMapLayer = null;
+let radioMapToken = 0;
+let radioMapScheduled = false;
+
+// A colour for a mean SNR, in the bands the legend shows.
+function snrColor(snr) {
+    if (snr == null || !Number.isFinite(Number(snr))) return "#94a3b8";
+    if (snr >= 5) return "#22c55e";
+    if (snr >= 0) return "#84cc16";
+    if (snr >= -5) return "#eab308";
+    if (snr >= -10) return "#f97316";
+    return "#ef4444";
+}
+
+function nodeLatLng(node) {
+    if (!node?.last_lat || !node?.last_long) return null;
+    const lat = node.last_lat / 1e7;
+    const lon = node.last_long / 1e7;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat === 0 || lon === 0) return null;
+    return [lat, lon];
+}
+
+function initRadioMap() {
+    radioMap = L.map("radio-map", { preferCanvas: true });
+    meshMapStartView(radioMap);
+    meshTileLayer().addTo(radioMap);
+    L.control.scale({ position: "bottomleft", metric: true, imperial: true }).addTo(radioMap);
+    radioMapLayer = L.layerGroup().addTo(radioMap);
+    document.querySelectorAll("[data-link-layer]").forEach(box =>
+        box.addEventListener("change", scheduleRadioMap));
+}
+
+// What the sections show, by node: for each kind of link, its packets and
+// signal and what it is, in the direction each section is set to.
+function radioLinks() {
+    const links = new Map();
+    const add = (id, kind, info) => {
+        if (Number(id) === radioNodeId) return;
+        if (!links.has(id)) links.set(id, {});
+        links.get(id)[kind] = info;
+    };
+    const receivedDirect = directState.direction === "received";
+    for (const peer of directState.data?.nodes || []) {
+        add(peer.node_id, "direct", { packets: peer.packets, snr: peer.snr_avg, rssi: peer.rssi_avg,
+            label: MeshI18n.t(receivedDirect ? "Heard by this node" : "Hears this node") });
+    }
+    if (relayState.direction === "received") {
+        for (const relay of relayState.data?.relays || []) {
+            for (const candidate of relay.candidates || []) {
+                add(candidate.node_id, "relay", { packets: relay.packets, snr: relay.snr_avg, rssi: relay.rssi_avg,
+                    shared: relay.candidates.length > 1,
+                    label: MeshI18n.t("Relay {byte}", {byte: relayHex(relay.relay_node)}) });
+            }
+        }
+    } else {
+        for (const gateway of relayState.data?.gateways || []) {
+            add(gateway.node_id, "relay", { packets: gateway.packets, snr: gateway.snr_avg, rssi: gateway.rssi_avg,
+                label: MeshI18n.t("Hears through this node") });
+        }
+    }
+    neighborData.ids.forEach((id, i) =>
+        add(id, "neighbor", { snr: neighborData.snrs[i], label: MeshI18n.t("Neighbor") }));
+    return links;
+}
+
+// A node's popup, laid out as the other maps' node popups, with its links.
+function linkPopup(nodeId, node, kinds, distanceKm) {
+    const name = nodeLabel(node, nodeId);
+    const shortName = node?.short_name && node.short_name !== name
+        ? ` <span class="node-popup-short">(${escapeHtml(node.short_name)})</span>` : "";
+    const facts = Object.values(kinds).map(info => {
+        const parts = [];
+        if (info.packets != null) parts.push(MeshI18n.t("{n} packets", {n: info.packets}));
+        if (info.snr != null) parts.push(`SNR ${info.snr} dB`);
+        if (info.rssi != null) parts.push(`RSSI ${info.rssi} dBm`);
+        if (info.shared) parts.push(MeshI18n.t("shared byte"));
+        return [info.label, parts.join(" · ")];
+    });
+    if (distanceKm != null) {
+        facts.push([MeshI18n.t("Distance"), `${distanceKm.toFixed(1)} km / ${(distanceKm * 0.621371).toFixed(1)} mi`]);
+    }
+    return `
+        <div class="node-popup">
+            <div class="node-popup-title"><a href="/node/${encodeURIComponent(nodeId)}">${escapeHtml(name)}</a>${shortName}</div>
+            <p class="node-popup-meta">${escapeHtml(MeshI18n.t("Node {id}", {id: nodeId}) + ` (${hexId(nodeId)})`)}</p>
+            <dl class="node-popup-facts">${facts.map(([label, value]) =>
+                `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}</dl>
+        </div>
+    `;
+}
+
+// The points the map opens on: a node far beyond the others, as one whose
+// position is wrong or out of date, is drawn but left out of the frame, so as
+// not to shrink every other link to a dot.
+function framedPoints(center, points) {
+    const distances = points.map(point => radioMap.distance(center, point));
+    const sorted = [...distances].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)] || 0;
+    const limit = Math.max(30000, 3 * median);
+    return points.filter((point, i) => distances[i] <= limit);
+}
+
+// Drawn once for however many sections change at the same time.
+function scheduleRadioMap() {
+    if (radioMapScheduled) return;
+    radioMapScheduled = true;
+    setTimeout(() => {
+        radioMapScheduled = false;
+        renderRadioMap().catch(error => console.error(error));
+    }, 0);
+}
+
+async function renderRadioMap() {
+    const token = ++radioMapToken;
+    if (!radioMap) initRadioMap();
+    const shown = new Set([...document.querySelectorAll("[data-link-layer]:checked")]
+        .map(box => box.dataset.linkLayer));
+    const links = [...radioLinks()]
+        .map(([id, kinds]) => [id, Object.fromEntries(Object.entries(kinds).filter(([kind]) => shown.has(kind)))])
+        .filter(([, kinds]) => Object.keys(kinds).length);
+    const nodes = new Map(await Promise.all([radioNodeId, ...links.map(([id]) => id)]
+        .map(async id => [Number(id), await fetchRadioNode(id)])));
+    // A later draw has begun meanwhile: it is the one to show.
+    if (token !== radioMapToken) return;
+
+    radioMapLayer.clearLayers();
+    const self = nodes.get(radioNodeId);
+    const center = nodeLatLng(self);
+    const bounds = [];
+    let missing = 0;
+    if (center) {
+        L.marker(center, {
+            icon: L.divIcon({ className: "", iconSize: [30, 30], iconAnchor: [15, 15], popupAnchor: [0, -15],
+                html: `<div class="radio-map-node"><span class="ti ti-antenna" aria-hidden="true"></span></div>` }),
+            zIndexOffset: 1000,
+        }).bindPopup(linkPopup(radioNodeId, self, {}, null), { closeButton: false }).addTo(radioMapLayer);
+        bounds.push(center);
+    }
+    for (const [id, kinds] of links) {
+        const position = nodeLatLng(nodes.get(Number(id)));
+        if (!position) { missing++; continue; }
+        bounds.push(position);
+        const distance = center ? radioMap.distance(center, position) / 1000 : null;
+        const popup = linkPopup(id, nodes.get(Number(id)), kinds, distance);
+        // The best signal of its links colours the node.
+        const snrs = Object.values(kinds).map(info => info.snr).filter(snr => snr != null);
+        if (center) {
+            for (const [kind, info] of Object.entries(kinds)) {
+                L.polyline(linkPath(center, position, LINK_BENDS[kind]), {
+                    color: snrColor(info.snr),
+                    weight: info.packets ? 2 + Math.min(4, Math.log10(info.packets + 1) * 1.6) : 2.5,
+                    dashArray: LINK_DASHES[kind],
+                    opacity: info.shared ? 0.4 : 0.85,
+                }).bindPopup(popup, { closeButton: false }).addTo(radioMapLayer);
+            }
+        }
+        L.circleMarker(position, {
+            radius: 7, color: "#fff", weight: 2, fillOpacity: 1,
+            fillColor: snrColor(snrs.length ? Math.max(...snrs) : null),
+        }).bindPopup(popup, { closeButton: false }).addTo(radioMapLayer);
+    }
+
+    const note = document.getElementById("radio-map-note");
+    note.textContent = !center
+        ? MeshI18n.t("This node has no position, so its links cannot be drawn.")
+        : missing ? MeshI18n.t("Linked nodes without a position, not on the map: {n}.", {n: missing}) : "";
+    note.hidden = !note.textContent;
+
+    radioMap.invalidateSize();
+    const framed = center ? framedPoints(center, bounds) : bounds;
+    if (framed.length > 1) radioMap.fitBounds(framed, { padding: [24, 24], maxZoom: 13 });
+    else if (center) radioMap.setView(center, 11);
 }
 
 /* ======================================================

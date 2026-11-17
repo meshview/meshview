@@ -1132,6 +1132,17 @@
     "({n} direct)": "({n} напрямую)",
     "Shared byte: it cannot be told which of them it was.": "Общий байт: нельзя определить, какой из них это был.",
     "Copy URL": "Копировать URL",
-    "QR code": "QR-код"
+    "QR code": "QR-код",
+    "Links map": "Карта связей",
+    "Neighbors": "Соседи",
+    "Mean SNR": "Средний SNR",
+    "Heard by this node": "Слышен этим узлом",
+    "Hears this node": "Слышит этот узел",
+    "Relay {byte}": "Ретранслятор {byte}",
+    "Hears through this node": "Слышит через этот узел",
+    "{n} packets": "Пакетов: {n}",
+    "shared byte": "общий байт",
+    "This node has no position, so its links cannot be drawn.": "У этого узла нет координат, поэтому его связи нельзя нарисовать.",
+    "Linked nodes without a position, not on the map: {n}.": "Связанные узлы без координат, не показанные на карте: {n}."
   }
 }

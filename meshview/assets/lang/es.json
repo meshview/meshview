@@ -1140,6 +1140,17 @@
     "({n} direct)": "({n} directas)",
     "Shared byte: it cannot be told which of them it was.": "Byte compartido: no se puede saber cuál de ellos fue.",
     "Copy URL": "Copiar URL",
-    "QR code": "Código QR"
+    "QR code": "Código QR",
+    "Links map": "Mapa de enlaces",
+    "Neighbors": "Vecinos",
+    "Mean SNR": "SNR medio",
+    "Heard by this node": "Oído por este nodo",
+    "Hears this node": "Oye a este nodo",
+    "Relay {byte}": "Relé {byte}",
+    "Hears through this node": "Oye a través de este nodo",
+    "{n} packets": "{n} paquetes",
+    "shared byte": "byte compartido",
+    "This node has no position, so its links cannot be drawn.": "Este nodo no tiene posición, así que no se pueden dibujar sus enlaces.",
+    "Linked nodes without a position, not on the map: {n}.": "Nodos enlazados sin posición, que no están en el mapa: {n}."
   }
 }
