@@ -990,10 +990,14 @@ async function renderRadioMap() {
         : missing ? MeshI18n.t("Linked nodes without a position, not on the map: {n}.", {n: missing}) : "";
     note.hidden = !note.textContent;
 
+    // Framed at once: Leaflet drops a new view asked for while a zoom is still
+    // animating, so a frame taken as the last section arrives, while the frame
+    // of the one before was zooming, would be lost, and the map left showing
+    // the earlier one.
     radioMap.invalidateSize();
     const framed = center ? framedPoints(center, bounds) : bounds;
-    if (framed.length > 1) radioMap.fitBounds(framed, { padding: [24, 24], maxZoom: 13 });
-    else if (center) radioMap.setView(center, 11);
+    if (framed.length > 1) radioMap.fitBounds(framed, { padding: [24, 24], maxZoom: 13, animate: false });
+    else if (center) radioMap.setView(center, 11, { animate: false });
 }
 
 /* ======================================================
