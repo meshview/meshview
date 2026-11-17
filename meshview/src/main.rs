@@ -53,10 +53,16 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     let command = cli.command.unwrap_or(Command::Run);
 
+    // The commit, when it was built from a Git checkout, as the pages show it.
+    let build = meshview::web::api::version::current();
+    let revision = match build.git_revision_short {
+        "unknown" => String::new(),
+        revision => format!(" ({revision})"),
+    };
     info!(
-        "{} {} — free software under the AGPL, version 3 or later",
+        "{} {}{revision} — free software under the AGPL, version 3 or later",
         env!("CARGO_PKG_NAME"),
-        env!("CARGO_PKG_VERSION")
+        build.version,
     );
 
     let config = match &cli.config {
