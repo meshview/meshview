@@ -1099,16 +1099,19 @@
     "No direct receptions in this period.": "За этот период прямых приёмов нет.",
     "Only the latest are shown.": "Показаны только последние.",
     "Show or hide this node": "Показать или скрыть этот узел",
-    "Nodes heard straight from, at no hops: {n}. Packets: {total}.": "Узлы, услышанные напрямую, без переходов: {n}. Пакетов: {total}.",
-    "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}.": "Шлюзы, услышавшие этот узел напрямую, без переходов: {n}. Пакетов: {total}.",
-    "Click a node to show or hide it, and a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click to see it all.": "Нажмите на узел, чтобы показать или скрыть его, и на точку, чтобы открыть её пакет. Выделите участок графика, чтобы увеличить его, прокручивайте колесом для перемещения и дважды щёлкните, чтобы увидеть всё.",
+    "Nodes heard directly: {n}. Packets: {total}.": "Узлы, услышанные напрямую: {n}. Пакетов: {total}.",
+    "Gateways that heard this node directly: {n}. Packets: {total}.": "Шлюзы, услышавшие этот узел напрямую: {n}. Пакетов: {total}.",
     "Chart time range": "Период графика",
     "No data in this period.": "За этот период данных нет.",
     "{n} neighbors": "{n} соседей",
     "The {n} neighbors with the most data points, of {total}": "{n} соседей с наибольшим числом точек, из {total}",
-    "Tap a node to show or hide it, and a point to open its packet. Expand the chart to zoom in.": "Коснитесь узла, чтобы показать или скрыть его, и точки, чтобы открыть её пакет. Разверните диаграмму, чтобы увеличить её.",
     "Packets: {n} · avg {avg} · min {min} · max {max} {unit}": "Пакетов: {n} · ср. {avg} · мин. {min} · макс. {max} {unit}",
     "24 hours": "24 часа",
-    "30 days": "30 дней"
+    "30 days": "30 дней",
+    "Invert": "Инвертировать",
+    "Click a node to show or hide it, double-click it to show only it, and click a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click it to see it all.": "Нажмите на узел, чтобы показать или скрыть его, дважды — чтобы оставить только его, и на точку, чтобы открыть её пакет. Выделите участок графика, чтобы увеличить его, прокручивайте колесом и дважды щёлкните по графику, чтобы увидеть его целиком.",
+    "Tap a node to show or hide it, tap it twice to show only it, and tap a point to open its packet. Expand the chart to zoom in.": "Коснитесь узла, чтобы показать или скрыть его, дважды — чтобы оставить только его, и точки, чтобы открыть её пакет. Разверните диаграмму, чтобы увеличить её.",
+    "Click a neighbor in the legend to show or hide it, and double-click it to show only it. Drag across the chart to zoom in, scroll to move along it and double-click it to see it all.": "Нажмите на соседа в легенде, чтобы показать или скрыть его, и дважды — чтобы оставить только его. Выделите участок графика, чтобы увеличить его, прокручивайте колесом и дважды щёлкните по графику, чтобы увидеть его целиком.",
+    "Tap a neighbor in the legend to show or hide it, and tap it twice to show only it. Expand the chart to zoom in.": "Коснитесь соседа в легенде, чтобы показать или скрыть его, и дважды — чтобы оставить только его. Разверните диаграмму, чтобы увеличить её."
   }
 }

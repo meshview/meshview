@@ -93,15 +93,22 @@
 .direct-table tbody tr.is-hidden td { opacity:.45; }
 .direct-table td.direct-summary { display:none; }
 .direct-swatch { display:inline-block; width:10px; height:10px; margin-right:8px; border-radius:2px; vertical-align:middle; }
-.direct-hint { margin:10px 0 0; color:var(--mesh-muted); font-size:12px; }
+.chart-hint { margin:10px 0 0; color:var(--mesh-muted); font-size:12px; }
+#neighbor_chart_container .chart-hint { margin:0; padding:0 20px 16px; }
+/* Show every node again, or swap the shown and the hidden ones. */
+.series-tools { display:flex; justify-content:flex-end; gap:6px; margin:4px 0 8px; }
+.mesh-data-page .mesh-content .series-tools > button { padding:3px 10px; border:1px solid var(--mesh-border); border-radius:999px; background:var(--mesh-soft); color:var(--mesh-text); font-size:12px; }
+.mesh-data-page .mesh-content .series-tools > button:hover { color:var(--mesh-primary); }
 /* With a mouse or with a finger, the hint that says how to use the chart. */
-@media(pointer:fine) { .direct-hint-touch { display:none; } }
-@media not (pointer:fine) { .direct-hint-mouse { display:none; } }
+@media(pointer:fine) { .chart-hint-touch { display:none; } }
+@media not (pointer:fine) { .chart-hint-mouse { display:none; } }
 /* On a phone, only the signal shown in the chart, and long names cut short. */
 @media(max-width:700px) {
   .direct-controls { gap:6px; padding:12px 12px 0; }
   .direct-toggle + .direct-toggle { margin-left:auto; }
   .direct-table-wrap { padding:0 12px 12px; }
+  #neighbor_chart_container .chart-hint { padding:0 12px 12px; }
+  .direct-table tbody tr { touch-action:manipulation; }
   .direct-table thead,.direct-table td.is-number { display:none; }
   .direct-table tbody tr { display:block; padding:8px 4px; border-bottom:1px solid var(--mesh-border); }
   .direct-table td { display:block; overflow:hidden; text-overflow:ellipsis; }
@@ -295,6 +302,8 @@
     <p class="chart-loading is-loading">{{ "Loading..." | tr }}</p>
     <p class="chart-empty" hidden>{{ "No data in this period." | tr }}</p>
     <div id="chart_neighbors" class="chart-canvas" style="height:380px;"></div>
+    <p class="chart-hint chart-hint-mouse"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Click a neighbor in the legend to show or hide it, and double-click it to show only it. Drag across the chart to zoom in, scroll to move along it and double-click it to see it all." | tr }}</p>
+    <p class="chart-hint chart-hint-touch"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Tap a neighbor in the legend to show or hide it, and tap it twice to show only it. Expand the chart to zoom in." | tr }}</p>
 </div>
 
     <!-- Direct receptions: packets heard at no hops, and their signal. -->
@@ -326,6 +335,10 @@
     <p class="chart-empty" hidden>{{ "No direct receptions in this period." | tr }}</p>
     <div id="chart_direct" class="chart-canvas" style="height:380px;"></div>
     <div class="direct-table-wrap">
+        <div class="series-tools">
+            <button type="button" data-direct-show="all">{{ "All" | tr }}</button>
+            <button type="button" data-direct-show="invert">{{ "Invert" | tr }}</button>
+        </div>
         <table class="direct-table" data-metric="snr">
             <thead>
                 <tr>
@@ -341,8 +354,8 @@
             </thead>
             <tbody id="direct_table"></tbody>
         </table>
-        <p class="direct-hint direct-hint-mouse"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Click a node to show or hide it, and a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click to see it all." | tr }}</p>
-        <p class="direct-hint direct-hint-touch"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Tap a node to show or hide it, and a point to open its packet. Expand the chart to zoom in." | tr }}</p>
+        <p class="chart-hint chart-hint-mouse"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Click a node to show or hide it, double-click it to show only it, and click a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click it to see it all." | tr }}</p>
+        <p class="chart-hint chart-hint-touch"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Tap a node to show or hide it, tap it twice to show only it, and tap a point to open its packet. Expand the chart to zoom in." | tr }}</p>
     </div>
 </div>
 
@@ -1180,6 +1193,37 @@ function enableSpanZoom(chart) {
     chart.getZr().on("dblclick", () => chart.dispatchAction({ type: "dataZoom", start: 0, end: 100 }));
 }
 
+// Whether a click is the second on the same thing in a short while: a double
+// click, or a double tap, told apart from two clicks that each toggle.
+function secondClick(memory, key) {
+    const now = Date.now();
+    const second = memory.last?.key === key && now - memory.last.time < 400;
+    memory.last = second ? null : { key, time: now };
+    return second;
+}
+
+// Which of these names to show: only one, or, when it already is the only one,
+// all of them again.
+function soloSelection(names, name, selected) {
+    const alone = names.every(other => other === name ? selected[other] !== false : selected[other] === false);
+    return Object.fromEntries(names.map(other => [other, alone || other === name]));
+}
+
+// A legend whose item, clicked twice in a row, is shown alone, as in Plotly;
+// and buttons at its end to show all of them or swap the shown and hidden.
+function legendSelector() {
+    return [{ type: "all", title: MeshI18n.t("All") }, { type: "inverse", title: MeshI18n.t("Invert") }];
+}
+function enableLegendSolo(chart) {
+    const memory = {};
+    chart.off("legendselectchanged");
+    chart.on("legendselectchanged", event => {
+        if (!secondClick(memory, event.name)) return;
+        const names = Object.keys(event.selected);
+        chart.setOption({ legend: { selected: soloSelection(names, event.name, event.selected) } });
+    });
+}
+
 // A chart drawn into its card, with the option replacing what was there.
 function drawChart(el, option, zoom = true) {
     const chart = echarts.getInstanceByDom(el) || initMeshChart(el);
@@ -1600,7 +1644,9 @@ async function loadNeighborTimeSeries(first = false) {
         legend: {
             type: "scroll",
             data: kept.map(([, entry]) => entry.name),
-            textStyle: { color: "#64748b" }
+            textStyle: { color: "#64748b" },
+            selector: legendSelector(),
+            selectorLabel: { color: "#64748b", borderColor: "#dce4ef" }
         },
         xAxis: { type: "time", axisLabel: { color: "#64748b", hideOverlap: true } },
         yAxis: { type: "value", name: "SNR", axisLabel: { color: "#64748b" } },
@@ -1614,6 +1660,7 @@ async function loadNeighborTimeSeries(first = false) {
             data: entry.times.map((t, i) => [t, entry.snr[i]])
         }))
     });
+    enableLegendSolo(echarts.getInstanceByDom(chartEl));
 }
 
 
@@ -1685,8 +1732,8 @@ function renderDirect() {
     note.textContent = empty
         ? ""
         : MeshI18n.t(received
-            ? "Nodes heard straight from, at no hops: {n}. Packets: {total}."
-            : "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}.",
+            ? "Nodes heard directly: {n}. Packets: {total}."
+            : "Gateways that heard this node directly: {n}. Packets: {total}.",
             {n: peers.length, total})
           + (data.truncated ? " " + MeshI18n.t("Only the latest are shown.") : "");
 
@@ -1778,14 +1825,31 @@ function renderDirect() {
                 max: fmt(peer[`${metric}_max`]), unit });
             row.append(cell);
         }
+        row.dataset.nodeId = peer.node_id;
         row.addEventListener("click", () => {
-            const hidden = directState.hidden.has(peer.node_id);
-            hidden ? directState.hidden.delete(peer.node_id) : directState.hidden.add(peer.node_id);
-            row.classList.toggle("is-hidden", !hidden);
-            chart.dispatchAction({ type: hidden ? "legendSelect" : "legendUnSelect", name: peer._name });
+            const hidden = directState.hidden;
+            // Each click toggles; the second of two in a row undoes the first's
+            // instead, and then shows only this one, or all again if it was.
+            hidden.has(peer.node_id) ? hidden.delete(peer.node_id) : hidden.add(peer.node_id);
+            if (secondClick(directState, peer.node_id)) {
+                const ids = peers.map(other => other.node_id);
+                const shown = soloSelection(ids, peer.node_id,
+                    Object.fromEntries(ids.map(id => [id, !hidden.has(id)])));
+                ids.forEach(id => shown[id] ? hidden.delete(id) : hidden.add(id));
+            }
+            applyDirectHidden();
         });
         return row;
     }));
+}
+
+// The nodes hidden, on the table's rows and the chart's lines.
+function applyDirectHidden() {
+    const peers = directState.data?.nodes || [];
+    document.querySelectorAll("#direct_table tr").forEach(row =>
+        row.classList.toggle("is-hidden", directState.hidden.has(Number(row.dataset.nodeId))));
+    echarts.getInstanceByDom(document.getElementById("chart_direct"))?.setOption({ legend: {
+        selected: Object.fromEntries(peers.map(peer => [peer._name, !directState.hidden.has(peer.node_id)])) } });
 }
 
 // Put each toggle's thumb under its pressed option; animated only once placed,
@@ -1802,6 +1866,14 @@ function placeDirectThumbs() {
 }
 
 function initDirectControls() {
+    document.querySelectorAll("#direct_container [data-direct-show]").forEach(button =>
+        button.addEventListener("click", () => {
+            const ids = (directState.data?.nodes || []).map(peer => peer.node_id);
+            const hidden = directState.hidden;
+            directState.hidden = button.dataset.directShow === "all"
+                ? new Set() : new Set(ids.filter(id => !hidden.has(id)));
+            applyDirectHidden();
+        }));
     document.querySelectorAll("#direct_container [data-direction]").forEach(button =>
         button.addEventListener("click", () => {
             if (directState.direction === button.dataset.direction) return;
@@ -1971,6 +2043,7 @@ function expandChart(type){
         if (!FINE_POINTER) modalChart.setOption(spanZoomOption(true));
         enableSpanZoom(modalChart);
     }
+    if (type === "neighbors") enableLegendSolo(modalChart);
 }
 // The modal chart follows its box, e.g. when a phone is rotated.
 new ResizeObserver(() => {

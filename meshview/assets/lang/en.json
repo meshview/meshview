@@ -1099,16 +1099,19 @@
     "No direct receptions in this period.": "No direct receptions in this period.",
     "Only the latest are shown.": "Only the latest are shown.",
     "Show or hide this node": "Show or hide this node",
-    "Nodes heard straight from, at no hops: {n}. Packets: {total}.": "Nodes heard straight from, at no hops: {n}. Packets: {total}.",
-    "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}.": "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}.",
-    "Click a node to show or hide it, and a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click to see it all.": "Click a node to show or hide it, and a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click to see it all.",
+    "Nodes heard directly: {n}. Packets: {total}.": "Nodes heard directly: {n}. Packets: {total}.",
+    "Gateways that heard this node directly: {n}. Packets: {total}.": "Gateways that heard this node directly: {n}. Packets: {total}.",
     "Chart time range": "Chart time range",
     "No data in this period.": "No data in this period.",
     "{n} neighbors": "{n} neighbors",
     "The {n} neighbors with the most data points, of {total}": "The {n} neighbors with the most data points, of {total}",
-    "Tap a node to show or hide it, and a point to open its packet. Expand the chart to zoom in.": "Tap a node to show or hide it, and a point to open its packet. Expand the chart to zoom in.",
     "Packets: {n} · avg {avg} · min {min} · max {max} {unit}": "Packets: {n} · avg {avg} · min {min} · max {max} {unit}",
     "24 hours": "24 hours",
-    "30 days": "30 days"
+    "30 days": "30 days",
+    "Invert": "Invert",
+    "Click a node to show or hide it, double-click it to show only it, and click a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click it to see it all.": "Click a node to show or hide it, double-click it to show only it, and click a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click it to see it all.",
+    "Tap a node to show or hide it, tap it twice to show only it, and tap a point to open its packet. Expand the chart to zoom in.": "Tap a node to show or hide it, tap it twice to show only it, and tap a point to open its packet. Expand the chart to zoom in.",
+    "Click a neighbor in the legend to show or hide it, and double-click it to show only it. Drag across the chart to zoom in, scroll to move along it and double-click it to see it all.": "Click a neighbor in the legend to show or hide it, and double-click it to show only it. Drag across the chart to zoom in, scroll to move along it and double-click it to see it all.",
+    "Tap a neighbor in the legend to show or hide it, and tap it twice to show only it. Expand the chart to zoom in.": "Tap a neighbor in the legend to show or hide it, and tap it twice to show only it. Expand the chart to zoom in."
   }
 }

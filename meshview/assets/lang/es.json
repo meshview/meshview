@@ -1107,16 +1107,19 @@
     "No direct receptions in this period.": "No hay recepciones directas en este periodo.",
     "Only the latest are shown.": "Solo se muestran los más recientes.",
     "Show or hide this node": "Mostrar u ocultar este nodo",
-    "Nodes heard straight from, at no hops: {n}. Packets: {total}.": "Nodos oídos directamente, sin saltos: {n}. Paquetes: {total}.",
-    "Gateways that heard this node straight from it, at no hops: {n}. Packets: {total}.": "Gateways que oyeron este nodo directamente, sin saltos: {n}. Paquetes: {total}.",
-    "Click a node to show or hide it, and a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click to see it all.": "Pulsa un nodo para mostrarlo u ocultarlo, y un punto para abrir su paquete. Arrastra sobre el gráfico para ampliar un tramo, usa la rueda para desplazarte y haz doble clic para verlo todo.",
+    "Nodes heard directly: {n}. Packets: {total}.": "Nodos oídos directamente: {n}. Paquetes: {total}.",
+    "Gateways that heard this node directly: {n}. Packets: {total}.": "Gateways que oyeron este nodo directamente: {n}. Paquetes: {total}.",
     "Chart time range": "Periodo del gráfico",
     "No data in this period.": "No hay datos en este periodo.",
     "{n} neighbors": "{n} vecinos",
     "The {n} neighbors with the most data points, of {total}": "Los {n} vecinos con más datos, de {total}",
-    "Tap a node to show or hide it, and a point to open its packet. Expand the chart to zoom in.": "Toca un nodo para mostrarlo u ocultarlo, y un punto para abrir su paquete. Amplía el gráfico para hacer zoom.",
     "Packets: {n} · avg {avg} · min {min} · max {max} {unit}": "Paquetes: {n} · media {avg} · mín. {min} · máx. {max} {unit}",
     "24 hours": "24 horas",
-    "30 days": "30 días"
+    "30 days": "30 días",
+    "Invert": "Invertir",
+    "Click a node to show or hide it, double-click it to show only it, and click a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click it to see it all.": "Pulsa un nodo para mostrarlo u ocultarlo, haz doble clic en él para ver solo ese, y pulsa un punto para abrir su paquete. Arrastra sobre el gráfico para ampliar un tramo, usa la rueda para desplazarte y haz doble clic en él para verlo todo.",
+    "Tap a node to show or hide it, tap it twice to show only it, and tap a point to open its packet. Expand the chart to zoom in.": "Toca un nodo para mostrarlo u ocultarlo, tócalo dos veces para ver solo ese, y toca un punto para abrir su paquete. Amplía el gráfico para hacer zoom.",
+    "Click a neighbor in the legend to show or hide it, and double-click it to show only it. Drag across the chart to zoom in, scroll to move along it and double-click it to see it all.": "Pulsa un vecino en la leyenda para mostrarlo u ocultarlo, y haz doble clic en él para ver solo ese. Arrastra sobre el gráfico para ampliar un tramo, usa la rueda para desplazarte y haz doble clic en él para verlo todo.",
+    "Tap a neighbor in the legend to show or hide it, and tap it twice to show only it. Expand the chart to zoom in.": "Toca un vecino en la leyenda para mostrarlo u ocultarlo, y tócalo dos veces para ver solo ese. Amplía el gráfico para hacer zoom."
   }
 }
