@@ -72,6 +72,13 @@ ALTER TABLE node ADD COLUMN public_key BLOB;
 CREATE INDEX IF NOT EXISTS idx_node_public_key ON node (public_key)
 	WHERE public_key IS NOT NULL;
 
+-- The precision of a node's position, in bits, from its latest position or
+-- map report: 0 when that said none, NULL until the node's next one, for every
+-- node stored before this column was. The map shows each node's position as
+-- precise as the node shares it, and kept here it is read with the node
+-- rather than from a packet of each node's, scattered over the table.
+ALTER TABLE node ADD COLUMN position_precision INTEGER;
+
 -- What the scheduled jobs did, one row for each time one ran: the daily cleanup
 -- and the daily snapshot, and whatever comes after them.
 --

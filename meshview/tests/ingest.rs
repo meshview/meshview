@@ -261,3 +261,84 @@ async fn a_node_keeps_its_latest_whole_key() {
     store.process(topic, &made_anew).await.unwrap();
     assert_eq!(key().await, Some(vec![3; 32]));
 }
+
+/// A message from `from` of `portnum` carrying `payload`, sent in the clear.
+fn message(id: u32, from: u32, portnum: i32, payload: Vec<u8>) -> Opened {
+    use meshview_proto::meshtastic::mesh_packet::PayloadVariant;
+    use meshview_proto::meshtastic::{Data, MeshPacket, ServiceEnvelope};
+    use prost::Message;
+
+    let envelope = ServiceEnvelope {
+        packet: Some(MeshPacket {
+            id,
+            from,
+            to: 0xffff_ffff,
+            payload_variant: Some(PayloadVariant::Decoded(Data {
+                portnum,
+                payload,
+                ..Default::default()
+            })),
+            ..Default::default()
+        }),
+        channel_id: "LongFast".into(),
+        gateway_id: "!12345678".into(),
+    };
+    Opened::open(&envelope.encode_to_vec(), &Keyring::new::<&str>(&[])).unwrap()
+}
+
+// The precision of the latest position or map report is kept with the node,
+// for the map: 0 when it says none, and a position with no coordinates counts.
+#[tokio::test]
+async fn a_node_keeps_the_precision_of_its_latest_position() {
+    use meshview_proto::meshtastic::{MapReport, PortNum, Position};
+    use prost::Message;
+
+    let dir = TempDir::new().unwrap();
+    let pool = sqlite::open_for_writing(&dir.path().join("packets.db"))
+        .await
+        .unwrap();
+    let mut store = Store::new(pool.clone()).await.unwrap();
+    let precision = async || {
+        sqlx::query_scalar::<_, Option<i64>>(
+            "SELECT position_precision FROM node WHERE node_id = 3735928559",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap()
+    };
+    let topic = "msh/EU_868/2/e/LongFast/!12345678";
+    let node = 0xdead_beef;
+    let position = |bits: u32, located: bool| {
+        Position {
+            latitude_i: located.then_some(433_000_000),
+            longitude_i: located.then_some(-83_000_000),
+            precision_bits: bits,
+            ..Default::default()
+        }
+        .encode_to_vec()
+    };
+
+    let located = message(1, node, PortNum::PositionApp as i32, position(13, true));
+    store.process(topic, &located).await.unwrap();
+    assert_eq!(precision().await, Some(13));
+
+    let nowhere = message(2, node, PortNum::PositionApp as i32, position(0, false));
+    store.process(topic, &nowhere).await.unwrap();
+    assert_eq!(precision().await, Some(0));
+
+    let report = MapReport {
+        long_name: "Gateway".into(),
+        latitude_i: 433_000_000,
+        longitude_i: -83_000_000,
+        position_precision: 40,
+        ..Default::default()
+    };
+    let report = message(
+        3,
+        node,
+        PortNum::MapReportApp as i32,
+        report.encode_to_vec(),
+    );
+    store.process(topic, &report).await.unwrap();
+    assert_eq!(precision().await, Some(32));
+}

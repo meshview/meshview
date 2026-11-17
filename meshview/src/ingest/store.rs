@@ -13,7 +13,7 @@
 use super::opened::Opened;
 use crate::db::Pool;
 use crate::db::write::{self, Arg, Tx};
-use crate::decode::BROADCAST;
+use crate::decode::{self, BROADCAST};
 use anyhow::{Context, Result};
 use meshview_proto::meshtastic::config::device_config::Role;
 use meshview_proto::meshtastic::mesh_packet::PayloadVariant;
@@ -237,6 +237,23 @@ impl Store {
             }
         }
 
+        // The precision of every position, located or not, as the node's
+        // latest: 0 when it says none, or cannot be read.
+        if data.portnum == PortNum::PositionApp as i32 {
+            let precision = wire::decode::<Position>("meshtastic.Position", &data.payload)
+                .and_then(|position| decode::precision_bits(position.precision_bits))
+                .unwrap_or(0);
+            tx.execute(
+                "UPDATE node SET position_precision = ? WHERE node_id = ?",
+                &[
+                    Arg::Int(i64::from(precision)),
+                    Arg::Int(i64::from(packet.from)),
+                ],
+            )
+            .await
+            .context("storing the position's precision")?;
+        }
+
         // One row per gateway that heard it, under the packet's own id.
         if data.portnum == PortNum::TracerouteApp as i32 {
             tx.execute(
@@ -282,6 +299,7 @@ impl Store {
         let altitude = (located && report.altitude != 0).then_some(i64::from(report.altitude));
         let hw_model = hw_model_name(report.hw_model);
         let role = role_name(report.role);
+        let precision = i64::from(decode::precision_bits(report.position_precision).unwrap_or(0));
 
         let mut tx = write::begin(&self.pool).await?;
 
@@ -292,7 +310,8 @@ impl Store {
                 "UPDATE node SET long_name = ?, short_name = ?, hw_model = ?, role = ?, \
                  channel = CASE WHEN channel IS NULL OR channel = '' THEN ? ELSE channel END, \
                  last_lat = COALESCE(?, last_lat), last_long = COALESCE(?, last_long), \
-                 last_altitude = COALESCE(?, last_altitude), firmware = ?, last_seen_us = ?, \
+                 last_altitude = COALESCE(?, last_altitude), position_precision = ?, \
+                 firmware = ?, last_seen_us = ?, \
                  first_seen_us = COALESCE(first_seen_us, ?) WHERE node_id = ?",
                 &[
                     Arg::Text(&report.long_name),
@@ -303,6 +322,7 @@ impl Store {
                     Arg::OptInt(lat),
                     Arg::OptInt(lon),
                     Arg::OptInt(altitude),
+                    Arg::Int(precision),
                     Arg::Text(&report.firmware_version),
                     Arg::Int(now),
                     Arg::Int(now),
@@ -316,8 +336,9 @@ impl Store {
             tx.execute(
                 "INSERT INTO node \
                  (id, node_id, long_name, short_name, hw_model, role, channel, firmware, \
-                  first_seen_us, last_seen_us, last_lat, last_long, last_altitude) \
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                  first_seen_us, last_seen_us, last_lat, last_long, last_altitude, \
+                  position_precision) \
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 &[
                     Arg::Text(&node_user_id(node_id)),
                     Arg::Int(node_id),
@@ -332,6 +353,7 @@ impl Store {
                     Arg::OptInt(lat),
                     Arg::OptInt(lon),
                     Arg::OptInt(altitude),
+                    Arg::Int(precision),
                 ],
             )
             .await

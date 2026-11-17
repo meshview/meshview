@@ -144,6 +144,12 @@ pub fn position_precision(payload: &[u8]) -> Option<u32> {
         }
         _ => return None,
     };
+    precision_bits(bits)
+}
+
+/// The precision a position or map report says, in bits: `None` for 0, which
+/// is not saying, and no more than 32, the exact position.
+pub fn precision_bits(bits: u32) -> Option<u32> {
     (bits > 0).then_some(bits.min(32))
 }
 

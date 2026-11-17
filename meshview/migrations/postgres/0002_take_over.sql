@@ -50,6 +50,10 @@ ALTER TABLE node ADD COLUMN IF NOT EXISTS public_key BYTEA;
 CREATE INDEX IF NOT EXISTS idx_node_public_key ON node (public_key)
 	WHERE public_key IS NOT NULL;
 
+-- The precision of a node's position, from its latest position or map
+-- report; see the SQLite migration of the same number.
+ALTER TABLE node ADD COLUMN IF NOT EXISTS position_precision INTEGER;
+
 -- What the scheduled jobs did, one row for each time one ran; see the SQLite
 -- migration of the same number. `details` is JSON, kept as text as there.
 CREATE TABLE IF NOT EXISTS job_run (

@@ -62,6 +62,10 @@ are, with one column added. What changes:
 - `node` gets a `public_key` column: the node's key, from its latest node info
   that carried one, indexed by `idx_node_public_key`, to find the nodes that
   share a key. Nodes stored before have none until they next send node info.
+- `node` gets a `position_precision` column too: the precision of the node's
+  latest position or map report, so that the map does not read a packet of
+  each node's for it. Until a node sends its next one, it is read from its
+  packets as before.
 - A table of Meshview's own is added: `job_run`, the record of what the daily
   cleanup and snapshot did, which the Python version kept in a JSON file.
 - Meshview records its own migrations in `_sqlx_migrations`.
