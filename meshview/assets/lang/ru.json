@@ -1148,6 +1148,20 @@
     "Maybe:": "Возможно:",
     "Maybe relay {byte}": "Возможно, ретранслятор {byte}",
     "not heard directly": "не услышан напрямую",
-    "Coverage": "Покрытие"
+    "Coverage": "Покрытие",
+    "Diagnosis": "Диагностика",
+    "What may be wrong with how this node is set up, from its latest packets.": "Что может быть не так с настройкой этого узла, по его последним пакетам.",
+    "Public key conflict": "Конфликт открытого ключа",
+    "Its latest node info carries [value] different public keys. Either two radios share this id, or the key was made anew, as when the node is reflashed: until the others take the new one, direct messages to it fail.": "В его последней информации об узле [value] разных открытых ключа. Либо у двух радиостанций один id, либо ключ создан заново, как при перепрошивке узла: пока остальные не получат новый, личные сообщения ему не доходят.",
+    "Hardware changed": "Смена оборудования",
+    "Its latest node info names more than one hardware model: [models]. Either two radios share this id, or the radio was replaced.": "В его последней информации об узле указано больше одной модели оборудования: [models]. Либо у двух радиостанций один id, либо радиостанцию заменили.",
+    "More hops than advised": "Больше переходов, чем советуется",
+    "Its packets start with [value] hops, and this mesh advises [limit] at most. Each hop more lets every packet be relayed once more, which takes airtime from everybody.": "Его пакеты начинаются с [value] переходами, а эта сеть советует не больше [limit]. Каждый лишний переход позволяет ретранслировать каждый пакет ещё раз, что отнимает эфирное время у всех.",
+    "Position without coordinates": "Положение без координат",
+    "Its latest position has no coordinates: the node has no GPS fix, or does not share its position.": "В его последнем положении нет координат: у узла нет фиксации GPS или он не передаёт своё положение.",
+    "Frequent broadcasts": "Частые широковещательные пакеты",
+    "It sent [value] [port] packets to everyone in the latest 24 hours, more than the [limit] any usual setting sends.": "За последние 24 часа он отправил всем [value] пакетов «[port]» — больше, чем [limit], которые отправляет любая обычная настройка.",
+    "Default name": "Имя по умолчанию",
+    "It still has the name the firmware gives it. A name of its own makes it easier to recognise.": "У него всё ещё имя, которое даёт прошивка. Собственное имя помогает его узнавать."
   }
 }

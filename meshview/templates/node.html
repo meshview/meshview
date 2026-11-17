@@ -83,6 +83,19 @@
   .node-actions .label-wide { display:none; }
   .node-actions .label-narrow { display:inline; }
 }
+.node-checks { margin-bottom:20px; padding:20px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; font-size:13px; }
+.node-checks[hidden] { display:none; }
+.node-checks h2 { display:flex; align-items:center; gap:8px; margin:0 0 10px; padding-bottom:10px; border-bottom:1px solid var(--mesh-border); color:var(--mesh-text); font-size:15px; font-weight:650; }
+.node-checks h2 .ti { color:var(--mesh-primary); font-size:18px; }
+.node-checks-intro { margin:0 0 8px; color:var(--mesh-muted); }
+.node-checks-list { margin:0; padding:0; list-style:none; }
+.node-checks-list li { display:grid; grid-template-columns:20px minmax(0,1fr); column-gap:8px; padding:8px 0; overflow-wrap:anywhere; }
+.node-checks-list li + li { border-top:1px solid var(--mesh-border); }
+.node-checks-list .ti { grid-row:span 2; font-size:17px; line-height:1.2; color:var(--mesh-muted); }
+.node-checks-list .is-warning .ti { color:#c27c0e; }
+[data-bs-theme="dark"] .node-checks-list .is-warning .ti { color:#f1d38a; }
+.node-checks-list strong { color:var(--mesh-text); font-weight:600; }
+.node-checks-list span { color:var(--mesh-muted); }
 @media(max-width:900px) { .node-info { grid-template-columns:minmax(0,1fr); gap:10px; } }
 @media(max-width:700px) { #node-packets { gap:8px !important; padding:12px; } #node-packets select { flex:1 1 0; min-width:0; padding-left:8px; padding-right:2px; } #node-packets #packet_port { flex-grow:1.2; } }
 </style>
@@ -172,6 +185,20 @@
             </div>
         </section>
     </div>
+
+    <!-- Checks: shown only when something may be wrong. Each kind is a
+         template, filled in with its figures by loadNodeChecks(). -->
+    <section id="node-checks" class="node-checks" aria-labelledby="node-checks-heading" hidden>
+        <h2 id="node-checks-heading"><span class="ti ti-stethoscope" aria-hidden="true"></span> {{ "Diagnosis" | tr }}</h2>
+        <p class="node-checks-intro">{{ "What may be wrong with how this node is set up, from its latest packets." | tr }}</p>
+        <ul id="node-checks-list" class="node-checks-list"></ul>
+    </section>
+    <template id="check-public_key_conflict"><li><strong>{{ "Public key conflict" | tr }}</strong><span>{{ "Its latest node info carries [value] different public keys. Either two radios share this id, or the key was made anew, as when the node is reflashed: until the others take the new one, direct messages to it fail." | tr }}</span></li></template>
+    <template id="check-hardware_changed"><li><strong>{{ "Hardware changed" | tr }}</strong><span>{{ "Its latest node info names more than one hardware model: [models]. Either two radios share this id, or the radio was replaced." | tr }}</span></li></template>
+    <template id="check-hop_limit"><li><strong>{{ "More hops than advised" | tr }}</strong><span>{{ "Its packets start with [value] hops, and this mesh advises [limit] at most. Each hop more lets every packet be relayed once more, which takes airtime from everybody." | tr }}</span></li></template>
+    <template id="check-position_without_coordinates"><li><strong>{{ "Position without coordinates" | tr }}</strong><span>{{ "Its latest position has no coordinates: the node has no GPS fix, or does not share its position." | tr }}</span></li></template>
+    <template id="check-frequent_broadcasts"><li><strong>{{ "Frequent broadcasts" | tr }}</strong><span>{{ "It sent [value] [port] packets to everyone in the latest 24 hours, more than the [limit] any usual setting sends." | tr }}</span></li></template>
+    <template id="check-default_name"><li><strong>{{ "Default name" | tr }}</strong><span>{{ "It still has the name the firmware gives it. A name of its own makes it easier to recognise." | tr }}</span></li></template>
 
     <!-- Map. -->
     <div id="map"><p id="map-loading" class="map-loading is-loading">{{ "Loading..." | tr }}</p></div>
@@ -1481,6 +1508,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         await loadNodeInfo();
 
         await loadNodeQr();
+        // Not awaited: the rest of the page does not wait for it.
+        loadNodeChecks();
 
         // ✅ MAP MUST EXIST FIRST
         if (!map) initMap();
@@ -1654,6 +1683,43 @@ async function fetchPacketsForExport() {
     ====================================================== */
 
 let currentMeshtasticUrl = "";
+
+/* What may be wrong with how the node is set up: one line per check, from
+   its template, with the figures put in for the [placeholders]. Nothing is
+   shown when nothing is found, or when the checks cannot be read. */
+async function loadNodeChecks() {
+    let checks;
+    try {
+        const res = await fetch(`/api/v1/node/${fromNodeId}/checks`);
+        if (!res.ok) return;
+        checks = (await res.json()).checks;
+    } catch (error) {
+        console.error(error);
+        return;
+    }
+    const list = document.getElementById("node-checks-list");
+    for (const check of checks) {
+        const template = document.getElementById(`check-${check.check}`);
+        if (!template) continue;
+        const item = template.content.firstElementChild.cloneNode(true);
+        const figures = {
+            value: check.value,
+            limit: check.limit,
+            port: PORT_LABEL_MAP[check.portnum] || check.portnum,
+            models: check.models.join(", "),
+        };
+        const text = item.querySelector("span");
+        text.textContent = text.textContent.replace(/\[(\w+)\]/g,
+            (whole, name) => figures[name] ?? whole);
+        item.classList.add(check.severity === "warning" ? "is-warning" : "is-info");
+        const icon = document.createElement("span");
+        icon.className = check.severity === "warning" ? "ti ti-alert-triangle" : "ti ti-info-circle";
+        icon.setAttribute("aria-hidden", "true");
+        item.prepend(icon);
+        list.append(item);
+    }
+    document.getElementById("node-checks").hidden = !list.children.length;
+}
 
 async function loadNodeQr() {
     const actionsDiv = document.getElementById("nodeActions");

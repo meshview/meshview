@@ -1156,6 +1156,20 @@
     "Maybe:": "Quizá:",
     "Maybe relay {byte}": "Quizá relé {byte}",
     "not heard directly": "no oído directamente",
-    "Coverage": "Cobertura"
+    "Coverage": "Cobertura",
+    "Diagnosis": "Diagnóstico",
+    "What may be wrong with how this node is set up, from its latest packets.": "Lo que puede estar mal en la configuración de este nodo, según sus últimos paquetes.",
+    "Public key conflict": "Conflicto de clave pública",
+    "Its latest node info carries [value] different public keys. Either two radios share this id, or the key was made anew, as when the node is reflashed: until the others take the new one, direct messages to it fail.": "Su última información de nodo trae [value] claves públicas distintas. O dos radios comparten este id, o la clave se generó de nuevo, como al reflashear el nodo: hasta que los demás reciban la nueva, los mensajes directos a él fallan.",
+    "Hardware changed": "Cambio de hardware",
+    "Its latest node info names more than one hardware model: [models]. Either two radios share this id, or the radio was replaced.": "Su última información de nodo nombra más de un modelo de hardware: [models]. O dos radios comparten este id, o se cambió la radio.",
+    "More hops than advised": "Más saltos de los aconsejados",
+    "Its packets start with [value] hops, and this mesh advises [limit] at most. Each hop more lets every packet be relayed once more, which takes airtime from everybody.": "Sus paquetes salen con [value] saltos, y esta malla aconseja [limit] como mucho. Cada salto de más permite retransmitir cada paquete una vez más, lo que quita tiempo de aire a todos.",
+    "Position without coordinates": "Posición sin coordenadas",
+    "Its latest position has no coordinates: the node has no GPS fix, or does not share its position.": "Su última posición no trae coordenadas: el nodo no tiene fix de GPS o no comparte su posición.",
+    "Frequent broadcasts": "Difusiones frecuentes",
+    "It sent [value] [port] packets to everyone in the latest 24 hours, more than the [limit] any usual setting sends.": "Envió [value] paquetes de [port] a todos en las últimas 24 horas, más que los [limit] que envía cualquier ajuste habitual.",
+    "Default name": "Nombre por defecto",
+    "It still has the name the firmware gives it. A name of its own makes it easier to recognise.": "Todavía tiene el nombre que le da el firmware. Un nombre propio hace que sea más fácil reconocerlo."
   }
 }

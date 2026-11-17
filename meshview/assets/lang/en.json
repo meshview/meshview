@@ -1148,6 +1148,20 @@
     "Maybe:": "Maybe:",
     "Maybe relay {byte}": "Maybe relay {byte}",
     "not heard directly": "not heard directly",
-    "Coverage": "Coverage"
+    "Coverage": "Coverage",
+    "Diagnosis": "Diagnosis",
+    "What may be wrong with how this node is set up, from its latest packets.": "What may be wrong with how this node is set up, from its latest packets.",
+    "Public key conflict": "Public key conflict",
+    "Its latest node info carries [value] different public keys. Either two radios share this id, or the key was made anew, as when the node is reflashed: until the others take the new one, direct messages to it fail.": "Its latest node info carries [value] different public keys. Either two radios share this id, or the key was made anew, as when the node is reflashed: until the others take the new one, direct messages to it fail.",
+    "Hardware changed": "Hardware changed",
+    "Its latest node info names more than one hardware model: [models]. Either two radios share this id, or the radio was replaced.": "Its latest node info names more than one hardware model: [models]. Either two radios share this id, or the radio was replaced.",
+    "More hops than advised": "More hops than advised",
+    "Its packets start with [value] hops, and this mesh advises [limit] at most. Each hop more lets every packet be relayed once more, which takes airtime from everybody.": "Its packets start with [value] hops, and this mesh advises [limit] at most. Each hop more lets every packet be relayed once more, which takes airtime from everybody.",
+    "Position without coordinates": "Position without coordinates",
+    "Its latest position has no coordinates: the node has no GPS fix, or does not share its position.": "Its latest position has no coordinates: the node has no GPS fix, or does not share its position.",
+    "Frequent broadcasts": "Frequent broadcasts",
+    "It sent [value] [port] packets to everyone in the latest 24 hours, more than the [limit] any usual setting sends.": "It sent [value] [port] packets to everyone in the latest 24 hours, more than the [limit] any usual setting sends.",
+    "Default name": "Default name",
+    "It still has the name the firmware gives it. A name of its own makes it easier to recognise.": "It still has the name the firmware gives it. A name of its own makes it easier to recognise."
   }
 }
