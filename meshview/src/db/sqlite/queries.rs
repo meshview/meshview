@@ -245,6 +245,11 @@ pub async fn count_sightings(pool: &SqlitePool, of: SightingsOf<'_>) -> Result<i
 /// table expressions. The windows are anchored to the latest packet and the
 /// latest sighting rather than to now, as in the Python version, so that a mesh
 /// that has gone quiet still has a top list.
+///
+/// The sightings are read first, those in the window, and then their packets:
+/// a CROSS JOIN is how SQLite is told to keep that order. Left to choose, it
+/// walked every packet there is by sender, for the grouping to come out in
+/// order, and looked each one's sightings up: hundreds of times the reading.
 fn push_top_traffic(query: &mut QueryBuilder<Sqlite>, window_us: i64) {
     query
         .push(
@@ -257,7 +262,7 @@ fn push_top_traffic(query: &mut QueryBuilder<Sqlite>, window_us: i64) {
             " GROUP BY packet.from_node_id), \
              seen AS ( \
                SELECT packet.from_node_id AS node_id, count(*) AS seen \
-                 FROM packet_seen JOIN packet ON packet.id = packet_seen.packet_id \
+                 FROM packet_seen CROSS JOIN packet ON packet.id = packet_seen.packet_id \
                 WHERE packet_seen.import_time_us >= \
                       (SELECT max(import_time_us) FROM packet_seen) - ",
         )
