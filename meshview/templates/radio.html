@@ -1,0 +1,767 @@
+{% extends "base.html" %}
+{% block theme %}light{% endblock %}
+{% block body_class %}mesh-data-page mesh-radio-page{% endblock %}
+
+{% block css %}
+{% include "data-page-styles.html" %}
+{% include "chart-styles.html" %}
+<style>
+.radio-description { margin-bottom:20px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; padding:14px 18px; font-size:13px; color:var(--mesh-muted); }
+.radio-description summary { cursor:pointer; color:var(--mesh-text); font-weight:500; }
+.radio-description p { margin:12px 0 0; line-height:1.7; }
+/* The node and the period, as the reliability page's controls. */
+.radio-controls { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:10px 12px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; padding:14px 16px; margin-bottom:20px; }
+.radio-controls[hidden] { display:none; }
+.radio-field { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.radio-label { margin:0; font-size:12px; color:var(--mesh-muted); }
+.radio-node { display:flex; flex-wrap:wrap; align-items:baseline; align-content:center; column-gap:6px; min-height:38px; margin:0; font-size:15px; font-weight:600; overflow-wrap:break-word; }
+/* Phones: the node on its own row, the period under it. */
+@media(max-width:600px) {
+    .radio-controls { grid-template-columns:minmax(0,1fr); }
+    .radio-node { min-height:0; }
+}
+.radio-node a { color:var(--mesh-primary); text-decoration:none; }
+.radio-node a:hover { text-decoration:underline; }
+.radio-hex { color:var(--mesh-muted); font-size:13px; font-weight:400; white-space:nowrap; }
+.mesh-data-page .radio-controls select { width:100%; min-width:160px; height:38px; padding:0 10px; font-size:14px; }
+/* Rows that show or hide their node in the chart above them. */
+.signal-table.is-toggling tbody tr { cursor:pointer; }
+.signal-table.is-toggling tbody tr:hover { background:var(--mesh-soft); }
+.signal-table tbody tr.is-hidden td { opacity:.45; }
+.signal-swatch { display:inline-block; width:10px; height:10px; margin-right:8px; border-radius:2px; vertical-align:middle; }
+/* Show every node again, or swap the shown and the hidden ones. */
+.series-tools { display:flex; justify-content:flex-end; gap:6px; margin:4px 0 8px; }
+.mesh-data-page .mesh-content .series-tools > button { padding:3px 10px; border:1px solid var(--mesh-border); border-radius:999px; background:var(--mesh-soft); color:var(--mesh-text); font-size:12px; }
+.mesh-data-page .mesh-content .series-tools > button:hover { color:var(--mesh-primary); }
+#neighbor_chart_container .chart-hint { margin:0; padding:0 20px 16px; }
+/* A relay is a byte, and the nodes it may be. */
+.relay-byte { display:inline-block; min-width:2.6em; padding:1px 6px; border-radius:5px; background:var(--mesh-soft); color:var(--mesh-text); font:600 12px ui-monospace,Consolas,monospace; text-align:center; }
+.relay-candidates { white-space:normal; }
+.relay-candidates a + a::before { content:" · "; color:var(--mesh-muted); }
+.relay-direct { color:var(--mesh-muted); font-size:12px; }
+.relay-none { color:var(--mesh-muted); font-style:italic; }
+.relay-shared { color:#9a5b00; font-size:12px; }
+[data-bs-theme="dark"] .relay-shared { color:#f1d38a; }
+#relays_container .chart-empty[hidden] { display:none; }
+#relays_container .signal-table-wrap { padding-top:12px; }
+/* With no chart, the signal shown only matters on a phone, where each row
+   tells one of them: the full table has both. */
+@media(min-width:701px) { .relay-metric { display:none; } }
+@media(max-width:700px) {
+  #neighbor_chart_container .chart-hint { padding:0 12px 12px; }
+  .signal-table tbody tr { touch-action:manipulation; }
+  .relay-candidates { margin-top:2px; }
+}
+</style>
+{% endblock %}
+
+{% block body %}
+<section class="radio-page">
+    <header class="data-heading is-compact"><div class="data-title"><h1>{{ "Radio" | tr }}</h1></div><div class="data-actions"><a class="mesh-secondary-button" id="radio-node-link" href="/nodelist">{{ "Back to Node" | tr }}</a></div></header>
+
+    <details class="radio-description"><summary>{{ "What this page shows" | tr }}</summary><p>{{ "Who this node hears and who hears it over the air. Direct receptions are the packets heard straight from the node that sent them, with no hops between. Relays are the nodes a packet was heard from after it had taken a hop at least: the firmware tells only the last byte of their id, so the nodes each one may be are those heard directly whose id ends in that byte, and a byte two of them share cannot be told apart. Neighbors are those the node itself reports hearing." | tr }}</p></details>
+
+    <!-- The node shown and the period of every section. -->
+    <div class="radio-controls" id="radio-controls">
+        <div class="radio-field radio-field-node">
+            <span class="radio-label">{{ "Node" | tr }}</span>
+            <p class="radio-node" id="radio-node"><span class="is-loading">{{ "Loading..." | tr }}</span></p>
+        </div>
+        <div class="radio-field">
+            <label for="radio-period" class="radio-label">{{ "Period" | tr }}</label>
+            <select class="chart-period radio-period" id="radio-period" data-chart="radio">
+                <option value="1">{{ "Last 24 hours" | tr }}</option>
+                <option value="7" selected>{{ "Last 7 days" | tr }}</option>
+                <option value="30">{{ "Last 30 days" | tr }}</option>
+            </select>
+        </div>
+    </div>
+
+    <p class="radio-missing chart-empty" id="radio-missing" hidden>{{ "Choose a node from the node list to see its radio links." | tr }}</p>
+
+    <!-- Direct receptions: packets heard at no hops, and their signal. -->
+    <div id="direct_container" class="chart-container">
+        <div class="chart-header">
+            <h2 class="chart-title"><span class="ti ti-wifi" aria-hidden="true"></span> <span>{{ "Direct receptions" | tr }}</span></h2>
+            <div class="chart-actions">
+                <button type="button" class="chart-tool" onclick="expandChart('direct')" title="{{ "Expand chart" | tr }}" aria-label="{{ "Expand chart" | tr }}"><span class="ti ti-arrows-maximize" aria-hidden="true"></span></button>
+                <button type="button" class="chart-tool" onclick="exportDirectCSV()" title="{{ "Export CSV" | tr }}" aria-label="{{ "Export CSV" | tr }}"><span class="ti ti-download" aria-hidden="true"></span></button>
+            </div>
+        </div>
+        <div class="chart-controls">
+            <div class="pill-toggle" role="group" aria-label="{{ "Direction" | tr }}">
+                <button type="button" data-direction="received" aria-pressed="true"><span class="ti ti-arrow-down" aria-hidden="true"></span> {{ "Received" | tr }}</button>
+                <button type="button" data-direction="transmitted" aria-pressed="false"><span class="ti ti-arrow-up" aria-hidden="true"></span> {{ "Transmitted" | tr }}</button>
+            </div>
+            <div class="pill-toggle" role="group" aria-label="{{ "Signal" | tr }}">
+                <button type="button" data-metric="rssi" aria-pressed="false">RSSI</button>
+                <button type="button" data-metric="snr" aria-pressed="true">SNR</button>
+            </div>
+            <p id="direct_note" class="chart-note"></p>
+        </div>
+        <p class="chart-loading is-loading">{{ "Loading..." | tr }}</p>
+        <p class="chart-empty" hidden>{{ "No direct receptions in this period." | tr }}</p>
+        <div id="chart_direct" class="chart-canvas" style="height:380px;"></div>
+        <div class="signal-table-wrap">
+            <div class="series-tools">
+                <button type="button" data-direct-show="all">{{ "All" | tr }}</button>
+                <button type="button" data-direct-show="invert">{{ "Invert" | tr }}</button>
+            </div>
+            <table class="signal-table is-toggling" data-metric="snr">
+                <thead>
+                    <tr>
+                        <th rowspan="2">{{ "Node" | tr }}</th>
+                        <th rowspan="2" class="is-number">{{ "Packets" | tr }}</th>
+                        <th colspan="3" class="is-group is-rssi">RSSI (dBm)</th>
+                        <th colspan="3" class="is-group is-snr">SNR (dB)</th>
+                    </tr>
+                    <tr>
+                        <th class="is-number is-rssi">{{ "Avg" | tr }}</th><th class="is-number is-rssi">{{ "Min" | tr }}</th><th class="is-number is-rssi">{{ "Max" | tr }}</th>
+                        <th class="is-number is-snr">{{ "Avg" | tr }}</th><th class="is-number is-snr">{{ "Min" | tr }}</th><th class="is-number is-snr">{{ "Max" | tr }}</th>
+                    </tr>
+                </thead>
+                <tbody id="direct_table"></tbody>
+            </table>
+            <p class="chart-hint chart-hint-mouse"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Click a node to show or hide it, double-click it to show only it, and click a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click it to see it all." | tr }}</p>
+            <p class="chart-hint chart-hint-touch"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Tap a node to show or hide it, tap it twice to show only it, and tap a point to open its packet. Expand the chart to zoom in." | tr }}</p>
+        </div>
+    </div>
+
+    <!-- Relays: who the packets heard after a hop were heard from. -->
+    <div id="relays_container" class="chart-container">
+        <div class="chart-header">
+            <h2 class="chart-title"><span class="ti ti-repeat" aria-hidden="true"></span> <span>{{ "Relays" | tr }}</span></h2>
+            <div class="chart-actions">
+                <button type="button" class="chart-tool" onclick="exportRelaysCSV()" title="{{ "Export CSV" | tr }}" aria-label="{{ "Export CSV" | tr }}"><span class="ti ti-download" aria-hidden="true"></span></button>
+            </div>
+        </div>
+        <div class="chart-controls">
+            <div class="pill-toggle" role="group" aria-label="{{ "Direction" | tr }}">
+                <button type="button" data-relay-direction="received" aria-pressed="true" title="{{ "The relays this node, as a gateway, heard packets through" | tr }}"><span class="ti ti-arrow-down" aria-hidden="true"></span> {{ "Through relays" | tr }}</button>
+                <button type="button" data-relay-direction="relayed" aria-pressed="false" title="{{ "The gateways that heard packets through this node" | tr }}"><span class="ti ti-repeat" aria-hidden="true"></span> {{ "As a relay" | tr }}</button>
+            </div>
+            <div class="pill-toggle relay-metric" role="group" aria-label="{{ "Signal" | tr }}">
+                <button type="button" data-relay-metric="rssi" aria-pressed="false">RSSI</button>
+                <button type="button" data-relay-metric="snr" aria-pressed="true">SNR</button>
+            </div>
+            <p id="relays_note" class="chart-note"></p>
+        </div>
+        <p class="chart-loading is-loading">{{ "Loading..." | tr }}</p>
+        <p class="chart-empty" hidden></p>
+        <div class="signal-table-wrap" hidden>
+            <table class="signal-table" id="relays_table" data-metric="snr">
+                <thead></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Neighbors: those the node reports hearing, and their SNR over time. -->
+    <div id="neighbor_chart_container" class="chart-container">
+        <div class="chart-header">
+            <h2 class="chart-title"><span class="ti ti-affiliate" aria-hidden="true"></span> <span>{{ "Neighbors (SNR over time)" | tr }}</span></h2>
+            <div class="chart-actions">
+                <button type="button" class="chart-tool" onclick="expandChart('neighbors')" title="{{ "Expand chart" | tr }}" aria-label="{{ "Expand chart" | tr }}"><span class="ti ti-arrows-maximize" aria-hidden="true"></span></button>
+                <button type="button" class="chart-tool" onclick="exportNeighborsCSV()" title="{{ "Export CSV" | tr }}" aria-label="{{ "Export CSV" | tr }}"><span class="ti ti-download" aria-hidden="true"></span></button>
+            </div>
+        </div>
+        <p class="chart-loading is-loading">{{ "Loading..." | tr }}</p>
+        <p class="chart-empty" hidden>{{ "No neighbors reported in this period." | tr }}</p>
+        <div id="chart_neighbors" class="chart-canvas" data-solo="true" style="height:380px;"></div>
+        <p class="chart-hint chart-hint-mouse"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Click a neighbor in the legend to show or hide it, and double-click it to show only it. Drag across the chart to zoom in, scroll to move along it and double-click it to see it all." | tr }}</p>
+        <p class="chart-hint chart-hint-touch"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Tap a neighbor in the legend to show or hide it, and tap it twice to show only it. Expand the chart to zoom in." | tr }}</p>
+    </div>
+</section>
+
+{% include "chart-modal.html" %}
+
+<script src="/static/vendor/echarts-6.1.0/dist/echarts.min.js"></script>
+<script src="/static/chart-kit.js"></script>
+<script>
+const radioNodeId = Number(new URLSearchParams(window.location.search).get("node_id")) || null;
+
+/* ======================================================
+    NODES, by id, for their names
+   ====================================================== */
+
+const radioNodes = new Map();
+function fetchRadioNode(nodeId) {
+    if (!radioNodes.has(nodeId)) {
+        radioNodes.set(nodeId, fetch(`/api/v1/nodes?node_id=${encodeURIComponent(nodeId)}`)
+            .then(res => res.ok ? res.json() : {})
+            .then(data => (data.nodes || [])[0] || null)
+            .catch(() => null));
+    }
+    return radioNodes.get(nodeId);
+}
+
+function hexId(nodeId) {
+    return `!${(Number(nodeId) >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+function nodeLabel(node, nodeId) {
+    return node?.long_name || node?.short_name || hexId(nodeId);
+}
+
+function relayHex(byte) {
+    return Number(byte).toString(16).padStart(2, "0");
+}
+
+function nodeAnchor(nodeId, text) {
+    const link = document.createElement("a");
+    link.href = `/node/${nodeId}`;
+    link.textContent = text;
+    link.addEventListener("click", event => event.stopPropagation());
+    return link;
+}
+
+async function showRadioNode() {
+    const node = await fetchRadioNode(radioNodeId);
+    const name = nodeLabel(node, radioNodeId);
+    const heading = document.getElementById("radio-node");
+    const short = node?.short_name && node.short_name !== name ? ` (${node.short_name})` : "";
+    const hex = document.createElement("span");
+    hex.className = "radio-hex";
+    hex.textContent = hexId(radioNodeId);
+    heading.replaceChildren(nodeAnchor(radioNodeId, name + short), hex);
+    document.getElementById("radio-node-link").href = `/node/${radioNodeId}`;
+    document.title = `${MeshI18n.t("Radio")} · ${name}`;
+}
+
+/* ======================================================
+    DIRECT RECEPTIONS: packets heard at no hops, and their signal
+   ====================================================== */
+
+// Series colours, so that each node's swatch in the table matches its line.
+const DIRECT_COLORS = ["#245ea8", "#d9480f", "#2f9e44", "#ae3ec9", "#f59f00", "#0c8599",
+    "#e03131", "#5c7cfa", "#66a80f", "#c2255c", "#1098ad", "#9c6644", "#7048e8", "#868e96"];
+// SNR first: how far above what LoRa can still decode, which RSSI does not say.
+const directState = { direction: "received", metric: "snr", data: null, hidden: new Set() };
+
+async function fetchDirect(direction) {
+    const url = new URL(`/api/v1/node/${radioNodeId}/direct_receptions`, window.location.origin);
+    url.searchParams.set("direction", direction);
+    url.searchParams.set("since", String(sinceUs(chartDays("radio"))));
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`direct_receptions returned ${res.status}`);
+    return res.json();
+}
+
+async function loadDirectReceptions(first = false) {
+    let data = await fetchDirect(directState.direction);
+    // At first, the way that has something: a node that is not a gateway has
+    // only transmitted ones.
+    if (first && !data.nodes.length) {
+        const other = directState.direction === "received" ? "transmitted" : "received";
+        const found = await fetchDirect(other);
+        if (found.nodes.length) {
+            directState.direction = other;
+            data = found;
+        }
+    }
+    document.querySelectorAll("#direct_container [data-direction]").forEach(button =>
+        button.setAttribute("aria-pressed", String(button.dataset.direction === directState.direction)));
+    placeToggleThumbs(document.getElementById("direct_container"));
+    directState.data = data;
+    directState.hidden.clear();
+    renderDirect();
+}
+
+function renderDirect() {
+    const data = directState.data;
+    const metric = directState.metric;
+    const peers = data?.nodes || [];
+    const container = document.getElementById("direct_container");
+    const chartEl = document.getElementById("chart_direct");
+    const note = document.getElementById("direct_note");
+
+    const received = directState.direction === "received";
+    const total = peers.reduce((sum, peer) => sum + peer.packets, 0);
+    // Nothing heard: a line in the middle of the card instead of an empty
+    // chart, a table and the tools to expand or export them.
+    const empty = !peers.length;
+    showChartEmpty(container, empty);
+    container.querySelector(".signal-table-wrap").hidden = empty;
+    container.querySelectorAll("[data-metric]").forEach(control => { control.disabled = empty; });
+    note.textContent = empty
+        ? ""
+        : MeshI18n.t(received
+            ? "Nodes heard directly: {n}. Packets: {total}."
+            : "Gateways that heard this node directly: {n}. Packets: {total}.",
+            {n: peers.length, total})
+          + (data.truncated ? " " + MeshI18n.t("Only the latest are shown.") : "");
+
+    // ECharts tells series apart by name: two nodes with the same one get their id.
+    const used = new Set();
+    peers.forEach(peer => {
+        let name = nodeLabel(peer, peer.node_id);
+        if (used.has(name)) name = `${name} (${peer.node_id})`;
+        used.add(name);
+        peer._name = name;
+    });
+
+    if (empty) return;
+    const chart = echarts.getInstanceByDom(chartEl) || initMeshChart(chartEl);
+    // Shown again after being hidden, the chart has to take its size anew.
+    chart.resize();
+    chart.off("click");
+    chart.setOption({
+        legend: { show: false, data: peers.map(peer => peer._name),
+            selected: Object.fromEntries(peers.map(peer => [peer._name, !directState.hidden.has(peer.node_id)])) },
+        grid: { left: 12, right: 12, top: 40, bottom: 8, containLabel: true },
+        tooltip: {
+            trigger: "item",
+            formatter: point => {
+                const r = point.data;
+                return `${point.marker}<strong>${escapeHtml(point.seriesName)}</strong><br>`
+                    + escapeHtml(new Date(r.value[0]).toLocaleString(MeshI18n.language)) + "<br>"
+                    + `RSSI: ${escapeHtml(r.rssi)} dBm · SNR: ${escapeHtml(r.snr ?? MeshI18n.t("N/A"))} dB`;
+            }
+        },
+        ...spanZoomOption(),
+        // #dce4ef is a border colour the theme turns dark at night.
+        xAxis: { type: "time", axisLabel: { color: "#64748b", hideOverlap: true },
+            axisLine: { lineStyle: { color: "#dce4ef" } } },
+        yAxis: { type: "value", scale: true, name: metric === "rssi" ? "RSSI (dBm)" : "SNR (dB)",
+            nameTextStyle: { align: "left" }, axisLabel: { color: "#64748b" },
+            splitLine: { lineStyle: { color: "#dce4ef" } } },
+        // Each node keeps its table colour, however often the series are replaced.
+        series: peers.map((peer, i) => ({
+            name: peer._name,
+            type: "line",
+            showSymbol: true,
+            symbolSize: 5,
+            itemStyle: { color: DIRECT_COLORS[i % DIRECT_COLORS.length] },
+            lineStyle: { width: 1, color: DIRECT_COLORS[i % DIRECT_COLORS.length] },
+            emphasis: { focus: "series" },
+            data: peer.receptions
+                .filter(r => (metric === "rssi" ? r.rssi : r.snr) != null)
+                .map(r => ({ value: [r.time_us / 1000, metric === "rssi" ? r.rssi : r.snr],
+                             rssi: r.rssi, snr: r.snr, packet_id: r.packet_id }))
+        }))
+    }, { replaceMerge: ["series"] });
+    chart.on("click", point => {
+        if (point.data?.packet_id) window.location.href = `/packet/${point.data.packet_id}`;
+    });
+    enableSpanZoom(chart);
+
+    container.querySelector(".signal-table").dataset.metric = metric;
+    const body = document.getElementById("direct_table");
+    body.replaceChildren(...peers.map((peer, i) => {
+        const row = signalRow(peer, peer._name, DIRECT_COLORS[i % DIRECT_COLORS.length]);
+        row.classList.toggle("is-hidden", directState.hidden.has(peer.node_id));
+        row.title = MeshI18n.t("Show or hide this node");
+        row.dataset.nodeId = peer.node_id;
+        row.addEventListener("click", () => {
+            const hidden = directState.hidden;
+            // Each click toggles; the second of two in a row undoes the first's
+            // instead, and then shows only this one, or all again if it was.
+            hidden.has(peer.node_id) ? hidden.delete(peer.node_id) : hidden.add(peer.node_id);
+            if (secondClick(directState, peer.node_id)) {
+                const ids = peers.map(other => other.node_id);
+                const shown = soloSelection(ids, peer.node_id,
+                    Object.fromEntries(ids.map(id => [id, !hidden.has(id)])));
+                ids.forEach(id => shown[id] ? hidden.delete(id) : hidden.add(id));
+            }
+            applyDirectHidden();
+        });
+        return row;
+    }));
+}
+
+// A table row of a node and the signal it was heard with: its name, linked
+// to its page, the packets, each signal's mean, weakest and strongest, and on
+// a phone a line under the name in place of those columns.
+function signalRow(peer, name, color, before = [], after = []) {
+    const fmt = value => value == null ? "—" : String(value);
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    if (color) {
+        const swatch = document.createElement("span");
+        swatch.className = "signal-swatch";
+        swatch.style.background = color;
+        cell.append(swatch);
+    }
+    cell.append(nodeAnchor(peer.node_id, name), ...before);
+    row.append(cell);
+    for (const [value, metric] of [...after, [peer.packets, ""],
+            [peer.rssi_avg, "rssi"], [peer.rssi_min, "rssi"], [peer.rssi_max, "rssi"],
+            [peer.snr_avg, "snr"], [peer.snr_min, "snr"], [peer.snr_max, "snr"]]) {
+        const number = document.createElement("td");
+        number.className = metric ? `is-number is-${metric}` : "is-number";
+        number.textContent = fmt(value);
+        row.append(number);
+    }
+    for (const [metric, unit] of [["rssi", "dBm"], ["snr", "dB"]]) {
+        const summary = document.createElement("td");
+        summary.className = `signal-summary is-${metric}`;
+        summary.textContent = MeshI18n.t("Packets: {n} · avg {avg} · min {min} · max {max} {unit}", {
+            n: peer.packets, avg: fmt(peer[`${metric}_avg`]), min: fmt(peer[`${metric}_min`]),
+            max: fmt(peer[`${metric}_max`]), unit });
+        row.append(summary);
+    }
+    return row;
+}
+
+// The nodes hidden, on the table's rows and the chart's lines.
+function applyDirectHidden() {
+    const peers = directState.data?.nodes || [];
+    document.querySelectorAll("#direct_table tr").forEach(row =>
+        row.classList.toggle("is-hidden", directState.hidden.has(Number(row.dataset.nodeId))));
+    echarts.getInstanceByDom(document.getElementById("chart_direct"))?.setOption({ legend: {
+        selected: Object.fromEntries(peers.map(peer => [peer._name, !directState.hidden.has(peer.node_id)])) } });
+}
+
+function initDirectControls() {
+    document.querySelectorAll("#direct_container [data-direct-show]").forEach(button =>
+        button.addEventListener("click", () => {
+            const ids = (directState.data?.nodes || []).map(peer => peer.node_id);
+            const hidden = directState.hidden;
+            directState.hidden = button.dataset.directShow === "all"
+                ? new Set() : new Set(ids.filter(id => !hidden.has(id)));
+            applyDirectHidden();
+        }));
+    document.querySelectorAll("#direct_container [data-direction]").forEach(button =>
+        button.addEventListener("click", () => {
+            if (directState.direction === button.dataset.direction) return;
+            directState.direction = button.dataset.direction;
+            pressToggle(button);
+            loadDirectReceptions().catch(error => console.error(error));
+        }));
+    document.querySelectorAll("#direct_container [data-metric]").forEach(button =>
+        button.addEventListener("click", () => {
+            directState.metric = button.dataset.metric;
+            pressToggle(button);
+            renderDirect();
+        }));
+}
+
+function exportDirectCSV() {
+    const rows = [[MeshI18n.t("Time"), MeshI18n.t("Node ID"), MeshI18n.t("Node"), MeshI18n.t("Packet ID"), "RSSI (dBm)", "SNR (dB)"]];
+    const receptions = (directState.data?.nodes || []).flatMap(peer =>
+        peer.receptions.map(r => [r.time_us, peer, r]));
+    receptions.sort((a, b) => a[0] - b[0]);
+    for (const [time, peer, r] of receptions)
+        rows.push([new Date(time / 1000).toISOString(), peer.node_id, peer._name, r.packet_id, r.rssi, r.snr]);
+    downloadCsv(rows, `direct_${radioNodeId}.csv`);
+}
+
+/* ======================================================
+    RELAYS: who packets heard after a hop were heard from
+   ====================================================== */
+
+const relayState = { direction: "received", metric: "snr", data: null };
+
+async function fetchRelays(direction) {
+    const path = direction === "received" ? "relays" : "relayed";
+    const url = new URL(`/api/v1/node/${radioNodeId}/${path}`, window.location.origin);
+    url.searchParams.set("since", String(sinceUs(chartDays("radio"))));
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`${path} returned ${res.status}`);
+    return res.json();
+}
+
+async function loadRelays(first = false) {
+    let data = await fetchRelays(relayState.direction);
+    // At first, the way that has something: a node that is not a gateway can
+    // only have been a relay.
+    if (first && !data.relays?.length) {
+        const found = await fetchRelays("relayed");
+        if (found.gateways.length) {
+            relayState.direction = "relayed";
+            data = found;
+        }
+    }
+    document.querySelectorAll("#relays_container [data-relay-direction]").forEach(button =>
+        button.setAttribute("aria-pressed", String(button.dataset.relayDirection === relayState.direction)));
+    placeToggleThumbs(document.getElementById("relays_container"));
+    relayState.data = data;
+    renderRelays();
+}
+
+function renderRelays() {
+    const received = relayState.direction === "received";
+    const items = (received ? relayState.data?.relays : relayState.data?.gateways) || [];
+    const container = document.getElementById("relays_container");
+    const table = document.getElementById("relays_table");
+    const empty = !items.length;
+    const total = items.reduce((sum, item) => sum + item.packets, 0);
+
+    container.querySelector(".chart-empty").hidden = !empty;
+    container.querySelector(".chart-empty").textContent = MeshI18n.t(received
+        ? "No packets heard through a relay in this period."
+        : "No gateway heard packets through this node in this period.");
+    container.querySelector(".signal-table-wrap").hidden = empty;
+    container.querySelectorAll(".chart-tool, [data-relay-metric]").forEach(control => { control.disabled = empty; });
+    document.getElementById("relays_note").textContent = empty ? "" : MeshI18n.t(received
+        ? "Relays: {n}. Packets: {total}."
+        : "Gateways that heard through this node: {n}. Packets: {total}.", {n: items.length, total});
+    if (empty) return;
+
+    table.dataset.metric = relayState.metric;
+    const head = document.createElement("tr");
+    const second = document.createElement("tr");
+    const th = (text, className = "", span = {}) => {
+        const cell = document.createElement("th");
+        cell.textContent = text;
+        if (className) cell.className = className;
+        Object.entries(span).forEach(([key, value]) => cell.setAttribute(key, value));
+        return cell;
+    };
+    head.append(th(MeshI18n.t(received ? "Relay" : "Gateway"), "", { rowspan: 2 }));
+    if (!received) head.append(th(MeshI18n.t("Heard directly"), "is-number", { rowspan: 2 }));
+    head.append(th(MeshI18n.t(received ? "Packets" : "Relayed"), "is-number", { rowspan: 2 }),
+        th("RSSI (dBm)", "is-group is-rssi", { colspan: 3 }), th("SNR (dB)", "is-group is-snr", { colspan: 3 }));
+    for (const metric of ["rssi", "snr"])
+        for (const text of ["Avg", "Min", "Max"]) second.append(th(MeshI18n.t(text), `is-number is-${metric}`));
+    table.tHead.replaceChildren(head, second);
+
+    table.tBodies[0].replaceChildren(...items.map(item => received ? relayRow(item) : relayGatewayRow(item)));
+}
+
+// A relay: its byte, the nodes it may be, and the signal through it.
+function relayRow(relay) {
+    const row = signalRow({ ...relay, node_id: null }, "", null);
+    const cell = row.cells[0];
+    const byte = document.createElement("span");
+    byte.className = "relay-byte";
+    byte.textContent = relayHex(relay.relay_node);
+    byte.title = MeshI18n.t("The last byte of the relay's id");
+    const candidates = document.createElement("div");
+    candidates.className = "relay-candidates";
+    if (!relay.candidates.length) {
+        const none = document.createElement("span");
+        none.className = "relay-none";
+        none.textContent = MeshI18n.t("No node heard directly ends in {byte}", {byte: relayHex(relay.relay_node)});
+        candidates.append(none);
+    } else {
+        for (const candidate of relay.candidates) {
+            const link = nodeAnchor(candidate.node_id, nodeLabel(candidate, candidate.node_id));
+            const direct = document.createElement("span");
+            direct.className = "relay-direct";
+            direct.textContent = " " + MeshI18n.t("({n} direct)", {n: candidate.direct_packets});
+            link.append(direct);
+            candidates.append(link);
+        }
+        if (relay.candidates.length > 1) {
+            const shared = document.createElement("div");
+            shared.className = "relay-shared";
+            shared.textContent = MeshI18n.t("Shared byte: it cannot be told which of them it was.");
+            candidates.append(shared);
+        }
+    }
+    cell.replaceChildren(byte, candidates);
+    return row;
+}
+
+// A gateway that heard through the node, and how often it heard it directly.
+function relayGatewayRow(gateway) {
+    return signalRow(gateway, nodeLabel(gateway, gateway.node_id), null, [], [[gateway.direct_packets, ""]]);
+}
+
+function initRelayControls() {
+    document.querySelectorAll("#relays_container [data-relay-direction]").forEach(button =>
+        button.addEventListener("click", () => {
+            if (relayState.direction === button.dataset.relayDirection) return;
+            relayState.direction = button.dataset.relayDirection;
+            pressToggle(button);
+            loadRelays().catch(error => console.error(error));
+        }));
+    document.querySelectorAll("#relays_container [data-relay-metric]").forEach(button =>
+        button.addEventListener("click", () => {
+            relayState.metric = button.dataset.relayMetric;
+            pressToggle(button);
+            document.getElementById("relays_table").dataset.metric = relayState.metric;
+        }));
+}
+
+function exportRelaysCSV() {
+    const received = relayState.direction === "received";
+    const signal = item => [item.packets, item.rssi_avg, item.rssi_min, item.rssi_max,
+        item.snr_avg, item.snr_min, item.snr_max];
+    const head = [MeshI18n.t("Packets"), "RSSI avg (dBm)", "RSSI min (dBm)", "RSSI max (dBm)",
+        "SNR avg (dB)", "SNR min (dB)", "SNR max (dB)"];
+    const rows = received
+        ? [[MeshI18n.t("Relay"), MeshI18n.t("Candidates"), ...head],
+           ...(relayState.data?.relays || []).map(relay => [relayHex(relay.relay_node),
+               relay.candidates.map(c => `${nodeLabel(c, c.node_id)} (${c.node_id})`).join("; "), ...signal(relay)])]
+        : [[MeshI18n.t("Node ID"), MeshI18n.t("Gateway"), MeshI18n.t("Heard directly"), ...head],
+           ...(relayState.data?.gateways || []).map(gateway => [gateway.node_id,
+               nodeLabel(gateway, gateway.node_id), gateway.direct_packets, ...signal(gateway)])];
+    downloadCsv(rows, `${received ? "relays" : "relayed"}_${radioNodeId}.csv`);
+}
+
+/* ======================================================
+    NEIGHBORS (portnum=71)
+
+    The NEIGHBOR_MAX_SERIES neighbors with the most data points in
+    the period are drawn: a busy node has many more.
+   ====================================================== */
+
+const NEIGHBOR_MAX_SERIES = 15;
+let neighborData = { ids: [], names: [], snrs: [] };
+
+// The node's neighbor reports in the period, latest first: pages of 1000, up
+// to ten.
+async function fetchNeighborPackets(days) {
+    const since = sinceUs(days);
+    const packets = [];
+    let before = null;
+    for (let page = 0; page < 10; page++) {
+        const url = new URL("/api/v1/packets", window.location.origin);
+        url.searchParams.set("portnum", 71);
+        url.searchParams.set("from_node_id", radioNodeId);
+        url.searchParams.set("since", since);
+        url.searchParams.set("limit", 1000);
+        if (before) url.searchParams.set("before", before);
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`/api/v1/packets returned ${res.status}`);
+        const data = await res.json();
+        packets.push(...(data.packets || []));
+        if (!data.next_before) break;
+        before = data.next_before;
+    }
+    return packets.filter(p => (p.import_time_us || 0) >= since);
+}
+
+async function loadNeighborTimeSeries() {
+    const container = document.getElementById("neighbor_chart_container");
+    const chartEl = document.getElementById("chart_neighbors");
+    const packets = await fetchNeighborPackets(chartDays("radio"));
+
+    // --- Pass 1: collect the readings, the earliest first ---
+    const neighborHistory = {}; // node_id -> { times[], snr[] }
+    for (const pkt of [...packets].reverse()) {
+        if (!pkt.import_time_us || !pkt.payload) continue;
+        const blockRe = /neighbors\s*\{([^}]+)\}/g;
+        let m;
+        while ((m = blockRe.exec(pkt.payload)) !== null) {
+            const idMatch  = m[1].match(/node_id:\s*(\d+)/);
+            const snrMatch = m[1].match(/snr:\s*(-?\d+(?:\.\d+)?)/);
+            if (!idMatch || !snrMatch) continue;
+            const nid = parseInt(idMatch[1], 10);
+            neighborHistory[nid] ??= { times: [], snr: [] };
+            neighborHistory[nid].times.push(pkt.import_time_us / 1000);
+            neighborHistory[nid].snr.push(parseFloat(snrMatch[1]));
+        }
+    }
+
+    // --- Keep the neighbors with the most data points in the period ---
+    const ranked = Object.entries(neighborHistory)
+        .sort((a, b) => b[1].times.length - a[1].times.length);
+    const kept = ranked.slice(0, NEIGHBOR_MAX_SERIES);
+    neighborData = { ids: [], names: [], snrs: [] };
+    showChartEmpty(container, !kept.length);
+    if (!kept.length) return;
+
+    // --- Pass 2: names, only for the series that are drawn ---
+    await Promise.all(kept.map(async ([nid, entry]) => {
+        const neighbor = await fetchRadioNode(nid);
+        entry.name = neighbor?.short_name || neighbor?.long_name || hexId(nid);
+    }));
+
+    // ECharts identifies a series by its name, so two neighbors sharing
+    // a short name would be drawn as one line. Keep them apart.
+    const usedNames = new Set();
+    for (const [nid, entry] of kept) {
+        if (usedNames.has(entry.name)) entry.name = `${entry.name} (${nid})`;
+        usedNames.add(entry.name);
+    }
+
+    // Values behind the "Export CSV" button: the most recent SNR in the
+    // period, per neighbor.
+    neighborData = {
+        ids:   kept.map(([nid]) => nid),
+        names: kept.map(([, entry]) => entry.name),
+        snrs:  kept.map(([, entry]) => entry.snr[entry.snr.length - 1])
+    };
+
+    // Say which neighbors are on screen, so a missing line is not a mystery.
+    const subtext = ranked.length > kept.length
+        ? MeshI18n.t("The {n} neighbors with the most data points, of {total}", {n: kept.length, total: ranked.length})
+        : MeshI18n.t("{n} neighbors", {n: kept.length});
+
+    drawChart(chartEl, {
+        title: {
+            subtext,
+            left: "center",
+            bottom: 0,
+            subtextStyle: { color: "#888", fontSize: 11 }
+        },
+        tooltip: {
+            trigger: "axis",
+            axisPointer: { type: "line" },
+            formatter: params => {
+                if (!params.length) return "";
+                const heading = new Date(Number(params[0].axisValue)).toLocaleString(MeshI18n.language);
+                return escapeHtml(heading) + "<br>" + params.map(point =>
+                    `${point.marker}${escapeHtml(point.seriesName)}: ${escapeHtml(point.value?.[1] ?? MeshI18n.t("N/A"))}`
+                ).join("<br>");
+            }
+        },
+        legend: {
+            type: "scroll",
+            data: kept.map(([, entry]) => entry.name),
+            textStyle: { color: "#64748b" },
+            selector: legendSelector(),
+            selectorLabel: { color: "#64748b", borderColor: "#dce4ef" }
+        },
+        xAxis: { type: "time", axisLabel: { color: "#64748b", hideOverlap: true } },
+        yAxis: { type: "value", name: "SNR", axisLabel: { color: "#64748b" } },
+        ...spanZoomOption(),
+        series: kept.map(([, entry]) => ({
+            name: entry.name,
+            type: "line",
+            smooth: true,
+            connectNulls: true,
+            showSymbol: false,
+            data: entry.times.map((t, i) => [t, entry.snr[i]])
+        }))
+    });
+    enableLegendSolo(echarts.getInstanceByDom(chartEl));
+}
+
+function exportNeighborsCSV() {
+    const rows = [[MeshI18n.t("Neighbor Node ID"), MeshI18n.t("Neighbor Name"), "SNR (dB)"]];
+    neighborData.ids.forEach((id, i) => rows.push([id, neighborData.names[i], neighborData.snrs[i]]));
+    downloadCsv(rows, `neighbors_${radioNodeId}.csv`);
+}
+
+/* ======================================================
+    INIT
+   ====================================================== */
+
+// Each card shows a loading line until its loader settles, and hides its
+// chart with an error.
+function settleCard(id, load) {
+    const card = document.getElementById(id);
+    return load
+        .catch(error => {
+            console.error(error);
+            card.querySelector(".chart-empty").hidden = false;
+            card.querySelector(".chart-canvas")?.setAttribute("hidden", "");
+        })
+        .finally(() => card.querySelector(".chart-loading")?.remove());
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+    await MeshI18n.ready;
+    if (!radioNodeId) {
+        document.getElementById("radio-missing").hidden = false;
+        document.querySelectorAll(".chart-container, .radio-controls").forEach(el => { el.hidden = true; });
+        return;
+    }
+    showRadioNode();
+    initDirectControls();
+    initRelayControls();
+    initChartPeriods({}, () => Promise.all([
+        loadDirectReceptions(), loadRelays(), loadNeighborTimeSeries()
+    ]));
+    await Promise.all([
+        settleCard("direct_container", loadDirectReceptions(true)),
+        settleCard("relays_container", loadRelays(true)),
+        settleCard("neighbor_chart_container", loadNeighborTimeSeries()),
+    ]);
+});
+</script>
+{% endblock %}

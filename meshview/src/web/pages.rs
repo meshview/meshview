@@ -57,11 +57,12 @@ fn templates_of<E: RustEmbed>() -> anyhow::Result<Vec<(String, String)>> {
 
 /// The pages, by template, and whether each is the dashboard: the map with
 /// the node explorer beside it.
-const PAGES: [(&str, bool); 13] = [
+const PAGES: [(&str, bool); 14] = [
     ("index.html", true),
     ("map.html", false),
     ("net.html", false),
     ("reliability.html", false),
+    ("radio.html", false),
     ("nodelist.html", false),
     ("firehose.html", false),
     ("chat.html", false),
@@ -75,7 +76,7 @@ const PAGES: [(&str, bool); 13] = [
 
 /// Where each page is served, as in the Python version; the node page,
 /// `/node/{id}`, is [`node_page`].
-const ROUTES: [(&str, &str); 15] = [
+const ROUTES: [(&str, &str); 16] = [
     ("/", "index.html"),
     ("/index", "index.html"),
     ("/index.html", "index.html"),
@@ -83,6 +84,7 @@ const ROUTES: [(&str, &str); 15] = [
     ("/map.html", "map.html"),
     ("/net", "net.html"),
     ("/reliability", "reliability.html"),
+    ("/radio", "radio.html"),
     ("/nodelist", "nodelist.html"),
     ("/firehose", "firehose.html"),
     ("/chat", "chat.html"),

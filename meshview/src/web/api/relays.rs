@@ -203,9 +203,6 @@ fn node_and_since(node_id: &str, params: &Params) -> Result<(i64, i64), ApiError
 /// no hops, in the same time, whose id ends in that byte: a relay a gateway
 /// hears is one it can hear directly. A byte two nodes share has both; one no
 /// such node ends in has none.
-///
-/// Only sightings stored by Meshview 5 or later, from firmware that tells the
-/// relay, count.
 #[utoipa::path(
     get,
     path = "/node/{node_id}/relays",
@@ -257,9 +254,6 @@ pub async fn relays(
 /// count, as one it relays to must be able to hear it; even so, another node
 /// they hear straight whose id ends in the same byte cannot be told apart
 /// from it.
-///
-/// Only sightings stored by Meshview 5 or later, from firmware that tells the
-/// relay, count.
 #[utoipa::path(
     get,
     path = "/node/{node_id}/relayed",

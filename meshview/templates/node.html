@@ -4,6 +4,7 @@
 
 {% block css %}
 {% include "data-page-styles.html" %}
+{% include "chart-styles.html" %}
 <style>
 .node-info { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; margin-bottom:20px; font-size:13px; }
 .node-info-col { background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; padding:20px; overflow-wrap:anywhere; }
@@ -37,21 +38,14 @@
 .mesh-dialog-body p { margin:0 0 10px; }
 .mesh-dialog-body ul { margin:0 0 10px; padding-left:20px; }
 .mesh-dialog-body code { padding:1px 5px; border-radius:4px; background:var(--mesh-soft); color:var(--mesh-text); font-size:12.5px; }
-.chart-container { position:relative; width:100%; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; margin-bottom:20px; overflow:hidden; }
-.chart-header { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:16px 20px; border-bottom:1px solid var(--mesh-border); font-size:14px; font-weight:600; }
-.chart-title { display:flex; align-items:center; gap:8px; min-width:0; margin:0; font-size:15px; font-weight:650; }
-.chart-title .ti { color:var(--mesh-primary); font-size:18px; }
-.chart-loading { position:absolute; left:0; right:0; top:66px; bottom:0; display:flex; align-items:center; justify-content:center; margin:0; color:var(--mesh-muted); pointer-events:none; }
 .packet-loading td { color:var(--mesh-muted); }
 .packet-load-more { margin:0; padding:18px 0 6px; text-align:center; color:var(--mesh-muted); font-size:13px; }
 .packet-load-more[hidden] { display:none; }
 #map { position:relative; }
 .map-loading { position:absolute; inset:0; z-index:500; display:flex; align-items:center; justify-content:center; margin:0; color:var(--mesh-muted); pointer-events:none; }
-.chart-actions { display:flex; gap:4px; flex-shrink:0; }
 .packet-filter-actions { display:flex; align-items:center; gap:8px; margin-left:auto; }
 .filter-container { display:flex; gap:10px; flex-wrap:wrap; padding:16px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; margin-bottom:18px; }
-#chartModal,#qrModal { display:none; position:fixed; inset:0; background:#17263c99; z-index:9999; align-items:center; justify-content:center; padding:16px; }
-#chartModal > div { background:var(--mesh-surface); border-radius:10px; width:95%; height:85%; padding:14px; }
+#qrModal { display:none; position:fixed; inset:0; background:#17263c99; z-index:9999; align-items:center; justify-content:center; padding:16px; }
 #qrModal > div { background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:12px; padding:24px; width:380px; max-width:100%; text-align:center; }
 .qr-header { display:flex; justify-content:space-between; align-items:center; gap:10px; }
 .qr-title { font-size:18px; margin:0; }
@@ -62,64 +56,18 @@
 .qr-url { display:block; max-height:80px; overflow:auto; overflow-wrap:anywhere; font:11px/1.6 monospace; color:var(--mesh-muted); }
 .qr-actions { display:flex; justify-content:center; }
 .mesh-data-page .copied { background:#e8f5ee; color:#187346; }
-/* Direct receptions: two toggles over the chart, and a table of the nodes heard below it. */
-.direct-controls { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:14px 20px 0; }
-.direct-toggle { position:relative; z-index:0; display:inline-flex; padding:3px; border:1px solid var(--mesh-border); border-radius:999px; background:var(--mesh-soft); }
-/* The thumb slides to the pressed option; JS gives it that option's place and width. */
-.direct-toggle::before { content:""; position:absolute; z-index:-1; top:3px; bottom:3px; left:0; width:var(--thumb-w,0); transform:translateX(var(--thumb-x,0)); border-radius:999px; background:var(--mesh-primary); box-shadow:0 1px 3px rgba(0,0,0,.18); }
-.direct-toggle.is-ready::before { transition:transform .25s ease, width .25s ease; }
-.mesh-data-page .mesh-content .direct-toggle > button { display:inline-flex; align-items:center; gap:4px; padding:5px 13px; border:0; border-radius:999px; background:transparent; color:var(--mesh-text); transition:color .25s ease; }
-/* Tabler icons leave room inside their box: shift what has one a little left to look centred. */
-.mesh-data-page .mesh-content .direct-toggle > button:has(> .ti) { padding-left:11px; padding-right:15px; }
-.mesh-data-page .mesh-content .direct-toggle > button:hover:not(:disabled) { background:transparent; color:var(--mesh-primary); }
-.mesh-data-page .mesh-content .direct-toggle > button[aria-pressed="true"],
-.mesh-data-page .mesh-content .direct-toggle > button[aria-pressed="true"]:hover { color:var(--mesh-surface); }
-.mesh-data-page .mesh-content .direct-toggle > button:disabled { cursor:default; }
-.direct-toggle:has(> button:disabled) { opacity:.45; }
-@media(prefers-reduced-motion:reduce) { .direct-toggle.is-ready::before,.mesh-data-page .mesh-content .direct-toggle > button { transition:none; } }
-.direct-note { flex:1 1 220px; margin:0; color:var(--mesh-muted); font-size:13px; }
-/* A chart with nothing in its period shows a line in the middle of its card instead. */
-.chart-empty { display:flex; align-items:center; justify-content:center; min-height:180px; margin:0; padding:20px; color:var(--mesh-muted); text-align:center; }
-.chart-canvas[hidden],.chart-empty[hidden],.direct-table-wrap[hidden] { display:none; }
-.chart-period { width:auto; }
-.direct-table-wrap { overflow:auto; padding:0 20px 16px; }
-.direct-table { width:100%; border-collapse:collapse; font-size:13px; }
-.direct-table th,.direct-table td { padding:7px 10px; border-bottom:1px solid var(--mesh-border); text-align:left; white-space:nowrap; }
-.direct-table th { color:var(--mesh-muted); font-weight:600; font-size:12px; }
-.direct-table .is-number { text-align:right; font-variant-numeric:tabular-nums; }
-.direct-table .is-group { text-align:center; }
-.direct-table tbody tr { cursor:pointer; }
-.direct-table tbody tr:hover { background:var(--mesh-soft); }
-.direct-table tbody tr.is-hidden td { opacity:.45; }
-.direct-table td.direct-summary { display:none; }
-.direct-swatch { display:inline-block; width:10px; height:10px; margin-right:8px; border-radius:2px; vertical-align:middle; }
-.chart-hint { margin:10px 0 0; color:var(--mesh-muted); font-size:12px; }
-#neighbor_chart_container .chart-hint { margin:0; padding:0 20px 16px; }
-/* Show every node again, or swap the shown and the hidden ones. */
-.series-tools { display:flex; justify-content:flex-end; gap:6px; margin:4px 0 8px; }
-.mesh-data-page .mesh-content .series-tools > button { padding:3px 10px; border:1px solid var(--mesh-border); border-radius:999px; background:var(--mesh-soft); color:var(--mesh-text); font-size:12px; }
-.mesh-data-page .mesh-content .series-tools > button:hover { color:var(--mesh-primary); }
-/* With a mouse or with a finger, the hint that says how to use the chart. */
-@media(pointer:fine) { .chart-hint-touch { display:none; } }
-@media not (pointer:fine) { .chart-hint-mouse { display:none; } }
-/* On a phone, only the signal shown in the chart, and long names cut short. */
+/* On a phone the longest actions are said short and the buttons pressed a little
+   closer, so that they take two rows and coverage stays whole beside its help. */
+.node-actions .label-short { display:none; }
 @media(max-width:700px) {
-  .direct-controls { gap:6px; padding:12px 12px 0; }
-  .direct-toggle + .direct-toggle { margin-left:auto; }
-  .direct-table-wrap { padding:0 12px 12px; }
-  #neighbor_chart_container .chart-hint { padding:0 12px 12px; }
-  .direct-table tbody tr { touch-action:manipulation; }
-  .direct-table thead,.direct-table td.is-number { display:none; }
-  .direct-table tbody tr { display:block; padding:8px 4px; border-bottom:1px solid var(--mesh-border); }
-  .direct-table td { display:block; overflow:hidden; text-overflow:ellipsis; }
-  #direct_table td { height:auto; padding:0; border:0; }
-  .direct-table td.direct-summary { display:block; margin-top:3px; color:var(--mesh-muted); font-size:12px; font-variant-numeric:tabular-nums; }
-  .direct-table[data-metric="rssi"] .is-snr,.direct-table[data-metric="snr"] .is-rssi { display:none; }
-  .mesh-data-page .mesh-content .direct-toggle > button { padding:5px 8px; }
-  .mesh-data-page .mesh-content .direct-toggle > button:has(> .ti) { padding-left:7px; padding-right:10px; }
+  .node-actions { gap:6px; }
+  .node-actions .label-long { display:none; }
+  .node-actions .label-short { display:inline; }
+  .mesh-data-page .mesh-content .node-actions button { padding-left:10px; padding-right:10px; }
+  .mesh-data-page .mesh-content .node-actions .node-help-btn { width:34px; padding:0; }
 }
 @media(max-width:900px) { .node-info { grid-template-columns:minmax(0,1fr); gap:10px; } }
-@media(max-width:700px) { .chart-header { padding:12px; } #node-packets { gap:8px !important; padding:12px; } #node-packets select { flex:1 1 0; min-width:0; padding-left:8px; padding-right:2px; } #node-packets #packet_port { flex-grow:1.2; } }
+@media(max-width:700px) { #node-packets { gap:8px !important; padding:12px; } #node-packets select { flex:1 1 0; min-width:0; padding-left:8px; padding-right:2px; } #node-packets #packet_port { flex-grow:1.2; } }
 </style>
 {% endblock %}
 
@@ -131,13 +79,16 @@
     <!-- Node Actions -->
     <div class="node-actions" id="nodeActions" style="display:none;">
         <button onclick="copyImportUrl()" id="copyUrlBtn">
-            <span class="ti ti-copy" aria-hidden="true"></span> <span data-translate-lang="copy_import_url">Copy Import URL</span>
+            <span class="ti ti-copy" aria-hidden="true"></span> <span class="label-long" data-translate-lang="copy_import_url">Copy Import URL</span><span class="label-short">{{ "Copy URL" | tr }}</span>
         </button>
         <button onclick="showQrCode()" id="showQrBtn">
-            <span class="ti ti-qrcode" aria-hidden="true"></span> <span data-translate-lang="show_qr_code">Show QR Code</span>
+            <span class="ti ti-qrcode" aria-hidden="true"></span> <span class="label-long" data-translate-lang="show_qr_code">Show QR Code</span><span class="label-short">{{ "QR code" | tr }}</span>
         </button>
         <button onclick="openReachReport()" id="reachReportBtn">
             <span class="ti ti-chart-line" aria-hidden="true"></span> <span>{{ "Reliability" | tr }}</span>
+        </button>
+        <button onclick="openRadio()" id="radioBtn">
+            <span class="ti ti-antenna" aria-hidden="true"></span> <span>{{ "Radio" | tr }}</span>
         </button>
         <span class="node-action-group">
             <button onclick="toggleCoverage()" id="toggleCoverageBtn" aria-pressed="false" disabled title="{{ "Location required for coverage" | tr }}">
@@ -284,81 +235,6 @@
         <div id="chart_environment" class="chart-canvas" style="height:380px;"></div>
     </div>
 
-    <!-- Neighbor chart -->
-<!-- Neighbor Time-Series Chart -->
-<div id="neighbor_chart_container" class="chart-container">
-    <div class="chart-header">
-        <h2 class="chart-title"><span class="ti ti-affiliate" aria-hidden="true"></span> <span data-translate-lang="neighbors_chart">Neighbors (SNR Over Time)</span></h2>
-        <div class="chart-actions">
-                <select class="chart-period" data-chart="neighbors" aria-label="{{ "Chart time range" | tr }}">
-                    <option value="1" data-long="{{ "Last 24 hours" | tr }}" data-short="{{ "24 hours" | tr }}">{{ "Last 24 hours" | tr }}</option>
-                    <option value="7" selected data-long="{{ "Last 7 days" | tr }}" data-short="{{ "7 days" | tr }}">{{ "Last 7 days" | tr }}</option>
-                    <option value="30" data-long="{{ "Last 30 days" | tr }}" data-short="{{ "30 days" | tr }}">{{ "Last 30 days" | tr }}</option>
-                </select>
-                <button type="button" class="chart-tool" onclick="expandChart('neighbors')" title="{{ "Expand chart" | tr }}" aria-label="{{ "Expand chart" | tr }}"><span class="ti ti-arrows-maximize" aria-hidden="true"></span></button>
-                <button type="button" class="chart-tool" onclick="exportCSV('neighbors')" title="{{ "Export CSV" | tr }}" aria-label="{{ "Export CSV" | tr }}"><span class="ti ti-download" aria-hidden="true"></span></button>
-            </div>
-    </div>
-    <p class="chart-loading is-loading">{{ "Loading..." | tr }}</p>
-    <p class="chart-empty" hidden>{{ "No data in this period." | tr }}</p>
-    <div id="chart_neighbors" class="chart-canvas" style="height:380px;"></div>
-    <p class="chart-hint chart-hint-mouse"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Click a neighbor in the legend to show or hide it, and double-click it to show only it. Drag across the chart to zoom in, scroll to move along it and double-click it to see it all." | tr }}</p>
-    <p class="chart-hint chart-hint-touch"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Tap a neighbor in the legend to show or hide it, and tap it twice to show only it. Expand the chart to zoom in." | tr }}</p>
-</div>
-
-    <!-- Direct receptions: packets heard at no hops, and their signal. -->
-<div id="direct_container" class="chart-container" style="display:none;">
-    <div class="chart-header">
-        <h2 class="chart-title"><span class="ti ti-wifi" aria-hidden="true"></span> <span>{{ "Direct receptions" | tr }}</span></h2>
-        <div class="chart-actions">
-            <select class="chart-period" data-chart="direct" aria-label="{{ "Chart time range" | tr }}">
-                    <option value="1" data-long="{{ "Last 24 hours" | tr }}" data-short="{{ "24 hours" | tr }}">{{ "Last 24 hours" | tr }}</option>
-                    <option value="7" selected data-long="{{ "Last 7 days" | tr }}" data-short="{{ "7 days" | tr }}">{{ "Last 7 days" | tr }}</option>
-                    <option value="30" data-long="{{ "Last 30 days" | tr }}" data-short="{{ "30 days" | tr }}">{{ "Last 30 days" | tr }}</option>
-                </select>
-            <button type="button" class="chart-tool" onclick="expandChart('direct')" title="{{ "Expand chart" | tr }}" aria-label="{{ "Expand chart" | tr }}"><span class="ti ti-arrows-maximize" aria-hidden="true"></span></button>
-            <button type="button" class="chart-tool" onclick="exportCSV('direct')" title="{{ "Export CSV" | tr }}" aria-label="{{ "Export CSV" | tr }}"><span class="ti ti-download" aria-hidden="true"></span></button>
-        </div>
-    </div>
-    <div class="direct-controls">
-        <div class="direct-toggle" role="group" aria-label="{{ "Direction" | tr }}">
-            <button type="button" data-direction="received" aria-pressed="true"><span class="ti ti-arrow-down" aria-hidden="true"></span> {{ "Received" | tr }}</button>
-            <button type="button" data-direction="transmitted" aria-pressed="false"><span class="ti ti-arrow-up" aria-hidden="true"></span> {{ "Transmitted" | tr }}</button>
-        </div>
-        <div class="direct-toggle" role="group" aria-label="{{ "Signal" | tr }}">
-            <button type="button" data-metric="rssi" aria-pressed="false">RSSI</button>
-            <button type="button" data-metric="snr" aria-pressed="true">SNR</button>
-        </div>
-        <p id="direct_note" class="direct-note"></p>
-    </div>
-    <p class="chart-loading is-loading">{{ "Loading..." | tr }}</p>
-    <p class="chart-empty" hidden>{{ "No direct receptions in this period." | tr }}</p>
-    <div id="chart_direct" class="chart-canvas" style="height:380px;"></div>
-    <div class="direct-table-wrap">
-        <div class="series-tools">
-            <button type="button" data-direct-show="all">{{ "All" | tr }}</button>
-            <button type="button" data-direct-show="invert">{{ "Invert" | tr }}</button>
-        </div>
-        <table class="direct-table" data-metric="snr">
-            <thead>
-                <tr>
-                    <th rowspan="2">{{ "Node" | tr }}</th>
-                    <th rowspan="2" class="is-number">{{ "Packets" | tr }}</th>
-                    <th colspan="3" class="is-group is-rssi">RSSI (dBm)</th>
-                    <th colspan="3" class="is-group is-snr">SNR (dB)</th>
-                </tr>
-                <tr>
-                    <th class="is-number is-rssi">{{ "Avg" | tr }}</th><th class="is-number is-rssi">{{ "Min" | tr }}</th><th class="is-number is-rssi">{{ "Max" | tr }}</th>
-                    <th class="is-number is-snr">{{ "Avg" | tr }}</th><th class="is-number is-snr">{{ "Min" | tr }}</th><th class="is-number is-snr">{{ "Max" | tr }}</th>
-                </tr>
-            </thead>
-            <tbody id="direct_table"></tbody>
-        </table>
-        <p class="chart-hint chart-hint-mouse"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Click a node to show or hide it, double-click it to show only it, and click a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click it to see it all." | tr }}</p>
-        <p class="chart-hint chart-hint-touch"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Tap a node to show or hide it, tap it twice to show only it, and tap a point to open its packet. Expand the chart to zoom in." | tr }}</p>
-    </div>
-</div>
-
     <!-- Packet Histogram -->
 <div id="packet_histogram_container" class="chart-container">
     <div class="chart-header">
@@ -375,7 +251,7 @@
     </div>
     <p class="chart-loading is-loading">{{ "Loading..." | tr }}</p>
     <p class="chart-empty" hidden>{{ "No data in this period." | tr }}</p>
-    <div id="chart_packet_histogram" class="chart-canvas" style="height:380px;"></div>
+    <div id="chart_packet_histogram" class="chart-canvas" data-zoom="false" style="height:380px;"></div>
 </div>
 
     <!-- Packet Filters -->
@@ -424,15 +300,7 @@
 
 </div>
 
-<!-- Modal -->
-<div id="chartModal">
-    <div>
-        <div style="text-align:right;">
-            <button onclick="closeModal()" aria-label="{{ "Close" | tr }}" style="background:none;border:none;color:var(--mesh-muted);"><span class="ti ti-x" aria-hidden="true"></span></button>
-        </div>
-        <div id="modalChart" style="width:100%; height:90%;"></div>
-    </div>
-</div>
+{% include "chart-modal.html" %}
 
 <!-- QR Code Modal -->
 <div id="qrModal">
@@ -457,6 +325,7 @@
 </div>
 
 <script src="/static/vendor/echarts-6.1.0/dist/echarts.min.js"></script>
+<script src="/static/chart-kit.js"></script>
 <script src="/static/vendor/qrcodejs-1.0.0/qrcode.min.js"></script>
 <script src="/static/vendor/leaflet.heat-0.2.0/dist/leaflet-heat.js"
         integrity="sha384-mFKkGiGvT5vo1fEyGCD3hshDdKmW3wzXW/x+fWriYJArD0R3gawT6lMvLboM22c0"
@@ -573,7 +442,6 @@ let currentPacketRows = [];
 
 let map, markers = {};
 let coverageLayer = null;
-let neighborData = { ids:[], names:[], snrs:[] };
 
 let fromNodeId = new URLSearchParams(window.location.search).get("from_node_id");
 if (!fromNodeId) {
@@ -1142,99 +1010,6 @@ function packetRowHtml(pkt) {
 
 
 
-/* ======================================================
-    CHART PERIODS AND ZOOM, shared by the charts below
-   ====================================================== */
-
-// The charts show the latest 24 hours, 7 days or 30 days: no further, to
-// spare the server. Each starts at 7 days, or 30 when 7 have nothing.
-const FINE_POINTER = window.matchMedia("(pointer: fine)").matches;
-
-function chartDays(key) {
-    return Number(document.querySelector(`.chart-period[data-chart="${key}"]`)?.value || 7);
-}
-
-function setChartDays(key, days) {
-    const select = document.querySelector(`.chart-period[data-chart="${key}"]`);
-    if (select) select.value = String(days);
-}
-
-function sinceUs(days) {
-    return (Date.now() - days * 86400000) * 1000;
-}
-
-// Nothing in the period: a line in the middle of the card instead of the
-// chart, and its tools off.
-function showChartEmpty(card, empty) {
-    card.querySelector(".chart-empty").hidden = !empty;
-    card.querySelector(".chart-canvas").hidden = empty;
-    card.querySelectorAll(".chart-tool").forEach(tool => { tool.disabled = empty; });
-}
-
-// With a mouse, dragging selects the span to zoom into and the wheel moves
-// along time. On a touch screen a finger on the page has to scroll it, so the
-// charts there do not zoom: expanded, they pinch and drag as usual. The box zoom
-// only works with its toolbox shown: it is, out of sight.
-function spanZoomOption(expanded = false) {
-    if (!FINE_POINTER && !expanded) return {};
-    return {
-        toolbox: { show: true, left: -1000, top: -1000, showTitle: false,
-            feature: { dataZoom: { yAxisIndex: "none" } } },
-        dataZoom: [{ type: "inside", xAxisIndex: 0, filterMode: "none",
-            ...(FINE_POINTER ? { zoomOnMouseWheel: false, moveOnMouseWheel: true, moveOnMouseMove: false } : {}) }]
-    };
-}
-
-// The box zoom always on, and a double click to see it all again.
-function enableSpanZoom(chart) {
-    if (!FINE_POINTER) return;
-    chart.dispatchAction({ type: "takeGlobalCursor", key: "dataZoomSelect", dataZoomSelectActive: true });
-    chart.getZr().off("dblclick");
-    chart.getZr().on("dblclick", () => chart.dispatchAction({ type: "dataZoom", start: 0, end: 100 }));
-}
-
-// Whether a click is the second on the same thing in a short while: a double
-// click, or a double tap, told apart from two clicks that each toggle.
-function secondClick(memory, key) {
-    const now = Date.now();
-    const second = memory.last?.key === key && now - memory.last.time < 400;
-    memory.last = second ? null : { key, time: now };
-    return second;
-}
-
-// Which of these names to show: only one, or, when it already is the only one,
-// all of them again.
-function soloSelection(names, name, selected) {
-    const alone = names.every(other => other === name ? selected[other] !== false : selected[other] === false);
-    return Object.fromEntries(names.map(other => [other, alone || other === name]));
-}
-
-// A legend whose item, clicked twice in a row, is shown alone, as in Plotly;
-// and buttons at its end to show all of them or swap the shown and hidden.
-function legendSelector() {
-    return [{ type: "all", title: MeshI18n.t("All") }, { type: "inverse", title: MeshI18n.t("Invert") }];
-}
-function enableLegendSolo(chart) {
-    const memory = {};
-    chart.off("legendselectchanged");
-    chart.on("legendselectchanged", event => {
-        if (!secondClick(memory, event.name)) return;
-        const names = Object.keys(event.selected);
-        chart.setOption({ legend: { selected: soloSelection(names, event.name, event.selected) } });
-    });
-}
-
-// A chart drawn into its card, with the option replacing what was there.
-function drawChart(el, option, zoom = true) {
-    const chart = echarts.getInstanceByDom(el) || initMeshChart(el);
-    // Shown again after being hidden, the chart has to take its size anew.
-    chart.resize();
-    chart.setOption(option, { replaceMerge: ["series", "xAxis", "yAxis", "legend"] });
-    fitLegend(chart);
-    if (zoom) enableSpanZoom(chart);
-    return chart;
-}
-
 // The node's packets of a port in the latest days, latest first: pages of
 // 1000, up to ten, and each period asked for once.
 const nodePacketLoads = new Map();
@@ -1536,368 +1311,6 @@ async function loadLatestNeighborIds() {
     return ids;
 }
 
-/* ======================================================
-    NEIGHBOR CHART (portnum=71)
-
-    The NEIGHBOR_MAX_SERIES neighbors with the most data points in
-    the period are drawn: a busy node has many more.
-   ====================================================== */
-
-const NEIGHBOR_MAX_SERIES = 15;
-const neighborNames = new Map();
-
-async function loadNeighborTimeSeries(first = false) {
-    const container = document.getElementById("neighbor_chart_container");
-    const chartEl   = document.getElementById("chart_neighbors");
-
-    let days = chartDays("neighbors");
-    let packets = await fetchNodePackets(71, days);
-    if (first && !packets.length && days < 30) {
-        days = 30;
-        setChartDays("neighbors", days);
-        packets = await fetchNodePackets(71, days);
-    }
-    if (first && !packets.length) {
-        container.style.display = "none";
-        return;
-    }
-    container.style.display = "";
-
-    // --- Pass 1: collect the readings, the earliest first ---
-    const neighborHistory = {}; // node_id -> { times[], snr[] }
-    for (const pkt of [...packets].reverse()) {
-        if (!pkt.import_time_us || !pkt.payload) continue;
-        const blockRe = /neighbors\s*\{([^}]+)\}/g;
-        let m;
-        while ((m = blockRe.exec(pkt.payload)) !== null) {
-            const idMatch  = m[1].match(/node_id:\s*(\d+)/);
-            const snrMatch = m[1].match(/snr:\s*(-?\d+(?:\.\d+)?)/);
-            if (!idMatch || !snrMatch) continue;
-            const nid = parseInt(idMatch[1], 10);
-            neighborHistory[nid] ??= { times: [], snr: [] };
-            neighborHistory[nid].times.push(pkt.import_time_us / 1000);
-            neighborHistory[nid].snr.push(parseFloat(snrMatch[1]));
-        }
-    }
-
-    // --- Keep the neighbors with the most data points in the period ---
-    const ranked = Object.entries(neighborHistory)
-        .sort((a, b) => b[1].times.length - a[1].times.length);
-    const kept = ranked.slice(0, NEIGHBOR_MAX_SERIES);
-    neighborData = { ids: [], names: [], snrs: [] };
-    showChartEmpty(container, !kept.length);
-    if (!kept.length) return;
-
-    // --- Pass 2: names, only for the series that are drawn ---
-    await Promise.all(kept.map(async ([nid, entry]) => {
-        if (!neighborNames.has(nid)) {
-            const neighbor = await fetchNodeFromApi(nid);
-            neighborNames.set(nid, neighbor?.short_name || neighbor?.long_name || `Node ${nid}`);
-        }
-        entry.name = neighborNames.get(nid);
-    }));
-
-    // ECharts identifies a series by its name, so two neighbors sharing
-    // a short name would be drawn as one line. Keep them apart.
-    const usedNames = new Set();
-    for (const [nid, entry] of kept) {
-        if (usedNames.has(entry.name)) entry.name = `${entry.name} (${nid})`;
-        usedNames.add(entry.name);
-    }
-
-    // Values behind the "Export CSV" button: the most recent SNR in the
-    // period, per neighbor.
-    neighborData = {
-        ids:   kept.map(([nid]) => nid),
-        names: kept.map(([, entry]) => entry.name),
-        snrs:  kept.map(([, entry]) => entry.snr[entry.snr.length - 1])
-    };
-
-    // Say which neighbors are on screen, so a missing line is not a mystery.
-    const dropped = ranked.length - kept.length;
-    const subtext = (dropped > 0
-        ? (nodeTranslations.neighbors_chart_subtitle_capped ||
-           MeshI18n.t("The {n} neighbors with the most data points, of {total}"))
-        : (nodeTranslations.neighbors_chart_subtitle ||
-           MeshI18n.t("{n} neighbors")))
-        .replace("{n}", kept.length)
-        .replace("{total}", ranked.length);
-
-    drawChart(chartEl, {
-        title: {
-            subtext,
-            left: "center",
-            bottom: 0,
-            subtextStyle: { color: "#888", fontSize: 11 }
-        },
-        tooltip: {
-            trigger: "axis",
-            axisPointer: { type: "line" },
-            formatter: params => {
-                if (!params.length) return "";
-                const heading = new Date(Number(params[0].axisValue)).toLocaleString(MeshI18n.language);
-                return escapeHtml(heading) + "<br>" + params.map(point =>
-                    `${point.marker}${escapeHtml(point.seriesName)}: ${escapeHtml(point.value?.[1] ?? MeshI18n.t("N/A"))}`
-                ).join("<br>");
-            }
-        },
-        legend: {
-            type: "scroll",
-            data: kept.map(([, entry]) => entry.name),
-            textStyle: { color: "#64748b" },
-            selector: legendSelector(),
-            selectorLabel: { color: "#64748b", borderColor: "#dce4ef" }
-        },
-        xAxis: { type: "time", axisLabel: { color: "#64748b", hideOverlap: true } },
-        yAxis: { type: "value", name: "SNR", axisLabel: { color: "#64748b" } },
-        ...spanZoomOption(),
-        series: kept.map(([, entry]) => ({
-            name: entry.name,
-            type: "line",
-            smooth: true,
-            connectNulls: true,
-            showSymbol: false,
-            data: entry.times.map((t, i) => [t, entry.snr[i]])
-        }))
-    });
-    enableLegendSolo(echarts.getInstanceByDom(chartEl));
-}
-
-
-
-/* ======================================================
-   DIRECT RECEPTIONS: packets heard at no hops, and their signal
-   ====================================================== */
-
-// Series colours, so that each node's swatch in the table matches its line.
-const DIRECT_COLORS = ["#245ea8", "#d9480f", "#2f9e44", "#ae3ec9", "#f59f00", "#0c8599",
-    "#e03131", "#5c7cfa", "#66a80f", "#c2255c", "#1098ad", "#9c6644", "#7048e8", "#868e96"];
-// SNR first: how far above what LoRa can still decode, which RSSI does not say.
-const directState = { direction: "received", metric: "snr", data: null, hidden: new Set() };
-
-function directLabel(peer) {
-    return peer.long_name || peer.short_name || `!${Number(peer.node_id).toString(16).padStart(8, "0")}`;
-}
-
-async function fetchDirect(direction) {
-    const url = new URL(`/api/v1/node/${fromNodeId}/direct_receptions`, window.location.origin);
-    url.searchParams.set("direction", direction);
-    url.searchParams.set("since", String(sinceUs(chartDays("direct"))));
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`direct_receptions returned ${res.status}`);
-    return res.json();
-}
-
-async function loadDirectReceptions(first = false) {
-    const container = document.getElementById("direct_container");
-    let data = await fetchDirect(directState.direction);
-    // At first, show whichever way has something, in 7 days or else in 30,
-    // and nothing if neither has.
-    if (first && !data.nodes.length) {
-        let found = null;
-        for (const [days, direction] of [[7, "transmitted"], [30, "received"], [30, "transmitted"]]) {
-            setChartDays("direct", days);
-            const other = await fetchDirect(direction);
-            if (other.nodes.length) { found = { direction, data: other }; break; }
-        }
-        if (!found) { container.style.display = "none"; return; }
-        directState.direction = found.direction;
-        data = found.data;
-    }
-    container.style.display = "";
-    document.querySelectorAll("#direct_container [data-direction]").forEach(button =>
-        button.setAttribute("aria-pressed", String(button.dataset.direction === directState.direction)));
-    placeDirectThumbs();
-    directState.data = data;
-    directState.hidden.clear();
-    renderDirect();
-}
-
-function renderDirect() {
-    const data = directState.data;
-    const metric = directState.metric;
-    const peers = data?.nodes || [];
-    const chartEl = document.getElementById("chart_direct");
-    const note = document.getElementById("direct_note");
-
-    const received = directState.direction === "received";
-    const total = peers.reduce((sum, peer) => sum + peer.packets, 0);
-    // Nothing heard: a line in the middle of the card instead of an empty
-    // chart, a table and the tools to expand or export them.
-    const empty = !peers.length;
-    showChartEmpty(document.getElementById("direct_container"), empty);
-    document.querySelector("#direct_container .direct-table-wrap").hidden = empty;
-    document.querySelectorAll("#direct_container [data-metric]")
-        .forEach(control => { control.disabled = empty; });
-    note.textContent = empty
-        ? ""
-        : MeshI18n.t(received
-            ? "Nodes heard directly: {n}. Packets: {total}."
-            : "Gateways that heard this node directly: {n}. Packets: {total}.",
-            {n: peers.length, total})
-          + (data.truncated ? " " + MeshI18n.t("Only the latest are shown.") : "");
-
-    // ECharts tells series apart by name: two nodes with the same one get their id.
-    const used = new Set();
-    peers.forEach(peer => {
-        let name = directLabel(peer);
-        if (used.has(name)) name = `${name} (${peer.node_id})`;
-        used.add(name);
-        peer._name = name;
-    });
-
-    if (empty) return;
-    const chart = echarts.getInstanceByDom(chartEl) || initMeshChart(chartEl);
-    // Shown again after being hidden, the chart has to take its size anew.
-    chart.resize();
-    chart.off("click");
-    chart.setOption({
-        legend: { show: false, data: peers.map(peer => peer._name),
-            selected: Object.fromEntries(peers.map(peer => [peer._name, !directState.hidden.has(peer.node_id)])) },
-        grid: { left: 12, right: 12, top: 40, bottom: 8, containLabel: true },
-        tooltip: {
-            trigger: "item",
-            formatter: point => {
-                const r = point.data;
-                return `${point.marker}<strong>${escapeHtml(point.seriesName)}</strong><br>`
-                    + escapeHtml(new Date(r.value[0]).toLocaleString(MeshI18n.language)) + "<br>"
-                    + `RSSI: ${escapeHtml(r.rssi)} dBm · SNR: ${escapeHtml(r.snr ?? MeshI18n.t("N/A"))} dB`;
-            }
-        },
-        ...spanZoomOption(),
-        // #dce4ef is a border colour the theme turns dark at night.
-        xAxis: { type: "time", axisLabel: { color: "#64748b", hideOverlap: true },
-            axisLine: { lineStyle: { color: "#dce4ef" } } },
-        yAxis: { type: "value", scale: true, name: metric === "rssi" ? "RSSI (dBm)" : "SNR (dB)",
-            nameTextStyle: { align: "left" }, axisLabel: { color: "#64748b" },
-            splitLine: { lineStyle: { color: "#dce4ef" } } },
-        // Each node keeps its table colour, however often the series are replaced.
-        series: peers.map((peer, i) => ({
-            name: peer._name,
-            type: "line",
-            showSymbol: true,
-            symbolSize: 5,
-            itemStyle: { color: DIRECT_COLORS[i % DIRECT_COLORS.length] },
-            lineStyle: { width: 1, color: DIRECT_COLORS[i % DIRECT_COLORS.length] },
-            emphasis: { focus: "series" },
-            data: peer.receptions
-                .filter(r => (metric === "rssi" ? r.rssi : r.snr) != null)
-                .map(r => ({ value: [r.time_us / 1000, metric === "rssi" ? r.rssi : r.snr],
-                             rssi: r.rssi, snr: r.snr, packet_id: r.packet_id }))
-        }))
-    }, { replaceMerge: ["series"] });
-    chart.on("click", point => {
-        if (point.data?.packet_id) window.location.href = `/packet/${point.data.packet_id}`;
-    });
-    enableSpanZoom(chart);
-
-    const fmt = value => value == null ? "—" : String(value);
-    document.querySelector("#direct_container .direct-table").dataset.metric = metric;
-    const body = document.getElementById("direct_table");
-    body.replaceChildren(...peers.map((peer, i) => {
-        const row = document.createElement("tr");
-        row.classList.toggle("is-hidden", directState.hidden.has(peer.node_id));
-        row.title = MeshI18n.t("Show or hide this node");
-        const name = document.createElement("td");
-        const swatch = document.createElement("span");
-        swatch.className = "direct-swatch";
-        swatch.style.background = DIRECT_COLORS[i % DIRECT_COLORS.length];
-        const link = document.createElement("a");
-        link.href = `/node/${peer.node_id}`;
-        link.textContent = peer._name;
-        link.addEventListener("click", event => event.stopPropagation());
-        name.append(swatch, link);
-        row.append(name);
-        for (const [value, metric] of [[peer.packets, ""],
-                [peer.rssi_avg, "rssi"], [peer.rssi_min, "rssi"], [peer.rssi_max, "rssi"],
-                [peer.snr_avg, "snr"], [peer.snr_min, "snr"], [peer.snr_max, "snr"]]) {
-            const cell = document.createElement("td");
-            cell.className = metric ? `is-number is-${metric}` : "is-number";
-            cell.textContent = fmt(value);
-            row.append(cell);
-        }
-        // On a phone, a line under the name instead of the columns.
-        for (const [metric, unit] of [["rssi", "dBm"], ["snr", "dB"]]) {
-            const cell = document.createElement("td");
-            cell.className = `direct-summary is-${metric}`;
-            cell.textContent = MeshI18n.t("Packets: {n} · avg {avg} · min {min} · max {max} {unit}", {
-                n: peer.packets, avg: fmt(peer[`${metric}_avg`]), min: fmt(peer[`${metric}_min`]),
-                max: fmt(peer[`${metric}_max`]), unit });
-            row.append(cell);
-        }
-        row.dataset.nodeId = peer.node_id;
-        row.addEventListener("click", () => {
-            const hidden = directState.hidden;
-            // Each click toggles; the second of two in a row undoes the first's
-            // instead, and then shows only this one, or all again if it was.
-            hidden.has(peer.node_id) ? hidden.delete(peer.node_id) : hidden.add(peer.node_id);
-            if (secondClick(directState, peer.node_id)) {
-                const ids = peers.map(other => other.node_id);
-                const shown = soloSelection(ids, peer.node_id,
-                    Object.fromEntries(ids.map(id => [id, !hidden.has(id)])));
-                ids.forEach(id => shown[id] ? hidden.delete(id) : hidden.add(id));
-            }
-            applyDirectHidden();
-        });
-        return row;
-    }));
-}
-
-// The nodes hidden, on the table's rows and the chart's lines.
-function applyDirectHidden() {
-    const peers = directState.data?.nodes || [];
-    document.querySelectorAll("#direct_table tr").forEach(row =>
-        row.classList.toggle("is-hidden", directState.hidden.has(Number(row.dataset.nodeId))));
-    echarts.getInstanceByDom(document.getElementById("chart_direct"))?.setOption({ legend: {
-        selected: Object.fromEntries(peers.map(peer => [peer._name, !directState.hidden.has(peer.node_id)])) } });
-}
-
-// Put each toggle's thumb under its pressed option; animated only once placed,
-// so that it does not slide in from the left when the card first shows.
-function placeDirectThumbs() {
-    document.querySelectorAll("#direct_container .direct-toggle").forEach(group => {
-        const pressed = group.querySelector('[aria-pressed="true"]');
-        if (!pressed || !pressed.offsetWidth) return;
-        // offsetLeft counts from the group's padding edge, where the thumb starts.
-        group.style.setProperty("--thumb-x", `${pressed.offsetLeft}px`);
-        group.style.setProperty("--thumb-w", `${pressed.offsetWidth}px`);
-        if (!group.classList.contains("is-ready")) requestAnimationFrame(() => group.classList.add("is-ready"));
-    });
-}
-
-function initDirectControls() {
-    document.querySelectorAll("#direct_container [data-direct-show]").forEach(button =>
-        button.addEventListener("click", () => {
-            const ids = (directState.data?.nodes || []).map(peer => peer.node_id);
-            const hidden = directState.hidden;
-            directState.hidden = button.dataset.directShow === "all"
-                ? new Set() : new Set(ids.filter(id => !hidden.has(id)));
-            applyDirectHidden();
-        }));
-    document.querySelectorAll("#direct_container [data-direction]").forEach(button =>
-        button.addEventListener("click", () => {
-            if (directState.direction === button.dataset.direction) return;
-            directState.direction = button.dataset.direction;
-            document.querySelectorAll("#direct_container [data-direction]").forEach(other =>
-                other.setAttribute("aria-pressed", String(other === button)));
-            placeDirectThumbs();
-            loadDirectReceptions().catch(error => console.error(error));
-        }));
-    document.querySelectorAll("#direct_container [data-metric]").forEach(button =>
-        button.addEventListener("click", () => {
-            directState.metric = button.dataset.metric;
-            document.querySelectorAll("#direct_container [data-metric]").forEach(other =>
-                other.setAttribute("aria-pressed", String(other === button)));
-            placeDirectThumbs();
-            renderDirect();
-        }));
-    window.addEventListener("resize", () => {
-        echarts.getInstanceByDom(document.getElementById("chart_direct"))?.resize();
-        placeDirectThumbs();
-    });
-    document.fonts?.ready.then(placeDirectThumbs);
-}
-
 async function loadPacketHistogram(first = false) {
     const container = document.getElementById("packet_histogram_container");
     const fetchCounts = async days => {
@@ -1982,81 +1395,6 @@ async function loadPacketHistogram(first = false) {
 
 
 
-/* Keep chart legends inside the card on narrow screens: the legend gets the
-   card width and wraps, and the plot starts below however many rows it
-   needs (ECharts does not move the grid for the legend by itself). */
-const legendCanvas = document.createElement("canvas").getContext("2d");
-function fitLegend(chart) {
-    const option = chart.getOption();
-    const legend = option.legend?.[0];
-    if (!legend) return;
-    const width = chart.getWidth() - 24;
-    const labels = legend.data?.length
-        ? legend.data.map(item => item?.name ?? item)
-        : (option.series || []).map(series => series.name);
-    // A hidden legend (direct receptions, toggled from its table) takes no room.
-    let rows = legend.show === false ? 0 : 1;
-    if (rows && legend.type !== "scroll") {
-        legendCanvas.font = "12px Inter, sans-serif";
-        let x = 0;
-        for (const label of labels) {
-            const item = legendCanvas.measureText(String(label)).width + 40;
-            if (x && x + item > width) { rows++; x = 0; }
-            x += item;
-        }
-    }
-    const yAxes = [].concat(option.yAxis || []);
-    const axisName = yAxes.some(axis => axis.name);
-    chart.setOption({
-        legend: { left: "center", top: 4, width },
-        // Axis names start (left axis) or end (right axis) at their axis so
-        // they are not cut by the card edge.
-        yAxis: yAxes.map((axis, i) => ({ nameTextStyle: { align: i ? "right" : "left" } })),
-        // A bottom subtitle (neighbors chart) needs room under the x labels.
-        grid: { left: 12, right: 12, bottom: option.title?.[0]?.subtext ? 30 : 8, containLabel: true,
-            top: 8 + rows * 22 + (axisName ? 30 : 12) }
-    });
-}
-
-/* ======================================================
-   EXPAND / EXPORT BUTTONS
-   ====================================================== */
-
-function expandChart(type){
-    const srcEl = document.getElementById(`chart_${type}`);
-    if (!srcEl) return;
-    const sourceChart = echarts.getInstanceByDom(srcEl);
-    if (!sourceChart) return;
-
-    // A tooltip left open on the page would float above the modal.
-    document.querySelectorAll('[_echarts_instance_]').forEach(el =>
-        echarts.getInstanceByDom(el)?.dispatchAction({ type: 'hideTip' }));
-    const modal = document.getElementById('chartModal');
-    const modalChart = initMeshChart(document.getElementById('modalChart'));
-    modal.style.display = "flex";
-    modalChart.setOption(sourceChart.getOption());
-    modalChart.resize();
-    fitLegend(modalChart);
-    // Every chart over time zooms, as on the page with a mouse, or by pinching
-    // on a touch screen, where only here it does; the bars do not.
-    if (type !== "packet_histogram") {
-        if (!FINE_POINTER) modalChart.setOption(spanZoomOption(true));
-        enableSpanZoom(modalChart);
-    }
-    if (type === "neighbors") enableLegendSolo(modalChart);
-}
-// The modal chart follows its box, e.g. when a phone is rotated.
-new ResizeObserver(() => {
-    const chart = echarts.getInstanceByDom(document.getElementById('modalChart'));
-    if (chart && document.getElementById('chartModal').style.display === "flex") {
-        chart.resize();
-        fitLegend(chart);
-    }
-}).observe(document.getElementById('modalChart'));
-function closeModal(){
-    document.getElementById('chartModal').style.display = "none";
-}
-
 function exportCSV(type){
     const rows = [[MeshI18n.t("Time")]];
     const set = telemetrySets[type];
@@ -2082,61 +1420,8 @@ function exportCSV(type){
         for (let i = 0; i < set.ts.length; i++)
             rows.push([time(i), ...set.powerSeries.map(s => isNaN(s.data[i]) ? null : s.data[i])]);
     }
-    else if (type === "direct") {
-        rows[0].push(MeshI18n.t("Node ID"), MeshI18n.t("Node"), MeshI18n.t("Packet ID"), "RSSI (dBm)", "SNR (dB)");
-        const receptions = (directState.data?.nodes || []).flatMap(peer =>
-            peer.receptions.map(r => [r.time_us, peer, r]));
-        receptions.sort((a, b) => a[0] - b[0]);
-        for (const [time, peer, r] of receptions)
-            rows.push([new Date(time / 1000).toISOString(), peer.node_id, peer._name, r.packet_id, r.rssi, r.snr]);
-    }
-    else if (type === "neighbors") {
-        rows[0] = [MeshI18n.t("Neighbor Node ID"), MeshI18n.t("Neighbor Name"), "SNR (dB)"];
-        for (let i = 0; i < neighborData.ids.length; i++) {
-            rows.push([
-                neighborData.ids[i],
-                neighborData.names[i],
-                neighborData.snrs[i]
-            ]);
-        }
-    }
 
-    const csv  = csvFromRows(rows);
-    const blob = new Blob([csv], { type:"text/csv" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `${type}_${fromNodeId}.csv`;
-    link.click();
-}
-
-// A chart's period changed: it loads again, for that period.
-function initChartPeriods() {
-    // On a phone the periods are said short, so that the card titles beside
-    // them keep room to break into two lines rather than run under them.
-    const narrow = window.matchMedia("(max-width: 700px)");
-    const label = () => document.querySelectorAll(".chart-period option").forEach(option => {
-        option.textContent = narrow.matches ? option.dataset.short : option.dataset.long;
-    });
-    narrow.addEventListener("change", label);
-    label();
-    const loaders = {
-        neighbors: () => loadNeighborTimeSeries(),
-        direct: () => loadDirectReceptions(),
-        packet_histogram: () => loadPacketHistogram()
-    };
-    document.querySelectorAll(".chart-period").forEach(select =>
-        select.addEventListener("change", () => {
-            const key = select.dataset.chart;
-            const load = loaders[key] || (() => loadTelemetry(key));
-            load().catch(error => console.error(error));
-        }));
-    // One handler for every chart on the page.
-    window.addEventListener("resize", () => {
-        document.querySelectorAll(".chart-canvas").forEach(el => {
-            const chart = echarts.getInstanceByDom(el);
-            if (chart && !el.hidden) { chart.resize(); fitLegend(chart); }
-        });
-    });
+    downloadCsv(rows, `${type}_${fromNodeId}.csv`);
 }
 
 /* ======================================================
@@ -2187,26 +1472,13 @@ document.addEventListener("DOMContentLoaded", async () => {
             document.querySelector(`#${id} .chart-loading`)?.remove());
         await loadTelemetryCharts().finally(settle(["battery_voltage_container",
             "power_chart_container", "air_channel_container", "env_chart_container"]));
-        await loadNeighborTimeSeries(true)
-            .catch(error => {
-                console.error(error);
-                document.getElementById("neighbor_chart_container").style.display = "none";
-            })
-            .finally(settle(["neighbor_chart_container"]));
-        initDirectControls();
-        await loadDirectReceptions(true)
-            .catch(error => {
-                console.error(error);
-                document.getElementById("direct_container").style.display = "none";
-            })
-            .finally(settle(["direct_container"]));
         await loadPacketHistogram(true)
             .catch(error => {
                 console.error(error);
                 document.getElementById("packet_histogram_container").style.display = "none";
             })
             .finally(settle(["packet_histogram_container"]));
-        initChartPeriods();
+        initChartPeriods({ packet_histogram: () => loadPacketHistogram() }, loadTelemetry);
 
         ensureMapVisible();
         setTimeout(ensureMapVisible, 1000);
@@ -2459,6 +1731,12 @@ function showQrCode() {
 function openReachReport() {
     if (!fromNodeId) return;
     window.location.href = `/reliability?node_id=${encodeURIComponent(fromNodeId)}`;
+}
+
+// Who the node hears and who hears it: direct receptions, relays, neighbors.
+function openRadio() {
+    if (!fromNodeId) return;
+    window.location.href = `/radio?node_id=${encodeURIComponent(fromNodeId)}`;
 }
 
 function closeQrModal() {

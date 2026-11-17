@@ -9,25 +9,24 @@
 .reach-description { margin-bottom:20px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; padding:14px 18px; font-size:13px; color:var(--mesh-muted); }
 .reach-description summary { cursor:pointer; color:var(--mesh-text); font-weight:500; }
 .reach-description p { margin:12px 0 0; line-height:1.7; }
-.reach-controls { display:grid; grid-template-columns:minmax(0,1fr) auto auto auto auto; align-items:end; gap:10px 12px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; padding:14px 16px; margin-bottom:20px; }
+.reach-controls { display:grid; grid-template-columns:minmax(0,1fr) auto auto auto; align-items:end; gap:10px 12px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; padding:14px 16px; margin-bottom:20px; }
 .reach-field { display:flex; flex-direction:column; gap:4px; min-width:0; }
 .reach-field label { margin:0; font-size:12px; color:var(--mesh-muted); }
 .mesh-data-page .reach-controls :is(input,select) { width:100%; height:38px; padding:0 10px; font-size:14px; }
 .mesh-data-page .reach-controls select { min-width:140px; }
 .mesh-data-page .mesh-content .reach-load { display:inline-flex; align-items:center; justify-content:center; gap:6px; height:38px; padding:0 16px; border-color:var(--mesh-brand); background:var(--mesh-brand); color:#fff; font-size:13px; font-weight:600; }
 .mesh-data-page .mesh-content .reach-load:hover { background:var(--mesh-brand-deep); }
-.mesh-data-page .reach-node-link { display:inline-flex; align-items:center; justify-content:center; height:38px; padding:0 14px; font-size:13px; white-space:nowrap; }
-/* Tablets: node on its own row, selects and buttons under it. */
+/* Tablets: node on its own row, selects and the button under it. */
 @media(max-width:1000px) {
-    .reach-controls { grid-template-columns:repeat(2,minmax(0,1fr)) auto auto; }
+    .reach-controls { grid-template-columns:repeat(2,minmax(0,1fr)) auto; }
     .reach-field-node { grid-column:1 / -1; }
 }
-/* Phones: selects side by side, then the two buttons side by side. */
+/* Phones: selects side by side, then the button across. */
 @media(max-width:600px) {
     .reach-controls { grid-template-columns:repeat(2,minmax(0,1fr)); }
     .mesh-data-page .reach-controls select { min-width:0; }
+    .reach-load { grid-column:1 / -1; }
 }
-.reach-node-link { white-space:nowrap; font-size:12px; }
 .reach-summary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-auto-rows:1fr; gap:12px; margin-bottom:20px; }
 /* Label and figure only: keep the figures on one line across cards whatever the label wraps to. */
 .reach-summary .mesh-metric { align-content:space-between; }
@@ -89,7 +88,7 @@
 
 {% block body %}
 <section class="reach-page">
-    <header class="data-heading is-compact"><div class="data-title"><h1>{{ "Reliability" | tr }}</h1></div><div class="data-actions"><a class="mesh-secondary-button" href="/nodelist">{{ "All nodes ↗" | tr }}</a></div></header>
+    <header class="data-heading is-compact"><div class="data-title"><h1>{{ "Reliability" | tr }}</h1></div><div class="data-actions"><a class="mesh-secondary-button" id="reach-node-link" href="/node/3530776522">{{ "Back to Node" | tr }}</a></div></header>
     <details class="reach-description"><summary>{{ "How reliability is calculated" | tr }}</summary><p>{{ "Review how often each gateway hears packets from a selected node. The report uses the latest selected packet sample on the node’s recorded main channel and calculates reliability as heard packets divided by packets reviewed. The range table groups gateways by reliability bands, while the gateway list shows each gateway's heard count and percentage for the same sample. Reliability is calculated only from Text, Position, Node Info, and Telemetry packets; other packet types are shown in packet details but skipped from the calculation." | tr }}</p><p>{{ "Heard is how many of the reviewed packets each gateway heard, over their total; click the count to see which. Avg Hops is how many hops the packets took to reach each gateway: the rounded average, followed by the exact one in parentheses." | tr }}</p></details>
 
     <section class="reach-panel">
@@ -133,9 +132,7 @@
                 <option value="100">100</option>
             </select>
             </div>
-            <button class="reach-load" type="submit"><span class="ti ti-search" aria-hidden="true"></span> {{ "Load" | tr }}</button>
-            <a class="mesh-secondary-button reach-node-link" id="reach-node-link" href="/node/3530776522">{{ "Back to Node" | tr }}</a>
-        </form>
+            <button class="reach-load" type="submit"><span class="ti ti-search" aria-hidden="true"></span> {{ "Load" | tr }}</button>        </form>
 
         <p class="reach-muted" id="reach-channel" role="status"></p>
         <div class="reach-summary">
