@@ -32,6 +32,10 @@ rewrite in Rust, which takes over from the
 Python version: its
 databases, its configuration and its API carry over.
 
+Meshview began as a Python project, which carries on in parallel in
+[its original repository](https://github.com/pablorevilla-meshtastic/meshview):
+the two are independent projects, and improvements travel between them.
+
 What ships is a single binary, statically linked and bringing its own libc, with
 everything it serves inside it.
 
