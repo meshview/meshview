@@ -73,6 +73,7 @@ RESTORE = [
     "DROP INDEX IF EXISTS idx_packet_to_node_time_us",
     "DROP INDEX IF EXISTS idx_packet_portnum_time_us",
     "DROP INDEX IF EXISTS idx_packet_seen_direct",
+    "DROP INDEX IF EXISTS idx_packet_seen_relayed",
     "CREATE INDEX idx_packet_to_node_id ON packet (to_node_id)",
     "CREATE INDEX idx_packet_from_node_id ON packet (from_node_id)",
     "CREATE INDEX idx_packet_seen_node_id ON packet_seen (node_id)",

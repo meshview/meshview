@@ -54,6 +54,14 @@ CREATE INDEX IF NOT EXISTS idx_packet_seen_direct
 -- and for every sighting stored before this column was.
 ALTER TABLE packet_seen ADD COLUMN relay_node INTEGER;
 
+-- The packets a gateway heard through a relay, by that relay: what each relay
+-- brought a gateway, and which gateways heard through a given one, are both
+-- answered from it alone, with the signal they arrived with, rather than by
+-- reading every sighting of the gateway in the window to learn its relay.
+CREATE INDEX IF NOT EXISTS idx_packet_seen_relayed
+	ON packet_seen (node_id, relay_node, import_time_us, rx_rssi, rx_snr)
+	WHERE relay_node IS NOT NULL AND hop_start > hop_limit;
+
 -- What the scheduled jobs did, one row for each time one ran: the daily cleanup
 -- and the daily snapshot, and whatever comes after them.
 --

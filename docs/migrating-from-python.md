@@ -57,6 +57,8 @@ are, with one column added. What changes:
 - `packet_seen` gets a `relay_node` column: who the gateway heard the packet
   from, the node that relayed it last or the sender itself, as the last byte of
   its id, which is all the firmware tells. Sightings stored before have none.
+  `idx_packet_seen_relayed` keeps the sightings heard through a relay, by
+  gateway and relay.
 - A table of Meshview's own is added: `job_run`, the record of what the daily
   cleanup and snapshot did, which the Python version kept in a JSON file.
 - Meshview records its own migrations in `_sqlx_migrations`.
