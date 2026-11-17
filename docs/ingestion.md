@@ -10,13 +10,13 @@ the databases.
 
 | | |
 |---|---|
-| Protocol | MQTT 3.1.1, plain or over TLS (`[mqtt] tls`) |
+| Protocol | MQTT 5, plain or over TLS (`[mqtt] tls`): the broker has to speak it, as Mosquitto does from 1.6 on, and EMQX and HiveMQ do |
 | Client id | `meshview-<random>`, new on every start, so two ingesters never throw each other off |
 | Session | clean: every connection subscribes again |
 | QoS | 0, at most once |
 | Keep-alive | 60 seconds |
-| Largest message | 1 MiB. Larger ones break the connection rather than being skipped, so the limit is generous; what is stored is limited far below it. |
-| Reconnecting | 1 second after losing the broker, for ever |
+| Largest message | 64 KiB, far beyond any real packet. It is sent to the broker as MQTT 5's maximum packet size, so the broker drops a larger message instead of sending it: under 3.1.1 one that arrived broke the connection, and a retained one every reconnection after. |
+| Reconnecting | 1 second after losing the broker, twice as long after each failure in a row, up to a minute; back to 1 second once a connection has lasted a minute. For ever. |
 
 Two tasks share the work. One does nothing but keep the connection and take
 messages off it; the other opens and stores them, one at a time, from a queue of

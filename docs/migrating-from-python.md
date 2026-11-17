@@ -204,6 +204,8 @@ lines indented, becomes a TOML multi-line string (`"""..."""`).
 | Coverage help | `docs/COVERAGE*.md`, fetched and rendered when it is opened, also served at `/docs/…` | part of the node page, translated with it |
 | Probes | `/health` | `/livez` and `/readyz`, for orchestrators, beside `/health` |
 | MQTT over TLS | no | yes |
+| MQTT protocol | 3.1.1 | 5, which the broker has to speak: it is told the largest message to send, so that an oversized one, even retained, never reaches Meshview |
+| Reconnecting to the broker | every second | every second at first, waiting twice as long after each failure in a row, up to a minute |
 | Coverage prediction | pyitm, installed apart | NTIA's model, built in (see [API](api.md#differences-from-the-python-version)) |
 | Stopping | the database's side files can be left behind | stops in order and leaves only the database file |
 | Backups | scheduled, copying the live file | `meshview backup`, a consistent copy, for your scheduler to run |

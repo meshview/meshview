@@ -18,9 +18,10 @@ use crate::state::{CHECK_MQTT, Readiness};
 use anyhow::{Context, Result, bail};
 use keys::Keyring;
 use opened::{NotOpened, Opened};
-use rumqttc::{
-    AsyncClient, Event, MqttOptions, Outgoing, Packet, QoS, TlsConfiguration, Transport,
-};
+use rumqttc::v5::mqttbytes::QoS;
+use rumqttc::v5::mqttbytes::v5::Packet;
+use rumqttc::v5::{AsyncClient, Event, MqttOptions};
+use rumqttc::{Outgoing, TlsConfiguration, Transport};
 use rustls::pki_types::pem::PemObject;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use rustls::{ClientConfig, RootCertStore};
@@ -40,17 +41,25 @@ const DEFAULT_TLS_PORT: u16 = 8883;
 /// How long the broker gets to hear that this client is leaving.
 const DISCONNECT_GRACE: Duration = Duration::from_secs(1);
 
-/// How long to wait before connecting again after losing the broker.
+/// How long to wait before connecting again after losing the broker, at first;
+/// each failure in a row doubles it, up to the longest.
 const RECONNECT_DELAY: Duration = Duration::from_secs(1);
+const MAX_RECONNECT_DELAY: Duration = Duration::from_secs(60);
+
+/// How long a connection has to last to count as good again, and bring the
+/// wait back to the first: one the broker accepts only to break at once, as
+/// over a message it should not have sent, is still a failure.
+const GOOD_CONNECTION: Duration = Duration::from_secs(60);
 
 /// What paho, under the Python version, asks the broker for.
 const KEEP_ALIVE: Duration = Duration::from_secs(60);
 
-/// The largest message taken off the connection. Far beyond any real packet,
-/// which the store refuses past a kilobyte anyway, but a message over this
-/// breaks the connection rather than being skipped, so it has to be generous:
-/// an oversized retained message would otherwise break every reconnection too.
-const MAX_INCOMING: usize = 1024 * 1024;
+/// The largest message the broker may send. Far beyond any real packet, which
+/// the store refuses past a kilobyte anyway. It goes to the broker as MQTT 5's
+/// maximum packet size, so that the broker drops a larger message rather than
+/// sending it: one that arrived anyway would break the connection, as the
+/// client cannot skip it, and a retained one every reconnection after.
+const MAX_INCOMING: u32 = 64 * 1024;
 
 /// Messages waiting to be stored before new ones are dropped. At the few a
 /// second a busy mesh sends, minutes' worth.
@@ -141,8 +150,8 @@ impl Settings {
         let mut options = MqttOptions::new(format!("meshview-{id}"), &self.server, self.port);
         options
             .set_keep_alive(KEEP_ALIVE)
-            .set_clean_session(true)
-            .set_max_packet_size(MAX_INCOMING, MAX_INCOMING);
+            .set_clean_start(true)
+            .set_max_packet_size(Some(MAX_INCOMING));
 
         if let Some(username) = &self.username {
             options.set_credentials(username, self.password.as_deref().unwrap_or(""));
@@ -233,6 +242,8 @@ pub async fn run(
     );
 
     let mut dropped: u64 = 0;
+    let mut delay: Option<Duration> = None;
+    let mut connected_at: Option<Instant> = None;
     loop {
         let event = tokio::select! {
             event = events.poll() => event,
@@ -254,9 +265,16 @@ pub async fn run(
                     }
                 }
                 readiness.set(CHECK_MQTT, true);
+                connected_at = Some(Instant::now());
             }
             Ok(Event::Incoming(Packet::Publish(publish))) => {
-                if queue.try_send((publish.topic, publish.payload)).is_err() {
+                // MQTT 5 sends the topic as bytes; a name that is not text is
+                // no topic a Meshtastic gateway would publish to.
+                let Ok(topic) = String::from_utf8(publish.topic.to_vec()) else {
+                    debug!("a message on a topic that is not UTF-8 skipped");
+                    continue;
+                };
+                if queue.try_send((topic, publish.payload)).is_err() {
                     dropped += 1;
                     if dropped.is_power_of_two() {
                         warn!("the database is not keeping up: {dropped} messages dropped so far");
@@ -266,8 +284,13 @@ pub async fn run(
             Ok(_) => {}
             Err(e) => {
                 readiness.set(CHECK_MQTT, false);
-                error!("MQTT error: {e}, reconnecting in 1s...");
-                tokio::time::sleep(RECONNECT_DELAY).await;
+                let wait = next_delay(delay, connected_at.take().map(|at| at.elapsed()));
+                delay = Some(wait);
+                error!("MQTT error: {e}, reconnecting in {}s...", wait.as_secs());
+                tokio::select! {
+                    _ = tokio::time::sleep(wait) => {}
+                    _ = stopping.wait_for(|stop| *stop) => break,
+                }
             }
         }
     }
@@ -301,6 +324,19 @@ pub async fn run(
         }
     }
     Ok(())
+}
+
+/// How long to wait after a failure, given the wait before it, if there was
+/// one, and how long the connection lasted, if there was one: the first wait
+/// for the first failure and after a connection that lasted, twice the last
+/// otherwise.
+fn next_delay(last: Option<Duration>, lasted: Option<Duration>) -> Duration {
+    match last {
+        Some(last) if !lasted.is_some_and(|lasted| lasted >= GOOD_CONNECTION) => {
+            (last * 2).min(MAX_RECONNECT_DELAY)
+        }
+        _ => RECONNECT_DELAY,
+    }
 }
 
 /// Opens and stores what the connection hands over, one message at a time.
@@ -352,6 +388,29 @@ async fn store_messages(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn failures_in_a_row_wait_longer_each_time() {
+        let second = Duration::from_secs(1);
+        assert_eq!(next_delay(None, None), second);
+        // Never connected, or broken at once: twice as long, up to a minute.
+        assert_eq!(next_delay(Some(second), None), 2 * second);
+        assert_eq!(
+            next_delay(Some(2 * second), Some(second / 1000)),
+            4 * second
+        );
+        assert_eq!(next_delay(Some(32 * second), None), MAX_RECONNECT_DELAY);
+        assert_eq!(
+            next_delay(Some(MAX_RECONNECT_DELAY), None),
+            MAX_RECONNECT_DELAY
+        );
+        // A connection that lasted starts over.
+        let lasted = Some(GOOD_CONNECTION);
+        assert_eq!(
+            next_delay(Some(MAX_RECONNECT_DELAY), lasted),
+            RECONNECT_DELAY
+        );
+    }
 
     #[test]
     fn the_sample_mqtt_section_is_enough() {
