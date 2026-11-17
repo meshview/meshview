@@ -20,6 +20,24 @@ DROP TABLE IF EXISTS example;
 -- page does.
 CREATE INDEX IF NOT EXISTS idx_traceroute_packet_id ON traceroute (packet_id);
 
+-- What a node page asks for is a node's packets or sightings in a recent
+-- window, and the Python indexes on a node alone made that read the node's
+-- whole history to keep the window: a busy gateway's sightings, for its direct
+-- receptions, took minutes on a cold cache. With the time beside the node, only
+-- the window is read. The same for the packets to a node, and for the packets
+-- of a port, which the chat and the statistics by port ask for: without it they
+-- walk every packet back in time looking for those of their port.
+--
+-- The indexes on the node alone go, as these begin with it and serve whatever
+-- those did. The one on the sender alone was already the start of
+-- idx_packet_from_node_time_us.
+CREATE INDEX IF NOT EXISTS idx_packet_seen_node_time_us ON packet_seen (node_id, import_time_us);
+CREATE INDEX IF NOT EXISTS idx_packet_to_node_time_us ON packet (to_node_id, import_time_us);
+CREATE INDEX IF NOT EXISTS idx_packet_portnum_time_us ON packet (portnum, import_time_us);
+DROP INDEX IF EXISTS idx_packet_seen_node_id;
+DROP INDEX IF EXISTS idx_packet_to_node_id;
+DROP INDEX IF EXISTS idx_packet_from_node_id;
+
 -- What the scheduled jobs did, one row for each time one ran: the daily cleanup
 -- and the daily snapshot, and whatever comes after them.
 --

@@ -45,6 +45,13 @@ are. What changes:
   nothing used.
 - An index the Python models declared but no migration ever created is added:
   `idx_traceroute_packet_id`, for looking traceroutes up by packet.
+- The indexes on a node alone are replaced by ones on the node and the time, so
+  that a node's recent packets and sightings are read without its whole
+  history: `idx_packet_seen_node_time_us` and `idx_packet_to_node_time_us`
+  replace `idx_packet_seen_node_id` and `idx_packet_to_node_id`, and
+  `idx_packet_from_node_id` goes, as `idx_packet_from_node_time_us` already
+  began with the sender. `idx_packet_portnum_time_us` is added, for the packets
+  of a port, as the chat and the statistics by port ask for.
 - A table of Meshview's own is added: `job_run`, the record of what the daily
   cleanup and snapshot did, which the Python version kept in a JSON file.
 - Meshview records its own migrations in `_sqlx_migrations`.

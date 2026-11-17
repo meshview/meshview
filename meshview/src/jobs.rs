@@ -230,6 +230,16 @@ pub async fn cleanup(pool: impl Into<Pool>, days_to_keep: u32, vacuum: bool) -> 
         }
         tx.commit().await?;
 
+        // SQLite chooses among indexes better with statistics on them, and
+        // nothing else gathers them: optimize does, and only where they are
+        // missing or out of date, within a bounded effort. PostgreSQL's
+        // autovacuum already does it there.
+        if matches!(pool, Pool::Sqlite(_)) {
+            write::run(pool, "PRAGMA optimize")
+                .await
+                .context("PRAGMA optimize")?;
+        }
+
         if vacuum {
             info!("Running VACUUM...");
             write::run(pool, "VACUUM").await.context("VACUUM")?;

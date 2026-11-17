@@ -19,9 +19,10 @@ What it does, in one transaction, so that it either all happens or none of it:
 
 - puts back the Python version's bookkeeping (alembic_version at 44612e74a798,
   migration_status, and the unused example table), exactly as Python creates it;
-- removes what Meshview added: the idx_traceroute_packet_id index, the
-  job_run table (what its scheduled jobs did) and its own record of
-  migrations, _sqlx_migrations.
+- removes what Meshview added: its indexes (idx_traceroute_packet_id and those
+  on a node, or a port, and the time), the job_run table (what its scheduled
+  jobs did) and its own record of migrations, _sqlx_migrations;
+- puts back the indexes on a node alone that Meshview's replace.
 
 The data, every row of every table, is not touched. Stop Meshview, every
 process using the database, before running it.
@@ -66,6 +67,12 @@ RESTORE = [
             )""",
     "INSERT INTO migration_status (id, in_progress) VALUES (1, 0)",
     "DROP INDEX IF EXISTS idx_traceroute_packet_id",
+    "DROP INDEX IF EXISTS idx_packet_seen_node_time_us",
+    "DROP INDEX IF EXISTS idx_packet_to_node_time_us",
+    "DROP INDEX IF EXISTS idx_packet_portnum_time_us",
+    "CREATE INDEX idx_packet_to_node_id ON packet (to_node_id)",
+    "CREATE INDEX idx_packet_from_node_id ON packet (from_node_id)",
+    "CREATE INDEX idx_packet_seen_node_id ON packet_seen (node_id)",
     "DROP TABLE IF EXISTS job_run",
     "DROP TABLE _sqlx_migrations",
 ]

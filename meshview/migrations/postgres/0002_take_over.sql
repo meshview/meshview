@@ -17,6 +17,16 @@ DROP TABLE IF EXISTS example;
 -- Looking a traceroute up by its packet is what the traceroute page does.
 CREATE INDEX IF NOT EXISTS idx_traceroute_packet_id ON traceroute (packet_id);
 
+-- A node's packets and sightings in a recent window, the packets to a node and
+-- those of a port, each read by its window alone; see the SQLite migration of
+-- the same number. The indexes on the node alone go, as these begin with it.
+CREATE INDEX IF NOT EXISTS idx_packet_seen_node_time_us ON packet_seen (node_id, import_time_us DESC);
+CREATE INDEX IF NOT EXISTS idx_packet_to_node_time_us ON packet (to_node_id, import_time_us DESC);
+CREATE INDEX IF NOT EXISTS idx_packet_portnum_time_us ON packet (portnum, import_time_us DESC);
+DROP INDEX IF EXISTS idx_packet_seen_node_id;
+DROP INDEX IF EXISTS idx_packet_to_node_id;
+DROP INDEX IF EXISTS idx_packet_from_node_id;
+
 -- What the scheduled jobs did, one row for each time one ran; see the SQLite
 -- migration of the same number. `details` is JSON, kept as text as there.
 CREATE TABLE IF NOT EXISTS job_run (
