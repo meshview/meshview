@@ -227,6 +227,7 @@ The x86_64 build runs on any x86_64 CPU, including older ones without AVX.
 podman run -d --name meshview -p 8081:8081 \
   -v meshview-data:/data \
   -v ./config.toml:/etc/meshview/config.toml:ro \
+  -e TZ=Europe/Madrid \
   ghcr.io/meshview/meshview
 ```
 
@@ -242,6 +243,7 @@ podman run -d --name meshview -p 8081:8081 \
 | Volumes | None declared: where the database lives is yours to decide and to name. Without a volume it lives and dies with the container. |
 | Health check | None built in: point your runtime at `/livez` and `/readyz`. |
 | CA certificates | None needed: the roots for MQTT over TLS are built into the binary. |
+| Time zone | UTC unless `TZ` names another, which is the [local time](configuration.md#local-time) the daily cleanup and snapshot run at. No `tzdata` needed: the time zone database is built into the binary too. |
 
 The whole configuration can also come from the environment, with no file:
 

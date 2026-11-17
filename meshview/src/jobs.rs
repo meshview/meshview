@@ -22,7 +22,7 @@ use jiff::{Timestamp, Zoned};
 use serde_json::{Value, json};
 use std::time::Duration;
 use tokio::sync::watch;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 /// The jobs, by the name their runs are recorded under.
 pub const CLEANUP: &str = "cleanup";
@@ -111,6 +111,15 @@ pub async fn run(settings: Settings, pool: impl Into<Pool>, mut stopping: watch:
     let pool: Pool = pool.into();
     if let Err(e) = mark_interrupted(&pool).await {
         error!("could not tidy up the job runs of a previous start: {e:#}");
+    }
+
+    // As in the container image, where there is neither TZ nor /etc/localtime:
+    // the jobs then keep UTC, which is seldom what their hours meant.
+    if TimeZone::system().is_unknown() {
+        warn!(
+            "The system's time zone is unknown, so the daily jobs run in UTC; \
+             set TZ (e.g. TZ=Europe/Madrid) to run them in local time"
+        );
     }
 
     match &settings.cleanup {
