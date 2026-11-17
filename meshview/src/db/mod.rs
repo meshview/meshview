@@ -354,6 +354,31 @@ impl Reader {
     ) -> Result<Vec<DirectReception>> {
         on!(self, direct_receptions(node_id, direction, since_us, limit))
     }
+
+    /// How many packets a node heard straight from each other node, or each
+    /// gateway heard straight from it, since a time, the most first.
+    pub async fn direct_counts(
+        &self,
+        node_id: i64,
+        direction: Direction,
+        since_us: i64,
+    ) -> Result<Vec<DirectCount>> {
+        on!(self, direct_counts(node_id, direction, since_us))
+    }
+
+    /// The packets these gateways heard through a relay since a time, by
+    /// gateway and relay, or through one relay only when it is given.
+    pub async fn relayed_counts(
+        &self,
+        gateways: &[i64],
+        relay_node: Option<i64>,
+        since_us: i64,
+    ) -> Result<Vec<RelayedCount>> {
+        if gateways.is_empty() {
+            return Ok(Vec::new());
+        }
+        on!(self, relayed_counts(gateways, relay_node, since_us))
+    }
 }
 
 /// A row of `daily_snapshot`.
@@ -698,6 +723,35 @@ pub struct DirectReception {
     pub time_us: i64,
     pub rssi: i64,
     pub snr: Option<f64>,
+}
+
+/// How many packets a node heard straight from another one, at no hops, under
+/// the same conditions as a [`DirectReception`].
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct DirectCount {
+    /// The node on the other side, as in a [`DirectReception`].
+    pub peer: i64,
+    pub long_name: Option<String>,
+    pub short_name: Option<String>,
+    pub packets: i64,
+}
+
+/// The packets a gateway heard through one relay: those that had taken a hop
+/// at least, the relay being the last byte of the id of the node it heard
+/// them from, as the firmware tells it.
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct RelayedCount {
+    pub gateway: i64,
+    pub relay_node: i64,
+    pub packets: i64,
+    /// The signal they were heard with, in dBm and dB; none for a reading
+    /// that was not one (an RSSI of 0, an SNR that was not a number).
+    pub rssi_avg: Option<f64>,
+    pub rssi_min: Option<i64>,
+    pub rssi_max: Option<i64>,
+    pub snr_avg: Option<f64>,
+    pub snr_min: Option<f64>,
+    pub snr_max: Option<f64>,
 }
 
 /// A row of `packet_seen`: one gateway hearing one packet.

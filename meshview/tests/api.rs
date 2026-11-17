@@ -307,6 +307,113 @@ async fn direct_receptions_are_those_heard_at_no_hops() {
 }
 
 #[tokio::test]
+async fn relays_are_told_by_the_last_byte_of_their_id() {
+    let api = api().await;
+    let now = now_us();
+    // 10 and 40 are gateways. 10 heard 20 and 276 straight, which both end in
+    // 0x14; 30's packets reached 10 through 0x14, once an hour ago, and
+    // through 0x63, which no node 10 heard straight ends in, with no signal.
+    // 40 heard one through 0x14 too, but never heard 20 straight.
+    api.exec(
+        "INSERT INTO node (id, node_id, long_name, short_name) VALUES \
+         ('!00000014', 20, 'Twenty', 'T20'), ('!0000000a', 10, 'Gateway', 'GW')",
+    )
+    .await;
+    for (id, from) in [
+        (1, 20),
+        (2, 276),
+        (3, 30),
+        (4, 30),
+        (5, 30),
+        (6, 30),
+        (7, 30),
+    ] {
+        sqlx::query("INSERT INTO packet (id, from_node_id, import_time_us) VALUES (?, ?, ?)")
+            .bind(id)
+            .bind(from)
+            .bind(now)
+            .execute(&api.pool)
+            .await
+            .unwrap();
+    }
+    for (packet, gateway, start, limit, relay, rssi, snr, ago) in [
+        (1, 10, 3, 3, Some(0x14), -80, Some(9.0), 1),
+        (2, 10, 3, 3, Some(0x14), -85, Some(8.0), 1),
+        (3, 10, 3, 2, Some(0x14), -100, Some(4.0), 1),
+        (4, 10, 3, 1, Some(0x14), -90, Some(6.0), 1),
+        (7, 10, 3, 2, Some(0x14), -110, Some(2.0), 3_600),
+        (5, 10, 3, 2, Some(0x63), 0, None, 1),
+        (6, 40, 3, 2, Some(0x14), -100, Some(1.0), 1),
+        // Stored before relays were, or from firmware that does not tell.
+        (3, 50, 3, 2, None, -100, Some(1.0), 1),
+    ] {
+        sqlx::query(
+            "INSERT INTO packet_seen (packet_id, node_id, rx_time, hop_start, hop_limit, \
+             relay_node, rx_rssi, rx_snr, import_time_us) VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(packet)
+        .bind(gateway)
+        .bind(start)
+        .bind(limit)
+        .bind(relay)
+        .bind(rssi)
+        .bind(snr)
+        .bind(now - ago * 1_000_000)
+        .execute(&api.pool)
+        .await
+        .unwrap();
+    }
+
+    let (status, body) = api.get("/api/v1/node/10/relays").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body,
+        json!({"node_id": 10, "relays": [
+            {"relay_node": 0x14, "packets": 3,
+             "rssi_avg": -100.0, "rssi_min": -110, "rssi_max": -90,
+             "snr_avg": 4.0, "snr_min": 2.0, "snr_max": 6.0,
+             "candidates": [
+                {"node_id": 20, "long_name": "Twenty", "short_name": "T20", "direct_packets": 1},
+                {"node_id": 276, "long_name": null, "short_name": null, "direct_packets": 1},
+             ]},
+            {"relay_node": 0x63, "packets": 1,
+             "rssi_avg": null, "rssi_min": null, "rssi_max": null,
+             "snr_avg": null, "snr_min": null, "snr_max": null,
+             "candidates": []},
+        ]})
+    );
+
+    // Since a time: the packet an hour ago is left out.
+    let since = now - 60 * 1_000_000;
+    let (_, recent) = api
+        .get(&format!("/api/v1/node/10/relays?since={since}"))
+        .await;
+    assert_eq!(recent["relays"][0]["packets"], 2);
+
+    // Through 20: only 10 counts, as 40 never heard 20 straight.
+    let (status, body) = api.get("/api/v1/node/20/relayed").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body,
+        json!({"node_id": 20, "relay_node": 0x14, "gateways": [
+            {"node_id": 10, "long_name": "Gateway", "short_name": "GW", "packets": 3,
+             "rssi_avg": -100.0, "rssi_min": -110, "rssi_max": -90,
+             "snr_avg": 4.0, "snr_min": 2.0, "snr_max": 6.0, "direct_packets": 1},
+        ]})
+    );
+
+    // A node no gateway heard straight relayed to none.
+    assert_eq!(
+        api.get("/api/v1/node/30/relayed").await.1["gateways"],
+        json!([])
+    );
+    assert_eq!(
+        api.get("/api/v1/node/x/relays").await.0,
+        StatusCode::BAD_REQUEST
+    );
+}
+
+#[tokio::test]
 async fn packet_counts_are_by_hour_and_port() {
     let api = api().await;
     const HOUR: i64 = 3_600_000_000;

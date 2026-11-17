@@ -18,6 +18,7 @@ mod packet_counts;
 mod packets;
 mod packets_seen;
 mod qr;
+mod relays;
 pub(crate) mod site_config;
 mod snapshots;
 mod stats;
@@ -50,6 +51,8 @@ pub fn v1() -> OpenApiRouter<AppState> {
         .routes(routes!(edges::edges))
         .routes(routes!(qr::qr))
         .routes(routes!(direct_receptions::direct_receptions))
+        .routes(routes!(relays::relays))
+        .routes(routes!(relays::relayed))
         .routes(routes!(packet_counts::packet_counts))
         .routes(routes!(coverage::coverage))
 }

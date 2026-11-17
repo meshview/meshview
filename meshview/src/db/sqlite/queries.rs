@@ -9,6 +9,7 @@ use crate::db::{
     DailySnapshot, DirectReception, Direction, Facet, JobRun, Node, NodeFacet, NodeFilter,
     NodeQuery, PacketFilter, PacketSeen, Period, PeriodCount, SightingsOf, TopNode, TopQuery,
 };
+use crate::db::{DirectCount, RelayedCount};
 use crate::db::{HourlyPortCount, PacketQuery, PacketRow, TracerouteHop, TracerouteRow};
 use anyhow::{Context, Result};
 use sqlx::SqlitePool;
@@ -142,6 +143,79 @@ pub async fn direct_receptions(
         .fetch_all(pool)
         .await
         .context("listing direct receptions")
+}
+
+pub async fn direct_counts(
+    pool: &SqlitePool,
+    node_id: i64,
+    direction: Direction,
+    since_us: i64,
+) -> Result<Vec<DirectCount>> {
+    // The same receptions as direct_receptions, counted by the node on the
+    // other side.
+    let sql = match direction {
+        Direction::Received => {
+            "SELECT p.from_node_id AS peer, n.long_name, n.short_name, count(*) AS packets \
+             FROM packet_seen s \
+             JOIN packet p ON p.id = s.packet_id \
+             LEFT JOIN node n ON n.node_id = p.from_node_id \
+             WHERE s.node_id = ? AND s.import_time_us >= ? \
+               AND s.hop_start > 0 AND s.hop_limit = s.hop_start AND s.rx_rssi <> 0 \
+               AND p.from_node_id IS NOT NULL AND p.from_node_id <> s.node_id \
+             GROUP BY p.from_node_id, n.long_name, n.short_name \
+             ORDER BY packets DESC, peer"
+        }
+        Direction::Transmitted => {
+            "SELECT s.node_id AS peer, n.long_name, n.short_name, count(*) AS packets \
+             FROM packet p \
+             JOIN packet_seen s ON s.packet_id = p.id \
+             LEFT JOIN node n ON n.node_id = s.node_id \
+             WHERE p.from_node_id = ? AND p.import_time_us >= ? \
+               AND s.import_time_us IS NOT NULL \
+               AND s.hop_start > 0 AND s.hop_limit = s.hop_start AND s.rx_rssi <> 0 \
+               AND s.node_id <> p.from_node_id \
+             GROUP BY s.node_id, n.long_name, n.short_name \
+             ORDER BY packets DESC, peer"
+        }
+    };
+    sqlx::query_as(sql)
+        .bind(node_id)
+        .bind(since_us)
+        .fetch_all(pool)
+        .await
+        .context("counting direct receptions")
+}
+
+pub async fn relayed_counts(
+    pool: &SqlitePool,
+    gateways: &[i64],
+    relay_node: Option<i64>,
+    since_us: i64,
+) -> Result<Vec<RelayedCount>> {
+    // Word for word the conditions of idx_packet_seen_relayed, which answers
+    // it alone.
+    let mut query = QueryBuilder::new(
+        "SELECT node_id AS gateway, relay_node, count(*) AS packets, \
+                avg(nullif(rx_rssi, 0)) AS rssi_avg, min(nullif(rx_rssi, 0)) AS rssi_min, \
+                max(nullif(rx_rssi, 0)) AS rssi_max, \
+                avg(rx_snr) AS snr_avg, min(rx_snr) AS snr_min, max(rx_snr) AS snr_max \
+         FROM packet_seen \
+         WHERE relay_node IS NOT NULL AND hop_start > hop_limit AND node_id IN (",
+    );
+    let mut ids = query.separated(", ");
+    for id in gateways {
+        ids.push_bind(*id);
+    }
+    query.push(") AND import_time_us >= ").push_bind(since_us);
+    if let Some(relay_node) = relay_node {
+        query.push(" AND relay_node = ").push_bind(relay_node);
+    }
+    query.push(" GROUP BY node_id, relay_node ORDER BY packets DESC, node_id, relay_node");
+    query
+        .build_query_as()
+        .fetch_all(pool)
+        .await
+        .context("counting the packets heard through relays")
 }
 
 pub async fn last_import_us(pool: &SqlitePool) -> Result<Option<i64>> {

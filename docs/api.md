@@ -86,6 +86,8 @@ for changing in a future version instead.
 | `/api/v1/stats/channels` | Not there | The packets of the latest hours or days by channel, to everyone and to a single node, each channel marked as named by a preset or not, for the statistics' packets by channel and by destination. |
 | `/api/v1/node/{node_id}/packet_counts` | Not there | How many packets from or to a node were stored each hour of the latest 30 days at most, by port, counted by the server, for the node page's packets chart. |
 | `/api/v1/node/{node_id}/direct_receptions` | Not there | The packets a gateway heard straight from other nodes, at no hops, or those of a node that gateways heard straight from it, with their signal, by node, for the node page's direct receptions chart. |
+| `/api/v1/node/{node_id}/relays` | Not there | The relays a gateway heard packets through, by the last byte of their id, which is all the firmware tells, with their signal and the nodes heard straight that each may be. |
+| `/api/v1/node/{node_id}/relayed` | Not there | The gateways that heard packets through a node, among those that heard it straight, with their signal. |
 | `/api/v1/node/{node_id}/qr` | From every node info packet the node ever sent | From its latest 50: an old key the node no longer sends does not keep the contact from being offered. |
 | `/api/v1/nodes` when the database fails | `{"nodes": []}`, as if there were none | 500, `{"error": "Failed to fetch nodes"}`. |
 | `/api/v1/nodes` with a `node_id` or `days_active` too large | An empty list without paging, a 500 with it | No nodes; or, for `days_active`, every node. |
