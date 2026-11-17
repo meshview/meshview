@@ -91,9 +91,26 @@
 .direct-table tbody tr { cursor:pointer; }
 .direct-table tbody tr:hover { background:var(--mesh-soft); }
 .direct-table tbody tr.is-hidden td { opacity:.45; }
+.direct-table td.direct-summary { display:none; }
 .direct-swatch { display:inline-block; width:10px; height:10px; margin-right:8px; border-radius:2px; vertical-align:middle; }
 .direct-hint { margin:10px 0 0; color:var(--mesh-muted); font-size:12px; }
-@media(max-width:700px) { .direct-controls { padding:12px 12px 0; } .direct-table-wrap { padding:0 12px 12px; } }
+/* With a mouse or with a finger, the hint that says how to use the chart. */
+@media(pointer:fine) { .direct-hint-touch { display:none; } }
+@media not (pointer:fine) { .direct-hint-mouse { display:none; } }
+/* On a phone, only the signal shown in the chart, and long names cut short. */
+@media(max-width:700px) {
+  .direct-controls { gap:6px; padding:12px 12px 0; }
+  .direct-toggle + .direct-toggle { margin-left:auto; }
+  .direct-table-wrap { padding:0 12px 12px; }
+  .direct-table thead,.direct-table td.is-number { display:none; }
+  .direct-table tbody tr { display:block; padding:8px 4px; border-bottom:1px solid var(--mesh-border); }
+  .direct-table td { display:block; overflow:hidden; text-overflow:ellipsis; }
+  #direct_table td { height:auto; padding:0; border:0; }
+  .direct-table td.direct-summary { display:block; margin-top:3px; color:var(--mesh-muted); font-size:12px; font-variant-numeric:tabular-nums; }
+  .direct-table[data-metric="rssi"] .is-snr,.direct-table[data-metric="snr"] .is-rssi { display:none; }
+  .mesh-data-page .mesh-content .direct-toggle > button { padding:5px 8px; }
+  .mesh-data-page .mesh-content .direct-toggle > button:has(> .ti) { padding-left:7px; padding-right:10px; }
+}
 @media(max-width:900px) { .node-info { grid-template-columns:minmax(0,1fr); gap:10px; } }
 @media(max-width:700px) { .chart-header { padding:12px; } #node-packets { gap:8px !important; padding:12px; } #node-packets select { flex:1 1 0; min-width:0; padding-left:8px; padding-right:2px; } #node-packets #packet_port { flex-grow:1.2; } }
 </style>
@@ -190,9 +207,9 @@
             <h2 class="chart-title"><span class="ti ti-battery-2" aria-hidden="true"></span> <span data-translate-lang="battery_voltage">Battery & Voltage</span></h2>
             <div class="chart-actions">
                 <select class="chart-period" data-chart="battery_voltage" aria-label="{{ "Chart time range" | tr }}">
-                    <option value="1">{{ "Last 24 hours" | tr }}</option>
-                    <option value="7" selected>{{ "Last 7 days" | tr }}</option>
-                    <option value="30">{{ "Last 30 days" | tr }}</option>
+                    <option value="1" data-long="{{ "Last 24 hours" | tr }}" data-short="{{ "24 hours" | tr }}">{{ "Last 24 hours" | tr }}</option>
+                    <option value="7" selected data-long="{{ "Last 7 days" | tr }}" data-short="{{ "7 days" | tr }}">{{ "Last 7 days" | tr }}</option>
+                    <option value="30" data-long="{{ "Last 30 days" | tr }}" data-short="{{ "30 days" | tr }}">{{ "Last 30 days" | tr }}</option>
                 </select>
                 <button type="button" class="chart-tool" onclick="expandChart('battery_voltage')" title="{{ "Expand chart" | tr }}" aria-label="{{ "Expand chart" | tr }}"><span class="ti ti-arrows-maximize" aria-hidden="true"></span></button>
                 <button type="button" class="chart-tool" onclick="exportCSV('battery_voltage')" title="{{ "Export CSV" | tr }}" aria-label="{{ "Export CSV" | tr }}"><span class="ti ti-download" aria-hidden="true"></span></button>
@@ -209,9 +226,9 @@
             <h2 class="chart-title"><span class="ti ti-bolt" aria-hidden="true"></span> <span data-translate-lang="power">Power Metrics</span></h2>
             <div class="chart-actions">
                 <select class="chart-period" data-chart="power" aria-label="{{ "Chart time range" | tr }}">
-                    <option value="1">{{ "Last 24 hours" | tr }}</option>
-                    <option value="7" selected>{{ "Last 7 days" | tr }}</option>
-                    <option value="30">{{ "Last 30 days" | tr }}</option>
+                    <option value="1" data-long="{{ "Last 24 hours" | tr }}" data-short="{{ "24 hours" | tr }}">{{ "Last 24 hours" | tr }}</option>
+                    <option value="7" selected data-long="{{ "Last 7 days" | tr }}" data-short="{{ "7 days" | tr }}">{{ "Last 7 days" | tr }}</option>
+                    <option value="30" data-long="{{ "Last 30 days" | tr }}" data-short="{{ "30 days" | tr }}">{{ "Last 30 days" | tr }}</option>
                 </select>
                 <button type="button" class="chart-tool" onclick="expandChart('power')" title="{{ "Expand chart" | tr }}" aria-label="{{ "Expand chart" | tr }}"><span class="ti ti-arrows-maximize" aria-hidden="true"></span></button>
                 <button type="button" class="chart-tool" onclick="exportCSV('power')" title="{{ "Export CSV" | tr }}" aria-label="{{ "Export CSV" | tr }}"><span class="ti ti-download" aria-hidden="true"></span></button>
@@ -228,9 +245,9 @@
             <h2 class="chart-title"><span class="ti ti-antenna-bars-5" aria-hidden="true"></span> <span data-translate-lang="air_channel">Air & Channel Utilization</span></h2>
             <div class="chart-actions">
                 <select class="chart-period" data-chart="air_channel" aria-label="{{ "Chart time range" | tr }}">
-                    <option value="1">{{ "Last 24 hours" | tr }}</option>
-                    <option value="7" selected>{{ "Last 7 days" | tr }}</option>
-                    <option value="30">{{ "Last 30 days" | tr }}</option>
+                    <option value="1" data-long="{{ "Last 24 hours" | tr }}" data-short="{{ "24 hours" | tr }}">{{ "Last 24 hours" | tr }}</option>
+                    <option value="7" selected data-long="{{ "Last 7 days" | tr }}" data-short="{{ "7 days" | tr }}">{{ "Last 7 days" | tr }}</option>
+                    <option value="30" data-long="{{ "Last 30 days" | tr }}" data-short="{{ "30 days" | tr }}">{{ "Last 30 days" | tr }}</option>
                 </select>
                 <button type="button" class="chart-tool" onclick="expandChart('air_channel')" title="{{ "Expand chart" | tr }}" aria-label="{{ "Expand chart" | tr }}"><span class="ti ti-arrows-maximize" aria-hidden="true"></span></button>
                 <button type="button" class="chart-tool" onclick="exportCSV('air_channel')" title="{{ "Export CSV" | tr }}" aria-label="{{ "Export CSV" | tr }}"><span class="ti ti-download" aria-hidden="true"></span></button>
@@ -247,9 +264,9 @@
             <h2 class="chart-title"><span class="ti ti-temperature" aria-hidden="true"></span> <span data-translate-lang="environment">Environment Metrics</span></h2>
             <div class="chart-actions">
                 <select class="chart-period" data-chart="environment" aria-label="{{ "Chart time range" | tr }}">
-                    <option value="1">{{ "Last 24 hours" | tr }}</option>
-                    <option value="7" selected>{{ "Last 7 days" | tr }}</option>
-                    <option value="30">{{ "Last 30 days" | tr }}</option>
+                    <option value="1" data-long="{{ "Last 24 hours" | tr }}" data-short="{{ "24 hours" | tr }}">{{ "Last 24 hours" | tr }}</option>
+                    <option value="7" selected data-long="{{ "Last 7 days" | tr }}" data-short="{{ "7 days" | tr }}">{{ "Last 7 days" | tr }}</option>
+                    <option value="30" data-long="{{ "Last 30 days" | tr }}" data-short="{{ "30 days" | tr }}">{{ "Last 30 days" | tr }}</option>
                 </select>
                 <button type="button" class="chart-tool" onclick="expandChart('environment')" title="{{ "Expand chart" | tr }}" aria-label="{{ "Expand chart" | tr }}"><span class="ti ti-arrows-maximize" aria-hidden="true"></span></button>
                 <button type="button" class="chart-tool" onclick="exportCSV('environment')" title="{{ "Export CSV" | tr }}" aria-label="{{ "Export CSV" | tr }}"><span class="ti ti-download" aria-hidden="true"></span></button>
@@ -267,9 +284,9 @@
         <h2 class="chart-title"><span class="ti ti-affiliate" aria-hidden="true"></span> <span data-translate-lang="neighbors_chart">Neighbors (SNR Over Time)</span></h2>
         <div class="chart-actions">
                 <select class="chart-period" data-chart="neighbors" aria-label="{{ "Chart time range" | tr }}">
-                    <option value="1">{{ "Last 24 hours" | tr }}</option>
-                    <option value="7" selected>{{ "Last 7 days" | tr }}</option>
-                    <option value="30">{{ "Last 30 days" | tr }}</option>
+                    <option value="1" data-long="{{ "Last 24 hours" | tr }}" data-short="{{ "24 hours" | tr }}">{{ "Last 24 hours" | tr }}</option>
+                    <option value="7" selected data-long="{{ "Last 7 days" | tr }}" data-short="{{ "7 days" | tr }}">{{ "Last 7 days" | tr }}</option>
+                    <option value="30" data-long="{{ "Last 30 days" | tr }}" data-short="{{ "30 days" | tr }}">{{ "Last 30 days" | tr }}</option>
                 </select>
                 <button type="button" class="chart-tool" onclick="expandChart('neighbors')" title="{{ "Expand chart" | tr }}" aria-label="{{ "Expand chart" | tr }}"><span class="ti ti-arrows-maximize" aria-hidden="true"></span></button>
                 <button type="button" class="chart-tool" onclick="exportCSV('neighbors')" title="{{ "Export CSV" | tr }}" aria-label="{{ "Export CSV" | tr }}"><span class="ti ti-download" aria-hidden="true"></span></button>
@@ -286,9 +303,9 @@
         <h2 class="chart-title"><span class="ti ti-wifi" aria-hidden="true"></span> <span>{{ "Direct receptions" | tr }}</span></h2>
         <div class="chart-actions">
             <select class="chart-period" data-chart="direct" aria-label="{{ "Chart time range" | tr }}">
-                    <option value="1">{{ "Last 24 hours" | tr }}</option>
-                    <option value="7" selected>{{ "Last 7 days" | tr }}</option>
-                    <option value="30">{{ "Last 30 days" | tr }}</option>
+                    <option value="1" data-long="{{ "Last 24 hours" | tr }}" data-short="{{ "24 hours" | tr }}">{{ "Last 24 hours" | tr }}</option>
+                    <option value="7" selected data-long="{{ "Last 7 days" | tr }}" data-short="{{ "7 days" | tr }}">{{ "Last 7 days" | tr }}</option>
+                    <option value="30" data-long="{{ "Last 30 days" | tr }}" data-short="{{ "30 days" | tr }}">{{ "Last 30 days" | tr }}</option>
                 </select>
             <button type="button" class="chart-tool" onclick="expandChart('direct')" title="{{ "Expand chart" | tr }}" aria-label="{{ "Expand chart" | tr }}"><span class="ti ti-arrows-maximize" aria-hidden="true"></span></button>
             <button type="button" class="chart-tool" onclick="exportCSV('direct')" title="{{ "Export CSV" | tr }}" aria-label="{{ "Export CSV" | tr }}"><span class="ti ti-download" aria-hidden="true"></span></button>
@@ -300,8 +317,8 @@
             <button type="button" data-direction="transmitted" aria-pressed="false"><span class="ti ti-arrow-up" aria-hidden="true"></span> {{ "Transmitted" | tr }}</button>
         </div>
         <div class="direct-toggle" role="group" aria-label="{{ "Signal" | tr }}">
-            <button type="button" data-metric="rssi" aria-pressed="true">RSSI</button>
-            <button type="button" data-metric="snr" aria-pressed="false">SNR</button>
+            <button type="button" data-metric="rssi" aria-pressed="false">RSSI</button>
+            <button type="button" data-metric="snr" aria-pressed="true">SNR</button>
         </div>
         <p id="direct_note" class="direct-note"></p>
     </div>
@@ -309,22 +326,23 @@
     <p class="chart-empty" hidden>{{ "No direct receptions in this period." | tr }}</p>
     <div id="chart_direct" class="chart-canvas" style="height:380px;"></div>
     <div class="direct-table-wrap">
-        <table class="direct-table">
+        <table class="direct-table" data-metric="snr">
             <thead>
                 <tr>
                     <th rowspan="2">{{ "Node" | tr }}</th>
                     <th rowspan="2" class="is-number">{{ "Packets" | tr }}</th>
-                    <th colspan="3" class="is-group">RSSI (dBm)</th>
-                    <th colspan="3" class="is-group">SNR (dB)</th>
+                    <th colspan="3" class="is-group is-rssi">RSSI (dBm)</th>
+                    <th colspan="3" class="is-group is-snr">SNR (dB)</th>
                 </tr>
                 <tr>
-                    <th class="is-number">{{ "Avg" | tr }}</th><th class="is-number">{{ "Min" | tr }}</th><th class="is-number">{{ "Max" | tr }}</th>
-                    <th class="is-number">{{ "Avg" | tr }}</th><th class="is-number">{{ "Min" | tr }}</th><th class="is-number">{{ "Max" | tr }}</th>
+                    <th class="is-number is-rssi">{{ "Avg" | tr }}</th><th class="is-number is-rssi">{{ "Min" | tr }}</th><th class="is-number is-rssi">{{ "Max" | tr }}</th>
+                    <th class="is-number is-snr">{{ "Avg" | tr }}</th><th class="is-number is-snr">{{ "Min" | tr }}</th><th class="is-number is-snr">{{ "Max" | tr }}</th>
                 </tr>
             </thead>
             <tbody id="direct_table"></tbody>
         </table>
-        <p class="direct-hint"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Click a node to show or hide it, and a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click to see it all." | tr }}</p>
+        <p class="direct-hint direct-hint-mouse"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Click a node to show or hide it, and a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click to see it all." | tr }}</p>
+        <p class="direct-hint direct-hint-touch"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Tap a node to show or hide it, and a point to open its packet. Expand the chart to zoom in." | tr }}</p>
     </div>
 </div>
 
@@ -334,9 +352,9 @@
         <h2 class="chart-title"><span class="ti ti-chart-bar" aria-hidden="true"></span> <span data-translate-lang="packets_per_day">Packets per Day (Last 7 Days)</span></h2>
         <div class="chart-actions">
                 <select class="chart-period" data-chart="packet_histogram" aria-label="{{ "Chart time range" | tr }}">
-                    <option value="1">{{ "Last 24 hours" | tr }}</option>
-                    <option value="7" selected>{{ "Last 7 days" | tr }}</option>
-                    <option value="30">{{ "Last 30 days" | tr }}</option>
+                    <option value="1" data-long="{{ "Last 24 hours" | tr }}" data-short="{{ "24 hours" | tr }}">{{ "Last 24 hours" | tr }}</option>
+                    <option value="7" selected data-long="{{ "Last 7 days" | tr }}" data-short="{{ "7 days" | tr }}">{{ "Last 7 days" | tr }}</option>
+                    <option value="30" data-long="{{ "Last 30 days" | tr }}" data-short="{{ "30 days" | tr }}">{{ "Last 30 days" | tr }}</option>
                 </select>
                 <button type="button" class="chart-tool" onclick="expandChart('packet_histogram')" title="{{ "Expand chart" | tr }}" aria-label="{{ "Expand chart" | tr }}"><span class="ti ti-arrows-maximize" aria-hidden="true"></span></button>
                 <button type="button" class="chart-tool" onclick="exportCSV('packet_histogram')" title="{{ "Export CSV" | tr }}" aria-label="{{ "Export CSV" | tr }}"><span class="ti ti-download" aria-hidden="true"></span></button>
@@ -1141,9 +1159,11 @@ function showChartEmpty(card, empty) {
 }
 
 // With a mouse, dragging selects the span to zoom into and the wheel moves
-// along time; on a touch screen, pinch and drag as usual. The box zoom only
-// works with its toolbox shown: it is, out of sight.
-function spanZoomOption() {
+// along time. On a touch screen a finger on the page has to scroll it, so the
+// charts there do not zoom: expanded, they pinch and drag as usual. The box zoom
+// only works with its toolbox shown: it is, out of sight.
+function spanZoomOption(expanded = false) {
+    if (!FINE_POINTER && !expanded) return {};
     return {
         toolbox: { show: true, left: -1000, top: -1000, showTitle: false,
             feature: { dataZoom: { yAxisIndex: "none" } } },
@@ -1605,7 +1625,8 @@ async function loadNeighborTimeSeries(first = false) {
 // Series colours, so that each node's swatch in the table matches its line.
 const DIRECT_COLORS = ["#245ea8", "#d9480f", "#2f9e44", "#ae3ec9", "#f59f00", "#0c8599",
     "#e03131", "#5c7cfa", "#66a80f", "#c2255c", "#1098ad", "#9c6644", "#7048e8", "#868e96"];
-const directState = { direction: "received", metric: "rssi", data: null, hidden: new Set() };
+// SNR first: how far above what LoRa can still decode, which RSSI does not say.
+const directState = { direction: "received", metric: "snr", data: null, hidden: new Set() };
 
 function directLabel(peer) {
     return peer.long_name || peer.short_name || `!${Number(peer.node_id).toString(16).padStart(8, "0")}`;
@@ -1724,6 +1745,7 @@ function renderDirect() {
     enableSpanZoom(chart);
 
     const fmt = value => value == null ? "—" : String(value);
+    document.querySelector("#direct_container .direct-table").dataset.metric = metric;
     const body = document.getElementById("direct_table");
     body.replaceChildren(...peers.map((peer, i) => {
         const row = document.createElement("tr");
@@ -1739,11 +1761,21 @@ function renderDirect() {
         link.addEventListener("click", event => event.stopPropagation());
         name.append(swatch, link);
         row.append(name);
-        for (const value of [peer.packets, peer.rssi_avg, peer.rssi_min, peer.rssi_max,
-                             peer.snr_avg, peer.snr_min, peer.snr_max]) {
+        for (const [value, metric] of [[peer.packets, ""],
+                [peer.rssi_avg, "rssi"], [peer.rssi_min, "rssi"], [peer.rssi_max, "rssi"],
+                [peer.snr_avg, "snr"], [peer.snr_min, "snr"], [peer.snr_max, "snr"]]) {
             const cell = document.createElement("td");
-            cell.className = "is-number";
+            cell.className = metric ? `is-number is-${metric}` : "is-number";
             cell.textContent = fmt(value);
+            row.append(cell);
+        }
+        // On a phone, a line under the name instead of the columns.
+        for (const [metric, unit] of [["rssi", "dBm"], ["snr", "dB"]]) {
+            const cell = document.createElement("td");
+            cell.className = `direct-summary is-${metric}`;
+            cell.textContent = MeshI18n.t("Packets: {n} · avg {avg} · min {min} · max {max} {unit}", {
+                n: peer.packets, avg: fmt(peer[`${metric}_avg`]), min: fmt(peer[`${metric}_min`]),
+                max: fmt(peer[`${metric}_max`]), unit });
             row.append(cell);
         }
         row.addEventListener("click", () => {
@@ -1933,8 +1965,12 @@ function expandChart(type){
     modalChart.setOption(sourceChart.getOption());
     modalChart.resize();
     fitLegend(modalChart);
-    // Every chart over time zooms as on the page; the bars do not.
-    if (type !== "packet_histogram") enableSpanZoom(modalChart);
+    // Every chart over time zooms, as on the page with a mouse, or by pinching
+    // on a touch screen, where only here it does; the bars do not.
+    if (type !== "packet_histogram") {
+        if (!FINE_POINTER) modalChart.setOption(spanZoomOption(true));
+        enableSpanZoom(modalChart);
+    }
 }
 // The modal chart follows its box, e.g. when a phone is rotated.
 new ResizeObserver(() => {
@@ -2002,6 +2038,14 @@ function exportCSV(type){
 
 // A chart's period changed: it loads again, for that period.
 function initChartPeriods() {
+    // On a phone the periods are said short, so that the card titles beside
+    // them keep room to break into two lines rather than run under them.
+    const narrow = window.matchMedia("(max-width: 700px)");
+    const label = () => document.querySelectorAll(".chart-period option").forEach(option => {
+        option.textContent = narrow.matches ? option.dataset.short : option.dataset.long;
+    });
+    narrow.addEventListener("change", label);
+    label();
     const loaders = {
         neighbors: () => loadNeighborTimeSeries(),
         direct: () => loadDirectReceptions(),

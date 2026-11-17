@@ -1113,6 +1113,10 @@
     "Chart time range": "Periodo del gráfico",
     "No data in this period.": "No hay datos en este periodo.",
     "{n} neighbors": "{n} vecinos",
-    "The {n} neighbors with the most data points, of {total}": "Los {n} vecinos con más datos, de {total}"
+    "The {n} neighbors with the most data points, of {total}": "Los {n} vecinos con más datos, de {total}",
+    "Tap a node to show or hide it, and a point to open its packet. Expand the chart to zoom in.": "Toca un nodo para mostrarlo u ocultarlo, y un punto para abrir su paquete. Amplía el gráfico para hacer zoom.",
+    "Packets: {n} · avg {avg} · min {min} · max {max} {unit}": "Paquetes: {n} · media {avg} · mín. {min} · máx. {max} {unit}",
+    "24 hours": "24 horas",
+    "30 days": "30 días"
   }
 }

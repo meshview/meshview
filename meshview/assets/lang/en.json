@@ -1105,6 +1105,10 @@
     "Chart time range": "Chart time range",
     "No data in this period.": "No data in this period.",
     "{n} neighbors": "{n} neighbors",
-    "The {n} neighbors with the most data points, of {total}": "The {n} neighbors with the most data points, of {total}"
+    "The {n} neighbors with the most data points, of {total}": "The {n} neighbors with the most data points, of {total}",
+    "Tap a node to show or hide it, and a point to open its packet. Expand the chart to zoom in.": "Tap a node to show or hide it, and a point to open its packet. Expand the chart to zoom in.",
+    "Packets: {n} · avg {avg} · min {min} · max {max} {unit}": "Packets: {n} · avg {avg} · min {min} · max {max} {unit}",
+    "24 hours": "24 hours",
+    "30 days": "30 days"
   }
 }

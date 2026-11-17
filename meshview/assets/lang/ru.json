@@ -1105,6 +1105,10 @@
     "Chart time range": "Период графика",
     "No data in this period.": "За этот период данных нет.",
     "{n} neighbors": "{n} соседей",
-    "The {n} neighbors with the most data points, of {total}": "{n} соседей с наибольшим числом точек, из {total}"
+    "The {n} neighbors with the most data points, of {total}": "{n} соседей с наибольшим числом точек, из {total}",
+    "Tap a node to show or hide it, and a point to open its packet. Expand the chart to zoom in.": "Коснитесь узла, чтобы показать или скрыть его, и точки, чтобы открыть её пакет. Разверните диаграмму, чтобы увеличить её.",
+    "Packets: {n} · avg {avg} · min {min} · max {max} {unit}": "Пакетов: {n} · ср. {avg} · мин. {min} · макс. {max} {unit}",
+    "24 hours": "24 часа",
+    "30 days": "30 дней"
   }
 }
