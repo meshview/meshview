@@ -1143,6 +1143,10 @@
     "{n} packets": "{n} packets",
     "shared byte": "shared byte",
     "This node has no position, so its links cannot be drawn.": "This node has no position, so its links cannot be drawn.",
-    "Linked nodes without a position, not on the map: {n}.": "Linked nodes without a position, not on the map: {n}."
+    "Linked nodes without a position, not on the map: {n}.": "Linked nodes without a position, not on the map: {n}.",
+    "Nodes seen whose id ends in this byte, not heard directly: the nearest first.": "Nodes seen whose id ends in this byte, not heard directly: the nearest first.",
+    "Maybe:": "Maybe:",
+    "Maybe relay {byte}": "Maybe relay {byte}",
+    "not heard directly": "not heard directly"
   }
 }

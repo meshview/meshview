@@ -10,7 +10,7 @@
 
 use super::error::{ApiError, ErrorBody};
 use super::params::{Params, parse_db_int};
-use crate::db::{DirectCount, Direction, RelayedCount};
+use crate::db::{DirectCount, Direction, Node, RelayedCount};
 use crate::state::AppState;
 use axum::Json;
 use axum::extract::{Path, State};
@@ -55,6 +55,30 @@ pub struct Relay {
     /// ends in the relay's byte, the one heard most first. None when it heard
     /// none of them; more than one when the byte is shared.
     pub candidates: Vec<Candidate>,
+    /// Only when there are no candidates: a few nodes seen in the same time
+    /// whose id ends in the relay's byte, though the gateway never heard them
+    /// straight, within 150 km of it, the nearest first and those with no
+    /// position last. A hint at who it may be, not a match.
+    pub hints: Vec<Hint>,
+}
+
+/// A node seen whose id ends in a relay's byte, which the gateway did not
+/// hear straight.
+#[derive(Debug, PartialEq, Serialize, ToSchema)]
+pub struct Hint {
+    #[schema(example = 3184301941_i64)]
+    pub node_id: i64,
+    #[schema(example = "Pena Trevinca")]
+    pub long_name: Option<String>,
+    #[schema(example = "PTRV")]
+    pub short_name: Option<String>,
+    /// When it was last seen, in microseconds since the epoch.
+    #[schema(example = 1794831200000000_i64)]
+    pub last_seen_us: Option<i64>,
+    /// How far it is from the gateway, in kilometres; null when either has
+    /// no position.
+    #[schema(example = 42.7)]
+    pub distance_km: Option<f64>,
 }
 
 /// A node a relay may be.
@@ -157,8 +181,68 @@ fn with_candidates(counts: Vec<RelayedCount>, direct: &[DirectCount]) -> Vec<Rel
                     direct_packets: peer.packets,
                 })
                 .collect(),
+            hints: Vec::new(),
         })
         .collect()
+}
+
+/// The most hints a relay gets.
+const MAX_HINTS: usize = 3;
+
+/// The farthest a hint may be from the gateway, in kilometres: beyond what a
+/// LoRa link reaches even between two summits, so no relay of its.
+const MAX_HINT_KM: f64 = 150.0;
+
+/// A node's position, in degrees, when it has one.
+fn position(node: &Node) -> Option<(f64, f64)> {
+    let (lat, lon) = (node.last_lat?, node.last_long?);
+    (lat != 0 && lon != 0).then(|| (lat as f64 / 1e7, lon as f64 / 1e7))
+}
+
+/// The distance between two points, in kilometres, along the Earth's surface.
+fn distance_km((lat1, lon1): (f64, f64), (lat2, lon2): (f64, f64)) -> f64 {
+    let (lat1, lat2) = (lat1.to_radians(), lat2.to_radians());
+    let (dlat, dlon) = (lat2 - lat1, (lon2 - lon1).to_radians());
+    let a = (dlat / 2.0).sin().powi(2) + lat1.cos() * lat2.cos() * (dlon / 2.0).sin().powi(2);
+    6371.0 * 2.0 * a.sqrt().asin()
+}
+
+/// For each relay with no candidates, the nodes seen that end in its byte,
+/// the nearest to the gateway first and those with no position last.
+fn with_hints(relays: &mut [Relay], gateway: Option<&Node>, seen: &[Node]) {
+    let from = gateway.and_then(position);
+    for relay in relays
+        .iter_mut()
+        .filter(|relay| relay.candidates.is_empty())
+    {
+        let mut hints: Vec<Hint> = seen
+            .iter()
+            .filter_map(|node| {
+                let node_id = node.node_id?;
+                (relay_byte(node_id) == relay.relay_node
+                    && Some(node_id) != gateway.and_then(|g| g.node_id))
+                .then(|| Hint {
+                    node_id,
+                    long_name: node.long_name.clone(),
+                    short_name: node.short_name.clone(),
+                    last_seen_us: node.last_seen_us,
+                    distance_km: from
+                        .zip(position(node))
+                        .map(|(a, b)| (distance_km(a, b) * 10.0).round() / 10.0),
+                })
+            })
+            .filter(|hint| hint.distance_km.is_none_or(|km| km <= MAX_HINT_KM))
+            .collect();
+        // Already the last seen first, which is kept among equals.
+        hints.sort_by(|a, b| match (a.distance_km, b.distance_km) {
+            (Some(a), Some(b)) => a.total_cmp(&b),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => std::cmp::Ordering::Equal,
+        });
+        hints.truncate(MAX_HINTS);
+        relay.hints = hints;
+    }
 }
 
 /// Each gateway that heard through the node, among those that heard it
@@ -202,7 +286,8 @@ fn node_and_since(node_id: &str, params: &Params) -> Result<(i64, i64), ApiError
 /// The nodes each relay may be are those the gateway heard straight from, at
 /// no hops, in the same time, whose id ends in that byte: a relay a gateway
 /// hears is one it can hear directly. A byte two nodes share has both; one no
-/// such node ends in has none.
+/// such node ends in has none, and then, as hints, a few nodes seen in the
+/// same time that end in it, the nearest to the gateway first.
 #[utoipa::path(
     get,
     path = "/node/{node_id}/relays",
@@ -237,11 +322,23 @@ pub async fn relays(
             .await
             .map_err(internal)?
     };
+    let mut relays = with_candidates(counts, &direct);
 
-    Ok(Json(Relays {
-        node_id,
-        relays: with_candidates(counts, &direct),
-    }))
+    let unmatched: Vec<i64> = relays
+        .iter()
+        .filter(|relay| relay.candidates.is_empty())
+        .map(|relay| relay.relay_node)
+        .collect();
+    if !unmatched.is_empty() {
+        let seen = db
+            .nodes_ending_in(&unmatched, since_us)
+            .await
+            .map_err(internal)?;
+        let gateway = db.node(node_id).await.map_err(internal)?;
+        with_hints(&mut relays, gateway.as_ref(), &seen);
+    }
+
+    Ok(Json(Relays { node_id, relays }))
 }
 
 /// Gateways heard through a node
@@ -362,5 +459,58 @@ mod tests {
             (10, 12, 40)
         );
         assert_eq!(gateways[0].long_name.as_deref(), Some("Node 10"));
+    }
+
+    fn seen(node_id: i64, lat: Option<f64>) -> Node {
+        Node {
+            id: format!("!{node_id:08x}"),
+            node_id: Some(node_id),
+            long_name: None,
+            short_name: None,
+            hw_model: None,
+            firmware: None,
+            role: None,
+            last_lat: lat.map(|lat| (lat * 1e7) as i64),
+            last_long: lat.map(|_| -80_000_000),
+            last_altitude: None,
+            channel: None,
+            is_mqtt_gateway: None,
+            first_seen_us: None,
+            last_seen_us: Some(1),
+        }
+    }
+
+    #[test]
+    fn a_relay_with_no_candidates_gets_the_nearest_nodes_seen_as_hints() {
+        let gateway = seen(0x0a63, Some(43.0));
+        // Last seen first, as the database gives them: one with no position,
+        // one 11 km away, one 22 km away, one 222 km away, and others that
+        // end in other bytes.
+        let nodes = [
+            seen(0x0363, None),
+            seen(0x0563, Some(43.2)),
+            seen(0x0163, Some(43.1)),
+            seen(0x0463, Some(45.0)),
+            seen(0x0114, Some(43.0)),
+            gateway.clone(),
+        ];
+        let mut relays = with_candidates(
+            vec![relayed(1, 0x63, 5), relayed(1, 0x14, 2)],
+            &[direct(0x0114, 3)],
+        );
+        with_hints(&mut relays, Some(&gateway), &nodes);
+
+        let hints: Vec<(i64, Option<f64>)> = relays[0]
+            .hints
+            .iter()
+            .map(|hint| (hint.node_id, hint.distance_km))
+            .collect();
+        // Not the gateway itself, nor one beyond reach; no position last.
+        assert_eq!(
+            hints,
+            [(0x0163, Some(11.1)), (0x0563, Some(22.2)), (0x0363, None)]
+        );
+        // A relay with a candidate gets none.
+        assert!(relays[1].hints.is_empty());
     }
 }

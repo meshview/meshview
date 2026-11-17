@@ -51,9 +51,11 @@
 /* A relay is a byte, and the nodes it may be. */
 .relay-byte { display:inline-block; min-width:2.6em; padding:1px 6px; border-radius:5px; background:var(--mesh-soft); color:var(--mesh-text); font:600 12px ui-monospace,Consolas,monospace; text-align:center; }
 .relay-candidates { white-space:normal; }
-.relay-candidates a + a::before { content:" · "; color:var(--mesh-muted); }
+.relay-candidates > a + a::before { content:" · "; color:var(--mesh-muted); }
 .relay-direct { color:var(--mesh-muted); font-size:12px; }
 .relay-none { color:var(--mesh-muted); font-style:italic; }
+.relay-hints { color:var(--mesh-muted); font-size:12px; white-space:normal; opacity:.85; }
+.relay-hints a { color:inherit; text-decoration:underline dotted; }
 .relay-shared { color:#9a5b00; font-size:12px; }
 [data-bs-theme="dark"] .relay-shared { color:#f1d38a; }
 #relays_container .chart-empty[hidden] { display:none; }
@@ -576,6 +578,20 @@ function relayRow(relay) {
         none.className = "relay-none";
         none.textContent = MeshI18n.t("No node heard directly ends in {byte}", {byte: relayHex(relay.relay_node)});
         candidates.append(none);
+        // Nodes seen that end in it, which the gateway never heard straight:
+        // who it may be, said as no more than that.
+        if (relay.hints?.length) {
+            const hints = document.createElement("div");
+            hints.className = "relay-hints";
+            hints.title = MeshI18n.t("Nodes seen whose id ends in this byte, not heard directly: the nearest first.");
+            hints.append(MeshI18n.t("Maybe:") + " ");
+            relay.hints.forEach((hint, i) => {
+                if (i) hints.append(" · ");
+                hints.append(nodeAnchor(hint.node_id, nodeLabel(hint, hint.node_id)));
+                if (hint.distance_km != null) hints.append(` (${hint.distance_km.toLocaleString(MeshI18n.language)} km)`);
+            });
+            candidates.append(hints);
+        }
     } else {
         for (const candidate of relay.candidates) {
             const link = nodeAnchor(candidate.node_id, nodeLabel(candidate, candidate.node_id));
@@ -850,6 +866,12 @@ function radioLinks() {
                     shared: relay.candidates.length > 1,
                     label: MeshI18n.t("Relay {byte}", {byte: relayHex(relay.relay_node)}) });
             }
+            // A hint is drawn fainter still than a shared byte's candidate.
+            for (const hint of relay.hints || []) {
+                add(hint.node_id, "relay", { packets: relay.packets, snr: relay.snr_avg, rssi: relay.rssi_avg,
+                    hint: true,
+                    label: MeshI18n.t("Maybe relay {byte}", {byte: relayHex(relay.relay_node)}) });
+            }
         }
     } else {
         for (const gateway of relayState.data?.gateways || []) {
@@ -873,6 +895,7 @@ function linkPopup(nodeId, node, kinds, distanceKm) {
         if (info.snr != null) parts.push(`SNR ${info.snr} dB`);
         if (info.rssi != null) parts.push(`RSSI ${info.rssi} dBm`);
         if (info.shared) parts.push(MeshI18n.t("shared byte"));
+        if (info.hint) parts.push(MeshI18n.t("not heard directly"));
         return [info.label, parts.join(" · ")];
     });
     if (distanceKm != null) {
@@ -949,12 +972,14 @@ async function renderRadioMap() {
                     color: snrColor(info.snr),
                     weight: info.packets ? 2 + Math.min(4, Math.log10(info.packets + 1) * 1.6) : 2.5,
                     dashArray: LINK_DASHES[kind],
-                    opacity: info.shared ? 0.4 : 0.85,
+                    opacity: info.hint ? 0.25 : info.shared ? 0.4 : 0.85,
                 }).bindPopup(popup, { closeButton: false }).addTo(radioMapLayer);
             }
         }
+        // A node that is only a hint is drawn as faint as its line.
+        const onlyHint = Object.values(kinds).every(info => info.hint);
         L.circleMarker(position, {
-            radius: 7, color: "#fff", weight: 2, fillOpacity: 1,
+            radius: 7, color: "#fff", weight: 2, opacity: onlyHint ? 0.5 : 1, fillOpacity: onlyHint ? 0.35 : 1,
             fillColor: snrColor(snrs.length ? Math.max(...snrs) : null),
         }).bindPopup(popup, { closeButton: false }).addTo(radioMapLayer);
     }

@@ -1143,6 +1143,10 @@
     "{n} packets": "Пакетов: {n}",
     "shared byte": "общий байт",
     "This node has no position, so its links cannot be drawn.": "У этого узла нет координат, поэтому его связи нельзя нарисовать.",
-    "Linked nodes without a position, not on the map: {n}.": "Связанные узлы без координат, не показанные на карте: {n}."
+    "Linked nodes without a position, not on the map: {n}.": "Связанные узлы без координат, не показанные на карте: {n}.",
+    "Nodes seen whose id ends in this byte, not heard directly: the nearest first.": "Замеченные узлы, чей идентификатор оканчивается на этот байт, не услышанные напрямую: сначала ближайший.",
+    "Maybe:": "Возможно:",
+    "Maybe relay {byte}": "Возможно, ретранслятор {byte}",
+    "not heard directly": "не услышан напрямую"
   }
 }

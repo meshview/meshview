@@ -313,10 +313,15 @@ async fn relays_are_told_by_the_last_byte_of_their_id() {
     // 10 and 40 are gateways. 10 heard 20 and 276 straight, which both end in
     // 0x14; 30's packets reached 10 through 0x14, once an hour ago, and
     // through 0x63, which no node 10 heard straight ends in, with no signal.
-    // 40 heard one through 0x14 too, but never heard 20 straight.
+    // 40 heard one through 0x14 too, but never heard 20 straight. 0x163 and
+    // 0x263 end in 0x63, seen but not heard straight by 10: hints, the one
+    // with a position, 11.1 km from 10, first.
     api.exec(
-        "INSERT INTO node (id, node_id, long_name, short_name) VALUES \
-         ('!00000014', 20, 'Twenty', 'T20'), ('!0000000a', 10, 'Gateway', 'GW')",
+        "INSERT INTO node (id, node_id, long_name, short_name, last_lat, last_long, last_seen_us) \
+         VALUES ('!00000014', 20, 'Twenty', 'T20', NULL, NULL, NULL), \
+         ('!0000000a', 10, 'Gateway', 'GW', 430000000, -80000000, 1), \
+         ('!00000263', 611, 'Far', NULL, NULL, NULL, 2), \
+         ('!00000163', 355, 'Near', NULL, 431000000, -80000000, 1)",
     )
     .await;
     for (id, from) in [
@@ -375,11 +380,16 @@ async fn relays_are_told_by_the_last_byte_of_their_id() {
              "candidates": [
                 {"node_id": 20, "long_name": "Twenty", "short_name": "T20", "direct_packets": 1},
                 {"node_id": 276, "long_name": null, "short_name": null, "direct_packets": 1},
-             ]},
+             ],
+             "hints": []},
             {"relay_node": 0x63, "packets": 1,
              "rssi_avg": null, "rssi_min": null, "rssi_max": null,
              "snr_avg": null, "snr_min": null, "snr_max": null,
-             "candidates": []},
+             "candidates": [],
+             "hints": [
+                {"node_id": 355, "long_name": "Near", "short_name": null, "last_seen_us": 1, "distance_km": 11.1},
+                {"node_id": 611, "long_name": "Far", "short_name": null, "last_seen_us": 2, "distance_km": null},
+             ]},
         ]})
     );
 

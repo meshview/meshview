@@ -1151,6 +1151,10 @@
     "{n} packets": "{n} paquetes",
     "shared byte": "byte compartido",
     "This node has no position, so its links cannot be drawn.": "Este nodo no tiene posición, así que no se pueden dibujar sus enlaces.",
-    "Linked nodes without a position, not on the map: {n}.": "Nodos enlazados sin posición, que no están en el mapa: {n}."
+    "Linked nodes without a position, not on the map: {n}.": "Nodos enlazados sin posición, que no están en el mapa: {n}.",
+    "Nodes seen whose id ends in this byte, not heard directly: the nearest first.": "Nodos vistos cuyo id acaba en este byte, no oídos directamente: primero el más cercano.",
+    "Maybe:": "Quizá:",
+    "Maybe relay {byte}": "Quizá relé {byte}",
+    "not heard directly": "no oído directamente"
   }
 }

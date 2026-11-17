@@ -201,6 +201,24 @@ pub async fn direct_counts(
         .context("counting direct receptions")
 }
 
+pub async fn nodes_ending_in(pool: &PgPool, bytes: &[i64], since_us: i64) -> Result<Vec<Node>> {
+    let mut query = QueryBuilder::new(NODE_COLUMNS);
+    query
+        .push(" WHERE node_id IS NOT NULL AND last_seen_us >= ")
+        .push_bind(since_us)
+        .push(" AND (node_id & 255) IN (");
+    let mut list = query.separated(", ");
+    for byte in bytes {
+        list.push_bind(*byte);
+    }
+    query.push(") ORDER BY last_seen_us DESC NULLS LAST, node_id");
+    query
+        .build_query_as()
+        .fetch_all(pool)
+        .await
+        .context("listing the nodes whose id ends in a byte")
+}
+
 pub async fn relayed_counts(
     pool: &PgPool,
     gateways: &[i64],

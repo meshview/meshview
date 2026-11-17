@@ -186,6 +186,25 @@ pub async fn direct_counts(
         .context("counting direct receptions")
 }
 
+pub async fn nodes_ending_in(pool: &SqlitePool, bytes: &[i64], since_us: i64) -> Result<Vec<Node>> {
+    let mut query = QueryBuilder::new(
+        "SELECT id, node_id, long_name, short_name, hw_model, firmware, role, last_lat, \
+         last_long, last_altitude, channel, is_mqtt_gateway, first_seen_us, last_seen_us \
+         FROM node WHERE node_id IS NOT NULL AND last_seen_us >= ",
+    );
+    query.push_bind(since_us).push(" AND (node_id & 255) IN (");
+    let mut list = query.separated(", ");
+    for byte in bytes {
+        list.push_bind(*byte);
+    }
+    query.push(") ORDER BY last_seen_us DESC, node_id");
+    query
+        .build_query_as()
+        .fetch_all(pool)
+        .await
+        .context("listing the nodes whose id ends in a byte")
+}
+
 pub async fn relayed_counts(
     pool: &SqlitePool,
     gateways: &[i64],

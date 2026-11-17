@@ -366,6 +366,15 @@ impl Reader {
         on!(self, direct_counts(node_id, direction, since_us))
     }
 
+    /// The nodes seen since a time whose id ends in one of these bytes, the
+    /// last seen first.
+    pub async fn nodes_ending_in(&self, bytes: &[i64], since_us: i64) -> Result<Vec<Node>> {
+        if bytes.is_empty() {
+            return Ok(Vec::new());
+        }
+        on!(self, nodes_ending_in(bytes, since_us))
+    }
+
     /// The packets these gateways heard through a relay since a time, by
     /// gateway and relay, or through one relay only when it is given.
     pub async fn relayed_counts(
