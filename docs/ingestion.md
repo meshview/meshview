@@ -10,7 +10,7 @@ the databases.
 
 | | |
 |---|---|
-| Protocol | MQTT 5, plain or over TLS (`[mqtt] tls`): the broker has to speak it, as Mosquitto does from 1.6 on, and EMQX and HiveMQ do |
+| Protocol | MQTT 5, plain or over TLS (`[mqtt] tls`): the broker has to speak it. One that does not closes the connection without accepting it, and the ingester says so once in the log. |
 | Client id | `meshview-<random>`, new on every start, so two ingesters never throw each other off |
 | Session | clean: every connection subscribes again |
 | QoS | 0, at most once |

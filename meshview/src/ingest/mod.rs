@@ -20,7 +20,7 @@ use keys::Keyring;
 use opened::{NotOpened, Opened};
 use rumqttc::v5::mqttbytes::QoS;
 use rumqttc::v5::mqttbytes::v5::Packet;
-use rumqttc::v5::{AsyncClient, Event, MqttOptions};
+use rumqttc::v5::{AsyncClient, ConnectionError, Event, MqttOptions, StateError};
 use rumqttc::{Outgoing, TlsConfiguration, Transport};
 use rustls::pki_types::pem::PemObject;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
@@ -244,6 +244,8 @@ pub async fn run(
     let mut dropped: u64 = 0;
     let mut delay: Option<Duration> = None;
     let mut connected_at: Option<Instant> = None;
+    // Until the broker first accepts the connection, and said once.
+    let mut may_not_speak_mqtt_5 = true;
     loop {
         let event = tokio::select! {
             event = events.poll() => event,
@@ -266,6 +268,7 @@ pub async fn run(
                 }
                 readiness.set(CHECK_MQTT, true);
                 connected_at = Some(Instant::now());
+                may_not_speak_mqtt_5 = false;
             }
             Ok(Event::Incoming(Packet::Publish(publish))) => {
                 // MQTT 5 sends the topic as bytes; a name that is not text is
@@ -287,6 +290,13 @@ pub async fn run(
                 let wait = next_delay(delay, connected_at.take().map(|at| at.elapsed()));
                 delay = Some(wait);
                 error!("MQTT error: {e}, reconnecting in {}s...", wait.as_secs());
+                if may_not_speak_mqtt_5 && hangs_up_on_mqtt_5(&e) {
+                    may_not_speak_mqtt_5 = false;
+                    warn!(
+                        "the broker closed the connection without accepting it, as one that \
+                         does not speak MQTT 5 does: Meshview needs a broker that speaks MQTT 5"
+                    );
+                }
                 tokio::select! {
                     _ = tokio::time::sleep(wait) => {}
                     _ = stopping.wait_for(|stop| *stop) => break,
@@ -324,6 +334,16 @@ pub async fn run(
         }
     }
     Ok(())
+}
+
+/// Whether a failure to connect looks like a broker that does not speak MQTT
+/// 5: it answers in a protocol the client does not read, and hangs up, which
+/// is all the client can tell.
+fn hangs_up_on_mqtt_5(error: &ConnectionError) -> bool {
+    matches!(
+        error,
+        ConnectionError::MqttState(StateError::ConnectionAborted)
+    )
 }
 
 /// How long to wait after a failure, given the wait before it, if there was
