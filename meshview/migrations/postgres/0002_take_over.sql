@@ -27,6 +27,12 @@ DROP INDEX IF EXISTS idx_packet_seen_node_id;
 DROP INDEX IF EXISTS idx_packet_to_node_id;
 DROP INDEX IF EXISTS idx_packet_from_node_id;
 
+-- Only the direct receptions, with what is shown of them; see the SQLite
+-- migration of the same number.
+CREATE INDEX IF NOT EXISTS idx_packet_seen_direct
+	ON packet_seen (node_id, import_time_us DESC, packet_id, rx_rssi, rx_snr)
+	WHERE hop_start > 0 AND hop_limit = hop_start AND rx_rssi <> 0;
+
 -- What the scheduled jobs did, one row for each time one ran; see the SQLite
 -- migration of the same number. `details` is JSON, kept as text as there.
 CREATE TABLE IF NOT EXISTS job_run (

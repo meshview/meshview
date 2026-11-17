@@ -38,6 +38,15 @@ DROP INDEX IF EXISTS idx_packet_seen_node_id;
 DROP INDEX IF EXISTS idx_packet_to_node_id;
 DROP INDEX IF EXISTS idx_packet_from_node_id;
 
+-- A gateway's direct receptions, the packets it heard at no hops, are a small
+-- part of its sightings, and this index keeps only those, with what is shown of
+-- them: the node page's chart of them is answered from it alone, without
+-- reading each sighting to find out whether it was one. The conditions are the
+-- query's own, word for word, as SQLite needs to know it can use it.
+CREATE INDEX IF NOT EXISTS idx_packet_seen_direct
+	ON packet_seen (node_id, import_time_us, packet_id, rx_rssi, rx_snr)
+	WHERE hop_start > 0 AND hop_limit = hop_start AND rx_rssi <> 0;
+
 -- What the scheduled jobs did, one row for each time one ran: the daily cleanup
 -- and the daily snapshot, and whatever comes after them.
 --

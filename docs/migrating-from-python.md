@@ -51,7 +51,9 @@ are. What changes:
   replace `idx_packet_seen_node_id` and `idx_packet_to_node_id`, and
   `idx_packet_from_node_id` goes, as `idx_packet_from_node_time_us` already
   began with the sender. `idx_packet_portnum_time_us` is added, for the packets
-  of a port, as the chat and the statistics by port ask for.
+  of a port, as the chat and the statistics by port ask for, and
+  `idx_packet_seen_direct`, of only the sightings heard at no hops, for a node's
+  direct receptions.
 - A table of Meshview's own is added: `job_run`, the record of what the daily
   cleanup and snapshot did, which the Python version kept in a JSON file.
 - Meshview records its own migrations in `_sqlx_migrations`.
