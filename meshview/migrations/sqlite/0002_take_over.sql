@@ -62,6 +62,16 @@ CREATE INDEX IF NOT EXISTS idx_packet_seen_relayed
 	ON packet_seen (node_id, relay_node, import_time_us, rx_rssi, rx_snr)
 	WHERE relay_node IS NOT NULL AND hop_start > hop_limit;
 
+-- A node's public key, from its latest node info that carried a whole one,
+-- as the node gave it. The Python version kept no key: the contact for a QR
+-- code read it from the packets. Kept here, and indexed, so that the nodes
+-- that share a key, which can read each other's direct messages, are found
+-- without reading every node info packet. NULL until the node's next node
+-- info, for every node stored before this column was.
+ALTER TABLE node ADD COLUMN public_key BLOB;
+CREATE INDEX IF NOT EXISTS idx_node_public_key ON node (public_key)
+	WHERE public_key IS NOT NULL;
+
 -- What the scheduled jobs did, one row for each time one ran: the daily cleanup
 -- and the daily snapshot, and whatever comes after them.
 --

@@ -21,6 +21,7 @@ pub enum Arg<'a> {
     Text(&'a str),
     OptText(Option<&'a str>),
     Bytes(&'a [u8]),
+    OptBytes(Option<&'a [u8]>),
     OptReal(Option<f64>),
     Bool(bool),
 }
@@ -43,6 +44,7 @@ macro_rules! bind {
                 Arg::Text(value) => query.bind(value),
                 Arg::OptText(value) => query.bind(value),
                 Arg::Bytes(value) => query.bind(value),
+                Arg::OptBytes(value) => query.bind(value),
                 Arg::OptReal(value) => query.bind(value),
                 Arg::Bool(value) => query.bind(value),
             };

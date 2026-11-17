@@ -21,12 +21,13 @@ What it does, in one transaction, so that it either all happens or none of it:
   migration_status, and the unused example table), exactly as Python creates it;
 - removes what Meshview added: its indexes (idx_traceroute_packet_id and those
   on a node, or a port, and the time), the relay_node column of packet_seen
-  (who each sighting was heard from), the job_run table (what its scheduled
+  (who each sighting was heard from), the public_key column of node (each
+  node's latest key) and its index, the job_run table (what its scheduled
   jobs did) and its own record of migrations, _sqlx_migrations;
 - puts back the indexes on a node alone that Meshview's replace.
 
-The data, every row of every table, is kept; only the relays Meshview recorded
-go with their column. Stop Meshview, every
+The data, every row of every table, is kept; only the relays and the keys
+Meshview recorded go with their columns. Stop Meshview, every
 process using the database, before running it.
 
 Only the standard library is used.
@@ -74,10 +75,12 @@ RESTORE = [
     "DROP INDEX IF EXISTS idx_packet_portnum_time_us",
     "DROP INDEX IF EXISTS idx_packet_seen_direct",
     "DROP INDEX IF EXISTS idx_packet_seen_relayed",
+    "DROP INDEX IF EXISTS idx_node_public_key",
     "CREATE INDEX idx_packet_to_node_id ON packet (to_node_id)",
     "CREATE INDEX idx_packet_from_node_id ON packet (from_node_id)",
     "CREATE INDEX idx_packet_seen_node_id ON packet_seen (node_id)",
     "ALTER TABLE packet_seen DROP COLUMN relay_node",
+    "ALTER TABLE node DROP COLUMN public_key",
     "DROP TABLE IF EXISTS job_run",
     "DROP TABLE _sqlx_migrations",
 ]

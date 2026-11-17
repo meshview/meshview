@@ -150,6 +150,11 @@ fn a_field_of_the_wrong_wire_type_is_kept_as_python_keeps_it() {
 
 /// A node info from `from` to `to`, sent in the clear on `channel`.
 fn node_info(id: u32, from: u32, to: u32, channel: &str) -> Opened {
+    node_info_with_key(id, from, to, channel, Vec::new())
+}
+
+/// The same, with this public key.
+fn node_info_with_key(id: u32, from: u32, to: u32, channel: &str, key: Vec<u8>) -> Opened {
     use meshview_proto::meshtastic::mesh_packet::PayloadVariant;
     use meshview_proto::meshtastic::{Data, MeshPacket, PortNum, ServiceEnvelope, User};
     use prost::Message;
@@ -165,6 +170,7 @@ fn node_info(id: u32, from: u32, to: u32, channel: &str) -> Opened {
                     id: format!("!{from:08x}"),
                     long_name: "Gateway".into(),
                     short_name: "GW".into(),
+                    public_key: key,
                     ..Default::default()
                 }
                 .encode_to_vec(),
@@ -218,4 +224,40 @@ async fn a_node_info_to_one_node_does_not_move_the_node_to_its_channel() {
         .await
         .unwrap();
     assert_eq!(channel().await, "LongFast");
+}
+
+// The key is kept from the latest node info that has a whole one, to find the
+// nodes that share it.
+#[tokio::test]
+async fn a_node_keeps_its_latest_whole_key() {
+    let dir = TempDir::new().unwrap();
+    let pool = sqlite::open_for_writing(&dir.path().join("packets.db"))
+        .await
+        .unwrap();
+    let mut store = Store::new(pool.clone()).await.unwrap();
+    let key = async || {
+        sqlx::query_scalar::<_, Option<Vec<u8>>>(
+            "SELECT public_key FROM node WHERE node_id = 3735928559",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap()
+    };
+    let topic = "msh/EU_868/2/e/LongFast/!12345678";
+    let node = 0xdead_beef;
+
+    let first = node_info_with_key(1, node, 0xffff_ffff, "LongFast", vec![1; 32]);
+    store.process(topic, &first).await.unwrap();
+    assert_eq!(key().await, Some(vec![1; 32]));
+
+    // None, or one cut short, leaves it.
+    for (id, short) in [(2, Vec::new()), (3, vec![2; 16])] {
+        let without = node_info_with_key(id, node, 0xffff_ffff, "LongFast", short);
+        store.process(topic, &without).await.unwrap();
+        assert_eq!(key().await, Some(vec![1; 32]));
+    }
+
+    let made_anew = node_info_with_key(4, node, 0xffff_ffff, "LongFast", vec![3; 32]);
+    store.process(topic, &made_anew).await.unwrap();
+    assert_eq!(key().await, Some(vec![3; 32]));
 }

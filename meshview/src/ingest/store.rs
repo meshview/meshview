@@ -41,6 +41,9 @@ const MQTT_DIRECT_NODE_ID: i64 = 1;
 /// in it.
 const UNKNOWN_NODE_NAME: &str = "unknown name";
 
+/// The length of a Meshtastic public key.
+const PUBLIC_KEY_LEN: usize = 32;
+
 /// What happened to a message.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Outcome {
@@ -357,6 +360,9 @@ async fn node_info(
     let short_name = normalize_node_name(&user.short_name);
     let hw_model = hw_model_name(user.hw_model);
     let role = role_name(user.role);
+    // Only a whole key; a node info without one leaves the one known.
+    let public_key =
+        (user.public_key.len() == PUBLIC_KEY_LEN).then_some(user.public_key.as_slice());
 
     // By the id as the node spells it first, and failing that by number: the
     // same node may already be stored under a differently spelled id, such as
@@ -368,6 +374,7 @@ async fn node_info(
                  role = ?, \
                  channel = CASE WHEN ? OR channel IS NULL OR channel = '' THEN ? \
                                 ELSE channel END, \
+                 public_key = COALESCE(?, public_key), \
                  last_seen_us = ?, first_seen_us = COALESCE(first_seen_us, ?) WHERE id = ?"
             }
             _ => {
@@ -375,6 +382,7 @@ async fn node_info(
                  role = ?, \
                  channel = CASE WHEN ? OR channel IS NULL OR channel = '' THEN ? \
                                 ELSE channel END, \
+                 public_key = COALESCE(?, public_key), \
                  last_seen_us = ?, first_seen_us = COALESCE(first_seen_us, ?) WHERE node_id = ?"
             }
         };
@@ -394,6 +402,7 @@ async fn node_info(
                     Arg::Text(&role),
                     Arg::Bool(broadcast),
                     Arg::Text(channel),
+                    Arg::OptBytes(public_key),
                     Arg::Int(now),
                     Arg::Int(now),
                     key,
@@ -408,9 +417,9 @@ async fn node_info(
 
     tx.execute(
         "INSERT INTO node \
-         (id, node_id, long_name, short_name, hw_model, role, channel, first_seen_us, \
-          last_seen_us) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+         (id, node_id, long_name, short_name, hw_model, role, channel, public_key, \
+          first_seen_us, last_seen_us) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         &[
             Arg::Text(&user.id),
             Arg::Int(node_id),
@@ -419,6 +428,7 @@ async fn node_info(
             Arg::Text(&hw_model),
             Arg::Text(&role),
             Arg::Text(channel),
+            Arg::OptBytes(public_key),
             Arg::Int(now),
             Arg::Int(now),
         ],

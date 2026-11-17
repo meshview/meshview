@@ -59,6 +59,9 @@ are, with one column added. What changes:
   its id, which is all the firmware tells. Sightings stored before have none.
   `idx_packet_seen_relayed` keeps the sightings heard through a relay, by
   gateway and relay.
+- `node` gets a `public_key` column: the node's key, from its latest node info
+  that carried one, indexed by `idx_node_public_key`, to find the nodes that
+  share a key. Nodes stored before have none until they next send node info.
 - A table of Meshview's own is added: `job_run`, the record of what the daily
   cleanup and snapshot did, which the Python version kept in a JSON file.
 - Meshview records its own migrations in `_sqlx_migrations`.

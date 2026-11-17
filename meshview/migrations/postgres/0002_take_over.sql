@@ -43,6 +43,13 @@ CREATE INDEX IF NOT EXISTS idx_packet_seen_relayed
 	ON packet_seen (node_id, relay_node, import_time_us DESC, rx_rssi, rx_snr)
 	WHERE relay_node IS NOT NULL AND hop_start > hop_limit;
 
+-- A node's public key, from its latest node info that carried a whole one,
+-- to find the nodes that share it; see the SQLite migration of the same
+-- number.
+ALTER TABLE node ADD COLUMN IF NOT EXISTS public_key BYTEA;
+CREATE INDEX IF NOT EXISTS idx_node_public_key ON node (public_key)
+	WHERE public_key IS NOT NULL;
+
 -- What the scheduled jobs did, one row for each time one ran; see the SQLite
 -- migration of the same number. `details` is JSON, kept as text as there.
 CREATE TABLE IF NOT EXISTS job_run (
