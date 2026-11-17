@@ -9,6 +9,7 @@
 //! latest node info packet.
 
 use super::error::{ApiError, ErrorBody};
+use super::keys::{self, PUBLIC_KEY_LEN};
 use super::params::parse_db_int_any_base;
 use crate::state::AppState;
 use axum::Json;
@@ -22,11 +23,7 @@ use meshview_proto::meshtastic::{HardwareModel, MeshPacket, SharedContact, User}
 use meshview_proto::wire;
 use prost::Message;
 use serde::Serialize;
-use std::collections::HashSet;
 use utoipa::ToSchema;
-
-/// The length of a Meshtastic public key.
-const PUBLIC_KEY_LEN: usize = 32;
 
 /// How many of a node's node info packets are read, the latest: enough to see
 /// whether they agree on its key, without reading every one it ever sent.
@@ -52,7 +49,8 @@ pub struct Contact {
     #[schema(example = "MCowBQYDK2VuAyEAlz7Wq8yZK9Z0r8yY2c3k3o4P5Q6R7S8T9U0V1W2X3Y4=")]
     pub public_key: Option<String>,
     /// Whether its node info packets disagree about its key. One of them may
-    /// be forged, so then no contact is offered.
+    /// be forged, so then no contact is offered. A copy of the key damaged on
+    /// the air, a few bits off, is the same key, and is not a disagreement.
     pub public_key_conflict: bool,
     /// The contact, as the link the Meshtastic apps import; none without a key
     /// or with conflicting ones.
@@ -132,7 +130,7 @@ pub async fn qr(
     // sent, the latest of which are read. Any packet counts, read as node info
     // whatever it says it carries, as in the Python version.
     let mut latest: Option<User> = None;
-    let mut keys = HashSet::new();
+    let mut heard: Vec<Vec<u8>> = Vec::new();
     for payload in db
         .nodeinfo_payloads(node_id, NODEINFO_PACKETS)
         .await
@@ -151,14 +149,16 @@ pub async fn qr(
         let Some(info) = wire::decode::<User>("meshtastic.User", inner) else {
             continue;
         };
-        if info.public_key.len() == PUBLIC_KEY_LEN {
-            keys.insert(info.public_key.clone());
-        }
+        heard.push(info.public_key.clone());
         latest.get_or_insert(info);
     }
+    let keys = keys::tell_apart(heard.iter().map(Vec::as_slice));
     if let Some(latest) = &latest {
-        if latest.public_key.len() == PUBLIC_KEY_LEN {
-            user.public_key = latest.public_key.clone();
+        // The latest key, as it was sent: a damaged copy of it is not offered.
+        if latest.public_key.len() == PUBLIC_KEY_LEN
+            && let Some(key) = keys::right_copy(&keys, &latest.public_key)
+        {
+            user.public_key = key.to_vec();
         }
         user.is_licensed = latest.is_licensed;
         user.is_unmessagable = latest.is_unmessagable;

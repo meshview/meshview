@@ -324,7 +324,6 @@
   "When the snapshot was taken, in microseconds since the epoch: usually the day after `date`.": "Когда был сделан снимок, в микросекундах с начала эпохи: обычно на следующий день после `date`.",
   "Where a node is predicted to be heard, from the ITS Irregular Terrain Model in area mode over average, hilly ground: by default the outline, the furthest point every 5° where the power received still reaches `threshold_dbm`; with any other `mode`, the power received at every point sampled.": "Где узел, согласно прогнозу, будет услышан, по модели ITS Irregular Terrain Model в режиме области над средней холмистой местностью: по умолчанию — периметр, самая дальняя точка через каждые 5°, где принимаемая мощность ещё достигает `threshold_dbm`; при любом другом `mode` — принимаемая мощность в каждой выбранной точке.",
   "Whether it forwards what it hears to MQTT.": "Пересылает ли он услышанное в MQTT.",
-  "Whether its node info packets disagree about its key. One of them may be forged, so then no contact is offered.": "Расходятся ли его пакеты информации об узле в ключе. Один из них может быть подделан, поэтому контакт тогда не предлагается.",
   "Whether old data is deleted every day.": "Удаляются ли старые данные каждый день.",
   "Whether one of the official presets names it, as one whose key is commonly known: LongFast, MediumFast and the like, but not `Custom`.": "Назван ли он по одному из официальных пресетов, ключ которых обычно общеизвестен: LongFast, MediumFast и подобные, но не `Custom`.",
   "Whether one of them was an answer, which shows the route reached the target.": "Был ли один из них ответом, что показывает, что маршрут достиг цели.",
@@ -471,5 +470,6 @@
   "What may be wrong, maybe nothing": "Что может быть не так, возможно ничего",
   "What may be wrong, warnings first; none when nothing is.": "Что может быть не так, сначала предупреждения; пусто, когда всё в порядке.",
   "What was found: the hops its packets start with, the packets of the port sent in a day, or the keys it gave; null when there is no figure.": "Что найдено: число переходов, с которым начинаются его пакеты, пакеты порта, отправленные за сутки, или сообщённые им ключи; null, когда числа нет.",
-  "`warning` or `info`.": "`warning` или `info`."
+  "`warning` or `info`.": "`warning` или `info`.",
+  "Whether its node info packets disagree about its key. One of them may be forged, so then no contact is offered. A copy of the key damaged on the air, a few bits off, is the same key, and is not a disagreement.": "Расходятся ли его пакеты информации об узле в ключе. Один из них может быть подделан, поэтому контакт тогда не предлагается. Копия ключа, повреждённая в эфире и отличающаяся на несколько битов, — это тот же ключ, а не расхождение."
 }

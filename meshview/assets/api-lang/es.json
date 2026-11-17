@@ -324,7 +324,6 @@
   "When the snapshot was taken, in microseconds since the epoch: usually the day after `date`.": "Cuándo se tomó la instantánea, en microsegundos desde la época: normalmente el día después de `date`.",
   "Where a node is predicted to be heard, from the ITS Irregular Terrain Model in area mode over average, hilly ground: by default the outline, the furthest point every 5° where the power received still reaches `threshold_dbm`; with any other `mode`, the power received at every point sampled.": "Dónde se prevé que se oiga un nodo, según el ITS Irregular Terrain Model en modo de área sobre terreno medio y ondulado: por defecto, el perímetro, el punto más lejano cada 5° en el que la potencia recibida aún alcanza `threshold_dbm`; con cualquier otro `mode`, la potencia recibida en cada punto muestreado.",
   "Whether it forwards what it hears to MQTT.": "Si reenvía a MQTT lo que oye.",
-  "Whether its node info packets disagree about its key. One of them may be forged, so then no contact is offered.": "Si sus paquetes de información de nodo discrepan sobre su clave. Uno de ellos puede estar falsificado, así que en ese caso no se ofrece contacto.",
   "Whether old data is deleted every day.": "Si se borran los datos antiguos cada día.",
   "Whether one of the official presets names it, as one whose key is commonly known: LongFast, MediumFast and the like, but not `Custom`.": "Si lleva el nombre de uno de los presets oficiales, cuya clave suele ser conocida: LongFast, MediumFast y similares, pero no `Custom`.",
   "Whether one of them was an answer, which shows the route reached the target.": "Si uno de ellos era una respuesta, lo que demuestra que la ruta llegó al destino.",
@@ -471,5 +470,6 @@
   "What may be wrong, maybe nothing": "Lo que puede estar mal, quizá nada",
   "What may be wrong, warnings first; none when nothing is.": "Lo que puede estar mal, los avisos primero; nada cuando nada lo está.",
   "What was found: the hops its packets start with, the packets of the port sent in a day, or the keys it gave; null when there is no figure.": "Lo que se encontró: los saltos con que salen sus paquetes, los paquetes del puerto enviados en un día o las claves que dio; null cuando no hay cifra.",
-  "`warning` or `info`.": "`warning` o `info`."
+  "`warning` or `info`.": "`warning` o `info`.",
+  "Whether its node info packets disagree about its key. One of them may be forged, so then no contact is offered. A copy of the key damaged on the air, a few bits off, is the same key, and is not a disagreement.": "Si sus paquetes de información de nodo discrepan sobre su clave. Uno de ellos puede estar falsificado, así que en ese caso no se ofrece contacto. Una copia de la clave dañada en el aire, con unos pocos bits cambiados, es la misma clave y no es una discrepancia."
 }

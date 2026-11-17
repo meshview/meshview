@@ -8,6 +8,7 @@
 //! grow with how busy the node is, nor with how long it has been heard.
 
 use super::error::{ApiError, ErrorBody};
+use super::keys;
 use super::now_us;
 use super::params::parse_db_int;
 use crate::config;
@@ -118,14 +119,11 @@ fn no_coordinates((lat, lon): (i32, i32)) -> bool {
     lat.unsigned_abs() <= 10_000_000 && lon.unsigned_abs() <= 10_000_000
 }
 
-/// Several keys, or several hardware models, in the node's node info.
+/// Several keys, or several hardware models, in the node's node info. A copy
+/// of a key damaged on the air is not another key.
 fn identity_checks(users: &[User]) -> Vec<Check> {
     let mut checks = Vec::new();
-    let keys: BTreeSet<&[u8]> = users
-        .iter()
-        .map(|user| user.public_key.as_slice())
-        .filter(|key| key.len() == 32)
-        .collect();
+    let keys = keys::tell_apart(users.iter().map(|user| user.public_key.as_slice()));
     if keys.len() > 1 {
         let mut check = Check::new("public_key_conflict", "warning");
         check.value = Some(keys.len() as i64);

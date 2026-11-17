@@ -13,6 +13,7 @@ mod coverage;
 mod direct_receptions;
 mod edges;
 mod health;
+mod keys;
 pub(crate) mod lang;
 mod nodes;
 mod packet_counts;
