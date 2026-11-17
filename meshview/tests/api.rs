@@ -1066,6 +1066,24 @@ async fn the_position_precision_comes_from_the_latest_position_only_when_asked()
     // Not among every field: it takes reading the packets.
     let (_, all) = api.get("/api/v1/nodes?node_id=1").await;
     assert!(all["nodes"][0].get("position_precision").is_none());
+
+    // What the ingester kept with the node wins over its packets, which are
+    // read only for a node with none kept: 0 is a kept none.
+    api.exec("UPDATE node SET position_precision = 20 WHERE node_id = 1")
+        .await;
+    api.exec("UPDATE node SET position_precision = 0 WHERE node_id = 3")
+        .await;
+    let (_, kept) = api
+        .get("/api/v1/nodes?sort=node_id&fields=position_precision")
+        .await;
+    assert_eq!(
+        kept["nodes"],
+        json!([
+            {"node_id": 1, "position_precision": 20},
+            {"node_id": 2, "position_precision": null},
+            {"node_id": 3, "position_precision": null},
+        ])
+    );
 }
 
 /// A telemetry packet from a node: device metrics with these utilizations, or

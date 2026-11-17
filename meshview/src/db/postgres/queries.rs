@@ -805,6 +805,17 @@ pub async fn nodeinfo_payloads(
 
 /// For each of these nodes, its latest position packet and its latest map
 /// report: the node, the port, the time and the stored packet.
+pub async fn stored_precisions(pool: &PgPool, node_ids: &[i64]) -> Result<Vec<(i64, i64)>> {
+    sqlx::query_as(
+        "SELECT node_id, position_precision::bigint FROM node \
+         WHERE position_precision IS NOT NULL AND node_id = ANY($1)",
+    )
+    .bind(node_ids)
+    .fetch_all(pool)
+    .await
+    .context("reading the nodes' position precisions")
+}
+
 pub async fn latest_positions(
     pool: &PgPool,
     node_ids: &[i64],

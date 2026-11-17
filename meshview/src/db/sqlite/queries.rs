@@ -786,9 +786,34 @@ pub async fn nodeinfo_payloads(
     .context("reading a node's node info")
 }
 
+pub async fn stored_precisions(pool: &SqlitePool, node_ids: &[i64]) -> Result<Vec<(i64, i64)>> {
+    let mut rows = Vec::new();
+    for chunk in node_ids.chunks(500) {
+        let mut query = QueryBuilder::<Sqlite>::new(
+            "SELECT node_id, position_precision FROM node \
+             WHERE position_precision IS NOT NULL AND node_id IN (",
+        );
+        let mut ids = query.separated(", ");
+        for id in chunk {
+            ids.push_bind(id);
+        }
+        query.push(")");
+        rows.extend(
+            query
+                .build_query_as::<(i64, i64)>()
+                .fetch_all(pool)
+                .await
+                .context("reading the nodes' position precisions")?,
+        );
+    }
+    Ok(rows)
+}
+
 /// For each of these nodes, its latest position packet and its latest map
 /// report, each a lookup on the sender, port and time index: the node, the
-/// port, the time and the stored packet.
+/// port, the time and the stored packet. By rowid, which the index holds,
+/// rather than by id, which is not the rowid and would take another index to
+/// find each packet by.
 pub async fn latest_positions(
     pool: &SqlitePool,
     node_ids: &[i64],
@@ -798,10 +823,10 @@ pub async fn latest_positions(
     for chunk in node_ids.chunks(500) {
         let mut query = QueryBuilder::<Sqlite>::new(
             "SELECT node.node_id, packet.portnum, packet.import_time_us, packet.payload \
-             FROM node JOIN packet ON packet.id IN (\
-               (SELECT id FROM packet WHERE from_node_id = node.node_id AND portnum = 3 \
+             FROM node JOIN packet ON packet.rowid IN (\
+               (SELECT rowid FROM packet WHERE from_node_id = node.node_id AND portnum = 3 \
                 ORDER BY import_time_us DESC LIMIT 1), \
-               (SELECT id FROM packet WHERE from_node_id = node.node_id AND portnum = 73 \
+               (SELECT rowid FROM packet WHERE from_node_id = node.node_id AND portnum = 73 \
                 ORDER BY import_time_us DESC LIMIT 1)) \
              WHERE node.node_id IN (",
         );

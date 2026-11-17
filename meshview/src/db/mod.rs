@@ -259,6 +259,13 @@ impl Reader {
         on!(self, nodeinfo_payloads(node_id, limit))
     }
 
+    /// The position precision kept with each of these nodes that has one: 0
+    /// when its latest position said none. Those without one have not sent a
+    /// position since it was kept.
+    pub async fn stored_precisions(&self, node_ids: &[i64]) -> Result<Vec<(i64, i64)>> {
+        on!(self, stored_precisions(node_ids))
+    }
+
     /// The latest position packet and map report of each of these nodes: the
     /// node, the port, the time and the stored packet, two rows at most for each.
     pub async fn latest_positions(

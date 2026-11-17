@@ -399,26 +399,41 @@ pub async fn nodes(State(state): State<AppState>, params: Params) -> Result<Json
 }
 
 /// The position precision of the nodes with a position, from the latest of
-/// their position packets and map reports.
+/// their position packets and map reports: as the ingester kept it with the
+/// node, and for a node it has not yet, from those packets.
 async fn precisions(db: &Reader, nodes: &[Node]) -> anyhow::Result<HashMap<i64, u32>> {
     let located: Vec<i64> = nodes
         .iter()
         .filter(|node| node.last_lat.is_some_and(|lat| lat != 0))
         .filter_map(|node| node.node_id)
         .collect();
+    let stored: HashMap<i64, i64> = db.stored_precisions(&located).await?.into_iter().collect();
+    let unknown: Vec<i64> = located
+        .into_iter()
+        .filter(|node_id| !stored.contains_key(node_id))
+        .collect();
+    let mut precisions: HashMap<i64, u32> = stored
+        .into_iter()
+        .filter_map(|(node_id, bits)| {
+            let bits = u32::try_from(bits).ok()?;
+            Some((node_id, decode::precision_bits(bits)?))
+        })
+        .collect();
+    if unknown.is_empty() {
+        return Ok(precisions);
+    }
+
     let mut latest: HashMap<i64, (Option<i64>, Option<Vec<u8>>)> = HashMap::new();
-    for (node_id, _, time, payload) in db.latest_positions(&located).await? {
+    for (node_id, _, time, payload) in db.latest_positions(&unknown).await? {
         let newer = latest.get(&node_id).is_none_or(|(seen, _)| time > *seen);
         if newer {
             latest.insert(node_id, (time, payload));
         }
     }
-    Ok(latest
-        .into_iter()
-        .filter_map(|(node_id, (_, payload))| {
-            Some((node_id, decode::position_precision(&payload?)?))
-        })
-        .collect())
+    precisions.extend(latest.into_iter().filter_map(|(node_id, (_, payload))| {
+        Some((node_id, decode::position_precision(&payload?)?))
+    }));
+    Ok(precisions)
 }
 
 /// A percentage as the node sent it, to two decimals: a float32 of 18.3 would
