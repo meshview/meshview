@@ -824,6 +824,9 @@ async function loadTrack(){
             const lat = parseInt(latMatch[1], 10) / 1e7;
             const lon = parseInt(lonMatch[1], 10) / 1e7;
             if (isNaN(lat) || isNaN(lon)) continue;
+            // No fix, or position sharing off: within a degree of 0,0, which
+            // the ingester does not take as a position either.
+            if (Math.abs(lat) <= 1 && Math.abs(lon) <= 1) continue;
 
             points.push({
                 lat,
@@ -833,7 +836,21 @@ async function loadTrack(){
         }
 
         if (!points.length) {
-            hideMap();
+            // No track to draw, but the node's position as stored, when it
+            // has one: shown alone, where the map already starts.
+            const stored = nodePositions[fromNodeId];
+            if (!stored) {
+                hideMap();
+                return;
+            }
+            if (!map) initMap();
+            const node = currentNode || nodeCache[fromNodeId] || null;
+            markers["__track_end"] = L.circleMarker(stored, {
+                radius: 6,
+                color: 'red',
+                fillColor: 'red',
+                fillOpacity: 1
+            }).addTo(map).bindPopup(node ? makeNodePopup(node) : MeshI18n.t("Latest"), {closeButton:false});
             return;
         }
 
