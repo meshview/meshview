@@ -77,6 +77,38 @@ async fn a_python_envelope_is_stored_as_python_stores_it() {
     assert_eq!(seen.get::<i64, _>("hop_limit"), 3);
     assert_eq!(seen.get::<i64, _>("hop_start"), 3);
     assert_eq!(seen.get::<String, _>("topic"), topic);
+    // The firmware did not say who it heard it from.
+    assert_eq!(seen.get::<Option<i64>, _>("relay_node"), None);
+}
+
+#[tokio::test]
+async fn who_a_gateway_heard_a_packet_from_is_kept() {
+    let dir = TempDir::new().unwrap();
+    let pool = sqlite::open_for_writing(&dir.path().join("packets.db"))
+        .await
+        .unwrap();
+    let mut store = Store::new(pool.clone()).await.unwrap();
+
+    // The same envelope, its packet with relay_node (field 19) set to 0xa2,
+    // as the firmware sets it: outside the encryption, at the packet's end.
+    let mut envelope = hex(ENVELOPE);
+    let packet_len = usize::from(envelope[1]);
+    envelope.splice(2 + packet_len..2 + packet_len, [0x98, 0x01, 0xa2, 0x01]);
+    envelope[1] += 4;
+    let opened = Opened::open(&envelope, &Keyring::new::<&str>(&[])).unwrap();
+    assert_eq!(
+        store
+            .process("msh/EU_868/2/e/LongFast/!12345678", &opened)
+            .await
+            .unwrap(),
+        Outcome::Stored
+    );
+
+    let relay: Option<i64> = sqlx::query_scalar("SELECT relay_node FROM packet_seen")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(relay, Some(0xa2));
 }
 
 /// From a firmware newer than these protobufs: Data carries a field 99 inside

@@ -47,6 +47,13 @@ CREATE INDEX IF NOT EXISTS idx_packet_seen_direct
 	ON packet_seen (node_id, import_time_us, packet_id, rx_rssi, rx_snr)
 	WHERE hop_start > 0 AND hop_limit = hop_start AND rx_rssi <> 0;
 
+-- Who a gateway heard each packet from: the node that relayed it last, or the
+-- sender itself at no hops. The firmware tells only the last byte of its id,
+-- and no longer form of it travels, so a relay is known as the nodes whose id
+-- ends in that byte. NULL where the firmware did not say, as older ones do not,
+-- and for every sighting stored before this column was.
+ALTER TABLE packet_seen ADD COLUMN relay_node INTEGER;
+
 -- What the scheduled jobs did, one row for each time one ran: the daily cleanup
 -- and the daily snapshot, and whatever comes after them.
 --

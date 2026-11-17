@@ -33,6 +33,10 @@ CREATE INDEX IF NOT EXISTS idx_packet_seen_direct
 	ON packet_seen (node_id, import_time_us DESC, packet_id, rx_rssi, rx_snr)
 	WHERE hop_start > 0 AND hop_limit = hop_start AND rx_rssi <> 0;
 
+-- Who a gateway heard each packet from, as the last byte of the relay's id;
+-- see the SQLite migration of the same number.
+ALTER TABLE packet_seen ADD COLUMN IF NOT EXISTS relay_node INTEGER;
+
 -- What the scheduled jobs did, one row for each time one ran; see the SQLite
 -- migration of the same number. `details` is JSON, kept as text as there.
 CREATE TABLE IF NOT EXISTS job_run (

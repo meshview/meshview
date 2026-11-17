@@ -38,7 +38,7 @@ INFO meshview::db::sqlite: database migrated to meshview at migration 2
 ```
 
 The data is not touched: the tables, their columns and their rows stay as they
-are. What changes:
+are, with one column added. What changes:
 
 - The Python version's bookkeeping goes: `alembic_version`, `migration_status`,
   and `example`, a table an example migration added to every Python database and
@@ -54,6 +54,9 @@ are. What changes:
   of a port, as the chat and the statistics by port ask for, and
   `idx_packet_seen_direct`, of only the sightings heard at no hops, for a node's
   direct receptions.
+- `packet_seen` gets a `relay_node` column: who the gateway heard the packet
+  from, the node that relayed it last or the sender itself, as the last byte of
+  its id, which is all the firmware tells. Sightings stored before have none.
 - A table of Meshview's own is added: `job_run`, the record of what the daily
   cleanup and snapshot did, which the Python version kept in a JSON file.
 - Meshview records its own migrations in `_sqlx_migrations`.
@@ -76,7 +79,7 @@ scripts/revert-to-python.py --yes packets.db  # gives it back
 It puts the Python version's bookkeeping back exactly as Python creates it, and
 removes what Meshview added, in a single transaction: it either all happens
 or none of it does. The data is not touched, so what Meshview ingested in the
-meantime is kept. It needs Python 3 and nothing else.
+meantime is kept, but for the relays, which go with their column. It needs Python 3 and nothing else.
 
 It only works **as long as Meshview has not changed the schema** beyond
 taking the database over. It refuses, and changes nothing, when:

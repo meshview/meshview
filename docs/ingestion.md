@@ -61,7 +61,7 @@ For every other message:
 | Table | Written |
 |---|---|
 | `packet` | One row per packet id, the first time it is seen: port, sender, recipient, channel, time of import, and the packet itself, decrypted, as `payload`. |
-| `packet_seen` | One row per packet, gateway and receive time: who relayed it to the broker, on which topic, with the signal (SNR, RSSI) and hops it arrived with. Not written when the gateway id is missing or malformed, which is logged. |
+| `packet_seen` | One row per packet, gateway and receive time: who relayed it to the broker, on which topic, with the signal (SNR, RSSI) and hops it arrived with, and who it heard it from: the last byte of that node's id, when the firmware says. Not written when the gateway id is missing or malformed, which is logged. |
 | `node` | Updated, or created, from what a packet says about its sender: see below. |
 | `traceroute` | One row per traceroute packet per gateway that relays it. |
 

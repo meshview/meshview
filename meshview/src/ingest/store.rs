@@ -159,8 +159,8 @@ impl Store {
         tx.execute(
             "INSERT INTO packet_seen \
              (packet_id, node_id, channel, rx_time, rx_snr, rx_rssi, hop_limit, hop_start, \
-              topic, import_time_us) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
+              topic, import_time_us, relay_node) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
              ON CONFLICT (packet_id, node_id, rx_time) DO NOTHING",
             &[
                 Arg::Int(packet_id),
@@ -179,6 +179,7 @@ impl Store {
                 Arg::Int(i64::from(packet.hop_start)),
                 Arg::Text(topic),
                 Arg::Int(now_us()),
+                Arg::OptInt(relay_node(packet)),
             ],
         )
         .await
@@ -487,6 +488,16 @@ fn storage_packet_id(packet: &MeshPacket, data: &Data) -> Option<i64> {
     }
     let from = i64::from(packet.from) & 0x7ff;
     Some(-(now_us() * 2048 + from))
+}
+
+/// The last byte of the id of the node the gateway heard the packet from, or
+/// none when the firmware did not say.
+///
+/// Only that byte means anything, and the firmware keeps 0 for not knowing,
+/// so a relay whose id ends in 0 cannot be told apart from no relay at all.
+fn relay_node(packet: &MeshPacket) -> Option<i64> {
+    let byte = packet.relay_node & 0xff;
+    (byte != 0).then_some(i64::from(byte))
 }
 
 fn storage_to_node_id(packet: &MeshPacket, data: &Data) -> i64 {
