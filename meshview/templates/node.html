@@ -66,6 +66,23 @@
   .mesh-data-page .mesh-content .node-actions button { padding-left:10px; padding-right:10px; }
   .mesh-data-page .mesh-content .node-actions .node-help-btn { width:34px; padding:0; }
 }
+/* Too narrow for one row: two, as wide as the page, the three ways to see or
+   share the node above and the two reports below; with nothing to share, the
+   three left in one. */
+@media(max-width:820px) {
+  .node-actions { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); }
+  .node-actions > * { grid-column:span 2; }
+  .node-actions.can-share > :nth-last-child(-n+2) { grid-column:span 3; }
+  .mesh-data-page .mesh-content .node-actions > button { display:inline-flex; align-items:center; justify-content:center; gap:4px; min-width:0; white-space:nowrap; }
+  .node-actions > .node-action-group { display:flex; min-width:0; }
+  .mesh-data-page .mesh-content .node-action-group > button:first-child { flex:1 1 auto; display:inline-flex; align-items:center; justify-content:center; gap:4px; min-width:0; white-space:nowrap; }
+}
+/* The narrowest phones: coverage, beside its help in half the row, said short too. */
+.node-actions .label-narrow { display:none; }
+@media(max-width:380px) {
+  .node-actions .label-wide { display:none; }
+  .node-actions .label-narrow { display:inline; }
+}
 @media(max-width:900px) { .node-info { grid-template-columns:minmax(0,1fr); gap:10px; } }
 @media(max-width:700px) { #node-packets { gap:8px !important; padding:12px; } #node-packets select { flex:1 1 0; min-width:0; padding-left:8px; padding-right:2px; } #node-packets #packet_port { flex-grow:1.2; } }
 </style>
@@ -84,15 +101,15 @@
         <button onclick="showQrCode()" id="showQrBtn">
             <span class="ti ti-qrcode" aria-hidden="true"></span> <span class="label-long" data-translate-lang="show_qr_code">Show QR Code</span><span class="label-short">{{ "QR code" | tr }}</span>
         </button>
-        <button onclick="openReachReport()" id="reachReportBtn">
-            <span class="ti ti-chart-line" aria-hidden="true"></span> <span>{{ "Reliability" | tr }}</span>
-        </button>
         <button onclick="openRadio()" id="radioBtn">
             <span class="ti ti-antenna" aria-hidden="true"></span> <span>{{ "Radio" | tr }}</span>
         </button>
+        <button onclick="openReachReport()" id="reachReportBtn">
+            <span class="ti ti-chart-line" aria-hidden="true"></span> <span>{{ "Reliability" | tr }}</span>
+        </button>
         <span class="node-action-group">
             <button onclick="toggleCoverage()" id="toggleCoverageBtn" aria-pressed="false" disabled title="{{ "Location required for coverage" | tr }}">
-                <span class="ti ti-broadcast" aria-hidden="true"></span> <span data-translate-lang="toggle_coverage">Predicted Coverage</span>
+                <span class="ti ti-broadcast" aria-hidden="true"></span> <span class="label-wide" data-translate-lang="toggle_coverage">Predicted Coverage</span><span class="label-narrow">{{ "Coverage" | tr }}</span>
             </button>
             <button type="button" id="coverageHelpBtn" class="node-help-btn" aria-haspopup="dialog" aria-controls="coverage-help" aria-label="{{ "Coverage help" | tr }}" title="{{ "Coverage help" | tr }}">
                 <span class="ti ti-help-circle" aria-hidden="true"></span>
@@ -1637,7 +1654,8 @@ async function loadNodeQr() {
             document.getElementById("qrUnavailable").style.display =
                 canShare || keyConflict ? "none" : "";
             document.getElementById("qrKeyConflict").style.display = keyConflict ? "" : "none";
-            actionsDiv.style.display = "flex";
+            actionsDiv.classList.toggle("can-share", canShare);
+            actionsDiv.style.display = "";
         } else {
             actionsDiv.style.display = "none";
         }

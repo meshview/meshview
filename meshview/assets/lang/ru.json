@@ -1147,6 +1147,7 @@
     "Nodes seen whose id ends in this byte, not heard directly: the nearest first.": "Замеченные узлы, чей идентификатор оканчивается на этот байт, не услышанные напрямую: сначала ближайший.",
     "Maybe:": "Возможно:",
     "Maybe relay {byte}": "Возможно, ретранслятор {byte}",
-    "not heard directly": "не услышан напрямую"
+    "not heard directly": "не услышан напрямую",
+    "Coverage": "Покрытие"
   }
 }

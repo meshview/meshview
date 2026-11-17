@@ -1155,6 +1155,7 @@
     "Nodes seen whose id ends in this byte, not heard directly: the nearest first.": "Nodos vistos cuyo id acaba en este byte, no oídos directamente: primero el más cercano.",
     "Maybe:": "Quizá:",
     "Maybe relay {byte}": "Quizá relé {byte}",
-    "not heard directly": "no oído directamente"
+    "not heard directly": "no oído directamente",
+    "Coverage": "Cobertura"
   }
 }
