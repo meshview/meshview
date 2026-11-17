@@ -1170,6 +1170,8 @@
     "Frequent broadcasts": "Difusiones frecuentes",
     "It sent [value] [port] packets to everyone in the latest 24 hours, more than the [limit] any usual setting sends.": "Envió [value] paquetes de [port] a todos en las últimas 24 horas, más que los [limit] que envía cualquier ajuste habitual.",
     "Default name": "Nombre por defecto",
-    "It still has the name the firmware gives it. A name of its own makes it easier to recognise.": "Todavía tiene el nombre que le da el firmware. Un nombre propio hace que sea más fácil reconocerlo."
+    "It still has the name the firmware gives it. A name of its own makes it easier to recognise.": "Todavía tiene el nombre que le da el firmware. Un nombre propio hace que sea más fácil reconocerlo.",
+    "Public key shared": "Clave pública compartida",
+    "Its public key is the same as that of other nodes seen in the latest week: [nodes]. Each of them can read the direct messages sent to the others. It happens with radios that came with the same key, or whose settings were copied from another: making a new key on this node ends it.": "Su clave pública es la misma que la de otros nodos vistos en la última semana: [nodes]. Cada uno de ellos puede leer los mensajes directos enviados a los demás. Pasa con radios que vienen con la misma clave, o cuya configuración se copió de otra: generar una clave nueva en este nodo lo resuelve."
   }
 }

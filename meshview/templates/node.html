@@ -96,6 +96,8 @@
 [data-bs-theme="dark"] .node-checks-list .is-warning .ti { color:#f1d38a; }
 .node-checks-list strong { color:var(--mesh-text); font-weight:600; }
 .node-checks-list span { color:var(--mesh-muted); }
+.node-checks-list a { color:var(--mesh-text); font-weight:600; text-decoration:none; }
+.node-checks-list a:hover { color:var(--mesh-primary); }
 @media(max-width:900px) { .node-info { grid-template-columns:minmax(0,1fr); gap:10px; } }
 @media(max-width:700px) { #node-packets { gap:8px !important; padding:12px; } #node-packets select { flex:1 1 0; min-width:0; padding-left:8px; padding-right:2px; } #node-packets #packet_port { flex-grow:1.2; } }
 </style>
@@ -193,6 +195,7 @@
         <p class="node-checks-intro">{{ "What may be wrong with how this node is set up, from its latest packets." | tr }}</p>
         <ul id="node-checks-list" class="node-checks-list"></ul>
     </section>
+    <template id="check-public_key_shared"><li><strong>{{ "Public key shared" | tr }}</strong><span>{{ "Its public key is the same as that of other nodes seen in the latest week: [nodes]. Each of them can read the direct messages sent to the others. It happens with radios that came with the same key, or whose settings were copied from another: making a new key on this node ends it." | tr }}</span></li></template>
     <template id="check-public_key_conflict"><li><strong>{{ "Public key conflict" | tr }}</strong><span>{{ "Its latest node info carries [value] different public keys. Either two radios share this id, or the key was made anew, as when the node is reflashed: until the others take the new one, direct messages to it fail." | tr }}</span></li></template>
     <template id="check-hardware_changed"><li><strong>{{ "Hardware changed" | tr }}</strong><span>{{ "Its latest node info names more than one hardware model: [models]. Either two radios share this id, or the radio was replaced." | tr }}</span></li></template>
     <template id="check-hop_limit"><li><strong>{{ "More hops than advised" | tr }}</strong><span>{{ "Its packets start with [value] hops, and this mesh advises [limit] at most. Each hop more lets every packet be relayed once more, which takes airtime from everybody." | tr }}</span></li></template>
@@ -1708,9 +1711,19 @@ async function loadNodeChecks() {
             port: PORT_LABEL_MAP[check.portnum] || check.portnum,
             models: check.models.join(", "),
         };
+        // The nodes are links, each by its name; the rest is text.
+        const links = check.nodes.flatMap((node, index) => {
+            const link = document.createElement("a");
+            link.href = `/node/${node.node_id}`;
+            link.textContent = node.long_name || node.short_name || `!${node.node_id.toString(16).padStart(8, "0")}`;
+            return index ? [", ", link] : [link];
+        });
         const text = item.querySelector("span");
-        text.textContent = text.textContent.replace(/\[(\w+)\]/g,
-            (whole, name) => figures[name] ?? whole);
+        text.replaceChildren(...text.textContent.split(/(\[\w+\])/).flatMap(part => {
+            const name = part.match(/^\[(\w+)\]$/)?.[1];
+            if (name === "nodes") return links;
+            return [name ? String(figures[name] ?? part) : part];
+        }));
         item.classList.add(check.severity === "warning" ? "is-warning" : "is-info");
         const icon = document.createElement("span");
         icon.className = check.severity === "warning" ? "ti ti-alert-triangle" : "ti ti-info-circle";

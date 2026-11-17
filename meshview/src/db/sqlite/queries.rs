@@ -242,6 +242,28 @@ pub async fn broadcasts_by_port(
     .context("counting a node's broadcasts by port")
 }
 
+pub async fn nodes_sharing_key(
+    pool: &SqlitePool,
+    node_id: i64,
+    since_us: i64,
+) -> Result<Vec<Node>> {
+    // By idx_node_public_key: the node's key, then the nodes that have it.
+    sqlx::query_as(
+        "SELECT o.id, o.node_id, o.long_name, o.short_name, o.hw_model, o.firmware, o.role, \
+         o.last_lat, o.last_long, o.last_altitude, o.channel, o.is_mqtt_gateway, \
+         o.first_seen_us, o.last_seen_us \
+         FROM node n JOIN node o ON o.public_key = n.public_key \
+         WHERE n.node_id = ? AND n.public_key IS NOT NULL AND o.public_key IS NOT NULL \
+         AND o.node_id IS NOT NULL AND o.node_id <> n.node_id AND o.last_seen_us >= ? \
+         ORDER BY o.last_seen_us DESC, o.node_id",
+    )
+    .bind(node_id)
+    .bind(since_us)
+    .fetch_all(pool)
+    .await
+    .context("listing the nodes that share a key")
+}
+
 pub async fn nodes_ending_in(pool: &SqlitePool, bytes: &[i64], since_us: i64) -> Result<Vec<Node>> {
     let mut query = QueryBuilder::new(
         "SELECT id, node_id, long_name, short_name, hw_model, firmware, role, last_lat, \

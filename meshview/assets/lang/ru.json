@@ -1162,6 +1162,8 @@
     "Frequent broadcasts": "Частые широковещательные пакеты",
     "It sent [value] [port] packets to everyone in the latest 24 hours, more than the [limit] any usual setting sends.": "За последние 24 часа он отправил всем [value] пакетов «[port]» — больше, чем [limit], которые отправляет любая обычная настройка.",
     "Default name": "Имя по умолчанию",
-    "It still has the name the firmware gives it. A name of its own makes it easier to recognise.": "У него всё ещё имя, которое даёт прошивка. Собственное имя помогает его узнавать."
+    "It still has the name the firmware gives it. A name of its own makes it easier to recognise.": "У него всё ещё имя, которое даёт прошивка. Собственное имя помогает его узнавать.",
+    "Public key shared": "Общий открытый ключ",
+    "Its public key is the same as that of other nodes seen in the latest week: [nodes]. Each of them can read the direct messages sent to the others. It happens with radios that came with the same key, or whose settings were copied from another: making a new key on this node ends it.": "Его открытый ключ совпадает с ключом других узлов, увиденных за последнюю неделю: [nodes]. Каждый из них может читать личные сообщения, отправленные остальным. Так бывает у радиостанций, пришедших с одинаковым ключом, или с настройками, скопированными с другой: создание нового ключа на этом узле это устраняет."
   }
 }

@@ -256,6 +256,23 @@ pub async fn broadcasts_by_port(
     .context("counting a node's broadcasts by port")
 }
 
+pub async fn nodes_sharing_key(pool: &PgPool, node_id: i64, since_us: i64) -> Result<Vec<Node>> {
+    sqlx::query_as(
+        "SELECT o.id, o.node_id, o.long_name, o.short_name, o.hw_model, o.firmware, o.role, \
+         o.last_lat, o.last_long, o.last_altitude, o.channel, o.is_mqtt_gateway, \
+         o.first_seen_us, o.last_seen_us \
+         FROM node n JOIN node o ON o.public_key = n.public_key \
+         WHERE n.node_id = $1 AND n.public_key IS NOT NULL AND o.public_key IS NOT NULL \
+         AND o.node_id IS NOT NULL AND o.node_id <> n.node_id AND o.last_seen_us >= $2 \
+         ORDER BY o.last_seen_us DESC NULLS LAST, o.node_id",
+    )
+    .bind(node_id)
+    .bind(since_us)
+    .fetch_all(pool)
+    .await
+    .context("listing the nodes that share a key")
+}
+
 pub async fn nodes_ending_in(pool: &PgPool, bytes: &[i64], since_us: i64) -> Result<Vec<Node>> {
     let mut query = QueryBuilder::new(NODE_COLUMNS);
     query

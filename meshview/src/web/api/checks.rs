@@ -43,6 +43,11 @@ const DAILY_LIMITS: [(PortNum, i64); 4] = [
 
 const DAY_US: i64 = 86_400_000_000;
 
+/// How recently another node must have been seen to tell that it shares the
+/// key: one long gone, as the same radio under an id it no longer uses, is no
+/// longer a risk.
+const SHARED_KEY_DAYS: i64 = 7;
+
 #[derive(Debug, Serialize, ToSchema)]
 pub struct Checks {
     /// The node asked about.
@@ -55,16 +60,17 @@ pub struct Checks {
 /// One thing that may be wrong with how a node is set up.
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct Check {
-    /// What it is: `public_key_conflict`, `hardware_changed`, `hop_limit`,
-    /// `position_without_coordinates`, `frequent_broadcasts` or
-    /// `default_name`.
+    /// What it is: `public_key_shared`, `public_key_conflict`,
+    /// `hardware_changed`, `hop_limit`, `position_without_coordinates`,
+    /// `frequent_broadcasts` or `default_name`.
     #[schema(example = "hop_limit")]
     pub check: &'static str,
     /// `warning` or `info`.
     #[schema(example = "warning")]
     pub severity: &'static str,
     /// What was found: the hops its packets start with, the packets of the
-    /// port sent in a day, or the keys it gave; null when there is no figure.
+    /// port sent in a day, the keys it gave, or the nodes it shares its key
+    /// with; null when there is no figure.
     #[schema(example = 7)]
     pub value: Option<i64>,
     /// What it should be at most: the hops this mesh advises, the packets a
@@ -76,6 +82,20 @@ pub struct Check {
     pub portnum: Option<i64>,
     /// The hardware models it gave, for `hardware_changed`.
     pub models: Vec<String>,
+    /// The other nodes with its key, latest seen first, for
+    /// `public_key_shared`.
+    pub nodes: Vec<SharedWith>,
+}
+
+/// A node that has the same public key as the one checked.
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
+pub struct SharedWith {
+    #[schema(example = 1975835426_i64)]
+    pub node_id: i64,
+    #[schema(example = "Sierra de Gata")]
+    pub long_name: Option<String>,
+    #[schema(example = "db22")]
+    pub short_name: Option<String>,
 }
 
 impl Check {
@@ -87,6 +107,7 @@ impl Check {
             limit: None,
             portnum: None,
             models: Vec::new(),
+            nodes: Vec::new(),
         }
     }
 }
@@ -199,7 +220,9 @@ fn has_default_name(node: &Node) -> bool {
 /// Node checks
 ///
 /// What may be wrong with how a node is set up, as its own packets show it:
-/// node info that disagrees on its key, which two radios with the same id
+/// a public key other nodes seen in the latest week have too, so that each can
+/// read the direct messages sent to the others, as radios given the same key
+/// at the factory do; node info that disagrees on its key, which two radios with the same id
 /// give, and so does one whose key was made anew, or on its hardware;
 /// packets that start with more hops than the mesh advises, a note from
 /// `[checks] hop_limit_notice` hops on (4 unless set) and a warning from
@@ -241,7 +264,27 @@ pub async fn checks(
         .flatten()
         .filter_map(|payload| user(&payload))
         .collect();
-    let mut checks = identity_checks(&users);
+    let mut checks = Vec::new();
+    let sharing = db
+        .nodes_sharing_key(node_id, now_us() - SHARED_KEY_DAYS * DAY_US)
+        .await
+        .map_err(internal)?;
+    if !sharing.is_empty() {
+        let mut check = Check::new("public_key_shared", "warning");
+        check.value = Some(sharing.len() as i64);
+        check.nodes = sharing
+            .into_iter()
+            .filter_map(|node| {
+                Some(SharedWith {
+                    node_id: node.node_id?,
+                    long_name: node.long_name,
+                    short_name: node.short_name,
+                })
+            })
+            .collect();
+        checks.push(check);
+    }
+    checks.extend(identity_checks(&users));
 
     let hop_starts = db
         .latest_hop_starts(node_id, HOP_PACKETS)

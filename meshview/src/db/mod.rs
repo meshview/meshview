@@ -390,6 +390,12 @@ impl Reader {
 
     /// The nodes seen since a time whose id ends in one of these bytes, the
     /// last seen first.
+    /// The other nodes seen since a time whose public key is this node's,
+    /// latest seen first.
+    pub async fn nodes_sharing_key(&self, node_id: i64, since_us: i64) -> Result<Vec<Node>> {
+        on!(self, nodes_sharing_key(node_id, since_us))
+    }
+
     pub async fn nodes_ending_in(&self, bytes: &[i64], since_us: i64) -> Result<Vec<Node>> {
         if bytes.is_empty() {
             return Ok(Vec::new());

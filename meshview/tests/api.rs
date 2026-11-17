@@ -1458,7 +1458,7 @@ async fn a_node_is_checked_from_its_latest_packets() {
     assert_eq!(status, StatusCode::OK);
     let check = |check: &str, severity: &str, value: Value, limit: Value, portnum: Value| {
         json!({"check": check, "severity": severity, "value": value, "limit": limit,
-               "portnum": portnum, "models": []})
+               "portnum": portnum, "models": [], "nodes": []})
     };
     // Warnings first.
     assert_eq!(
@@ -1482,6 +1482,40 @@ async fn a_node_is_checked_from_its_latest_packets() {
             json!({"error": "Invalid or missing node_id"})
         )
     );
+}
+
+#[tokio::test]
+async fn the_nodes_that_share_a_key_are_told() {
+    let api = api().await;
+    let now = now_us();
+    let week_ago = now - 8 * 86_400_000_000;
+    // 1, 2 and 3 have one key, 4 another; 3 was last seen over a week ago.
+    for (node_id, key, seen) in [(1, 7, now), (2, 7, now - 1), (3, 7, week_ago), (4, 8, now)] {
+        sqlx::query(
+            "INSERT INTO node (id, node_id, long_name, short_name, public_key, last_seen_us) \
+             VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(format!("!{node_id:08x}"))
+        .bind(node_id)
+        .bind(format!("Node {node_id}"))
+        .bind(format!("N{node_id}"))
+        .bind(vec![key as u8; 32])
+        .bind(seen)
+        .execute(&api.pool)
+        .await
+        .unwrap();
+    }
+
+    let (status, body) = api.get("/api/v1/node/1/checks").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["checks"],
+        json!([{"check": "public_key_shared", "severity": "warning", "value": 1,
+                "limit": null, "portnum": null, "models": [],
+                "nodes": [{"node_id": 2, "long_name": "Node 2", "short_name": "N2"}]}])
+    );
+    let (_, alone) = api.get("/api/v1/node/4/checks").await;
+    assert_eq!(alone["checks"], json!([]));
 }
 
 #[tokio::test]
