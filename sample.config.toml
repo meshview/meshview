@@ -151,6 +151,16 @@ hour = 1
 minute = 0
 
 # -------------------------
+# Node Checks Configuration
+# -------------------------
+[checks]
+# The hops a node's packets start with from which its page notes them, and
+# from which it warns of them. Meshtastic advises three; a mesh that needs more
+# sets the note above what it needs.
+hop_limit_notice = 4
+hop_limit_warning = 7
+
+# -------------------------
 # Logging Configuration
 # -------------------------
 [logging]

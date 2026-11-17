@@ -270,6 +270,18 @@ Meshview, so `TZ` works even where the system has none installed. Daylight
 saving time is followed: a job set inside the hour a clock skips runs at the
 first time after it, and one inside the hour a clock repeats runs once.
 
+### `[checks]`
+
+What the checks on a node's page take as too much for this mesh. Meshtastic
+advises packets to start with three hops, but a sparse mesh, or one spread
+along valleys, may need more: set what yours needs, so that only the nodes off
+it are told.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `hop_limit_notice` | whole number | `4` | The hops a node's packets start with from which its page notes them as more than the mesh advises. New in Meshview. |
+| `hop_limit_warning` | whole number | `7` | The hops from which it warns of them instead. New in Meshview. |
+
 ### `[logging]`
 
 Everything is logged to standard output, for the process's supervisor (systemd,

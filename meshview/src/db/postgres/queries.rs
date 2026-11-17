@@ -22,7 +22,7 @@ use crate::db::{
     DailySnapshot, DirectReception, Direction, Facet, JobRun, Node, NodeFacet, NodeFilter,
     NodeQuery, PacketFilter, PacketSeen, Period, PeriodCount, SightingsOf, TopNode, TopQuery,
 };
-use crate::db::{DirectCount, RelayedCount};
+use crate::db::{DirectCount, PortCount, RelayedCount};
 use crate::db::{HourlyPortCount, PacketQuery, PacketRow, TracerouteHop, TracerouteRow};
 use anyhow::{Context, Result};
 use sqlx::{PgPool, Postgres, QueryBuilder};
@@ -199,6 +199,61 @@ pub async fn direct_counts(
         .fetch_all(pool)
         .await
         .context("counting direct receptions")
+}
+
+pub async fn latest_payloads(
+    pool: &PgPool,
+    node_id: i64,
+    portnum: i64,
+    limit: i64,
+) -> Result<Vec<Option<Vec<u8>>>> {
+    sqlx::query_scalar(
+        "SELECT payload FROM packet WHERE from_node_id = $1 AND portnum = $2 \
+         ORDER BY import_time_us DESC NULLS LAST, id DESC LIMIT $3",
+    )
+    .bind(node_id)
+    .bind(i32::try_from(portnum).unwrap_or(-1))
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .context("reading a node's latest packets of a port")
+}
+
+pub async fn latest_hop_starts(
+    pool: &PgPool,
+    node_id: i64,
+    limit: i64,
+) -> Result<Vec<Option<i64>>> {
+    // One sighting of each, as in SQLite.
+    sqlx::query_scalar(
+        "SELECT (SELECT s.hop_start::bigint FROM packet_seen s \
+                 WHERE s.packet_id = p.id AND s.hop_start > 0 LIMIT 1) \
+         FROM packet p WHERE p.from_node_id = $1 \
+         ORDER BY p.import_time_us DESC NULLS LAST, p.id DESC LIMIT $2",
+    )
+    .bind(node_id)
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .context("reading the hops a node's packets started with")
+}
+
+pub async fn broadcasts_by_port(
+    pool: &PgPool,
+    node_id: i64,
+    since_us: i64,
+) -> Result<Vec<PortCount>> {
+    sqlx::query_as(
+        "SELECT portnum::bigint AS portnum, count(*) AS packets FROM packet \
+         WHERE from_node_id = $1 AND import_time_us >= $2 AND to_node_id = 4294967295 \
+           AND portnum IS NOT NULL \
+         GROUP BY portnum ORDER BY portnum",
+    )
+    .bind(node_id)
+    .bind(since_us)
+    .fetch_all(pool)
+    .await
+    .context("counting a node's broadcasts by port")
 }
 
 pub async fn nodes_ending_in(pool: &PgPool, bytes: &[i64], since_us: i64) -> Result<Vec<Node>> {

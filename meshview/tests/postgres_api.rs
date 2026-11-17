@@ -635,6 +635,7 @@ const URIS: &[&str] = &[
     "/api/v1/node/256/relays",
     "/api/v1/node/256/relays?since=1",
     "/api/v1/node/257/relayed",
+    "/api/v1/node/256/checks",
     "/api/v1/node/256/packet_counts",
     "/api/v1/node/257/packet_counts?since=0",
     "/api/v1/stats",

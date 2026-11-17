@@ -1415,6 +1415,76 @@ async fn a_node_is_offered_as_the_contact_python_encoded() {
 }
 
 #[tokio::test]
+async fn a_node_is_checked_from_its_latest_packets() {
+    let mut config = Config::default();
+    // A mesh that needs five hops notes them from six on.
+    config.checks.hop_limit_notice = 6;
+    let api = api_with(config).await;
+    let now = now_us();
+    api.exec(
+        "INSERT INTO node (id, node_id, long_name, last_seen_us) \
+         VALUES ('!ae613964', 2925607268, 'Meshtastic 3964', 1)",
+    )
+    .await;
+    // Two keys in its latest node info; then 30 node info broadcasts in the
+    // latest day, more than the 24 an hourly one sends, which give no key.
+    nodeinfo(&api, 1, 0xae61_3964, vec![1; 32], now).await;
+    nodeinfo(&api, 2, 0xae61_3964, vec![2; 32], now).await;
+    for id in 10..40 {
+        sqlx::query(
+            "INSERT INTO packet (id, portnum, from_node_id, to_node_id, import_time_us) \
+             VALUES (?, 4, 2925607268, 4294967295, ?)",
+        )
+        .bind(id)
+        .bind(now - 3_600_000_000)
+        .execute(&api.pool)
+        .await
+        .unwrap();
+    }
+    // Most packets start with six hops, one with three.
+    for (packet, start) in [(1, 6), (2, 6), (10, 3)] {
+        sqlx::query(
+            "INSERT INTO packet_seen (packet_id, node_id, rx_time, hop_start, hop_limit) \
+             VALUES (?, 10, 0, ?, 1)",
+        )
+        .bind(packet)
+        .bind(start)
+        .execute(&api.pool)
+        .await
+        .unwrap();
+    }
+
+    let (status, body) = api.get("/api/v1/node/2925607268/checks").await;
+    assert_eq!(status, StatusCode::OK);
+    let check = |check: &str, severity: &str, value: Value, limit: Value, portnum: Value| {
+        json!({"check": check, "severity": severity, "value": value, "limit": limit,
+               "portnum": portnum, "models": []})
+    };
+    // Warnings first.
+    assert_eq!(
+        body,
+        json!({"node_id": 2925607268_i64, "checks": [
+            check("public_key_conflict", "warning", json!(2), Value::Null, Value::Null),
+            check("frequent_broadcasts", "warning", json!(30), json!(24), json!(4)),
+            check("hop_limit", "info", json!(6), json!(5), Value::Null),
+            check("default_name", "info", Value::Null, Value::Null, Value::Null),
+        ]})
+    );
+
+    assert_eq!(
+        api.get("/api/v1/node/1/checks").await,
+        (StatusCode::OK, json!({"node_id": 1, "checks": []}))
+    );
+    assert_eq!(
+        api.get("/api/v1/node/x/checks").await,
+        (
+            StatusCode::BAD_REQUEST,
+            json!({"error": "Invalid or missing node_id"})
+        )
+    );
+}
+
+#[tokio::test]
 async fn coverage_is_predicted_around_a_node_with_a_position() {
     let api = api().await;
     api.exec(

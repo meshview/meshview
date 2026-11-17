@@ -8,6 +8,7 @@ pub mod error;
 pub mod params;
 
 mod channels;
+mod checks;
 mod coverage;
 mod direct_receptions;
 mod edges;
@@ -53,6 +54,7 @@ pub fn v1() -> OpenApiRouter<AppState> {
         .routes(routes!(direct_receptions::direct_receptions))
         .routes(routes!(relays::relays))
         .routes(routes!(relays::relayed))
+        .routes(routes!(checks::checks))
         .routes(routes!(packet_counts::packet_counts))
         .routes(routes!(coverage::coverage))
 }

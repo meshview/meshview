@@ -366,6 +366,28 @@ impl Reader {
         on!(self, direct_counts(node_id, direction, since_us))
     }
 
+    /// The payloads of the latest packets of a port a node sent, latest first.
+    pub async fn latest_payloads(
+        &self,
+        node_id: i64,
+        portnum: i64,
+        limit: i64,
+    ) -> Result<Vec<Option<Vec<u8>>>> {
+        on!(self, latest_payloads(node_id, portnum, limit))
+    }
+
+    /// The hops the latest packets a node sent started with, latest first, as
+    /// a gateway that heard each reported it; none for a packet no gateway
+    /// said it of.
+    pub async fn latest_hop_starts(&self, node_id: i64, limit: i64) -> Result<Vec<Option<i64>>> {
+        on!(self, latest_hop_starts(node_id, limit))
+    }
+
+    /// How many packets a node sent to everyone since a time, by port.
+    pub async fn broadcasts_by_port(&self, node_id: i64, since_us: i64) -> Result<Vec<PortCount>> {
+        on!(self, broadcasts_by_port(node_id, since_us))
+    }
+
     /// The nodes seen since a time whose id ends in one of these bytes, the
     /// last seen first.
     pub async fn nodes_ending_in(&self, bytes: &[i64], since_us: i64) -> Result<Vec<Node>> {
@@ -742,6 +764,13 @@ pub struct DirectCount {
     pub peer: i64,
     pub long_name: Option<String>,
     pub short_name: Option<String>,
+    pub packets: i64,
+}
+
+/// How many packets of one port there are.
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct PortCount {
+    pub portnum: i64,
     pub packets: i64,
 }
 

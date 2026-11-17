@@ -45,6 +45,7 @@ pub struct Config {
     pub database: Database,
     pub cleanup: Cleanup,
     pub snapshot: Snapshot,
+    pub checks: Checks,
     pub logging: Logging,
     /// The file this came from, if any.
     #[serde(skip)]
@@ -285,6 +286,27 @@ pub struct Snapshot {
 impl Default for Snapshot {
     fn default() -> Self {
         Self { hour: 1, minute: 0 }
+    }
+}
+
+/// `[checks]`: what the node checks take as too much for this mesh.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Checks {
+    /// The hops a node's packets start with from which the node page notes
+    /// it: one more than the mesh advises.
+    pub hop_limit_notice: u8,
+    /// The hops from which it warns of them.
+    pub hop_limit_warning: u8,
+}
+
+impl Default for Checks {
+    /// Meshtastic's advice, three hops, and a warning at seven, the most.
+    fn default() -> Self {
+        Self {
+            hop_limit_notice: 4,
+            hop_limit_warning: 7,
+        }
     }
 }
 
