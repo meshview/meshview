@@ -28,6 +28,10 @@ use utoipa::ToSchema;
 /// The length of a Meshtastic public key.
 const PUBLIC_KEY_LEN: usize = 32;
 
+/// How many of a node's node info packets are read, the latest: enough to see
+/// whether they agree on its key, without reading every one it ever sent.
+const NODEINFO_PACKETS: i64 = 50;
+
 const CONTACT_URL: &str = "https://meshtastic.org/v/#";
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -125,11 +129,15 @@ pub async fn qr(
     }
 
     // The database keeps no keys: they are in the node info packets the node
-    // sent. Any packet counts, read as node info whatever it says it carries,
-    // as in the Python version.
+    // sent, the latest of which are read. Any packet counts, read as node info
+    // whatever it says it carries, as in the Python version.
     let mut latest: Option<User> = None;
     let mut keys = HashSet::new();
-    for payload in db.nodeinfo_payloads(node_id).await.map_err(failed)? {
+    for payload in db
+        .nodeinfo_payloads(node_id, NODEINFO_PACKETS)
+        .await
+        .map_err(failed)?
+    {
         let Some(payload) = payload.filter(|payload| !payload.is_empty()) else {
             continue;
         };

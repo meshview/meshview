@@ -625,6 +625,32 @@ async fn totals_count_what_is_asked() {
     );
 }
 
+/// The totals of everything are kept, so a packet arriving afterwards is not
+/// in them until they are counted again; filtered totals are always counted.
+#[tokio::test]
+async fn totals_of_everything_are_kept_for_a_while() {
+    let api = api().await;
+    traffic(&api).await;
+    let all = json!({"total_packets": 4, "total_seen": 4});
+    assert_eq!(api.get("/api/v1/stats/count").await.1, all);
+
+    api.exec(
+        "INSERT INTO packet (id, portnum, from_node_id, to_node_id, import_time_us, channel) \
+         VALUES (5, 1, 10, 20, 9223372036854775807, 'LongFast')",
+    )
+    .await;
+
+    assert_eq!(api.get("/api/v1/stats/count").await.1, all);
+    assert_eq!(
+        api.get("/api/v1/stats/count?packet_id=5").await.1,
+        json!({"total_packets": 4, "total_seen": 0})
+    );
+    assert_eq!(
+        api.get("/api/v1/stats/count?from_node=10").await.1["total_packets"],
+        3
+    );
+}
+
 #[tokio::test]
 async fn packets_are_counted_by_channel_and_destination() {
     let api = api().await;

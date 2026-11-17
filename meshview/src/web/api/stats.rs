@@ -247,6 +247,10 @@ pub struct Counts {
 /// counted are those of those packets, whenever they happened. `packet_id`
 /// only changes `total_seen`, and the other filters do not apply to it:
 /// `total_packets` stays what it would be without it.
+///
+/// The totals of everything take reading both tables whole, so they are
+/// counted again at most every five minutes, when asked for, and can be that
+/// far behind.
 #[utoipa::path(
     get,
     path = "/stats/count",
@@ -304,15 +308,26 @@ pub async fn count(
         None
     };
 
-    let total_packets = db.count_packets(filter.as_ref()).await.map_err(failed)?;
-    let total_seen = db
-        .count_sightings(match (packet_id, &filter) {
-            (Some(packet_id), _) => SightingsOf::Packet(packet_id),
-            (None, Some(filter)) => SightingsOf::Packets(filter),
-            (None, None) => SightingsOf::All,
-        })
-        .await
-        .map_err(failed)?;
+    // Everything there is takes reading both tables whole, so it is counted
+    // only now and then, and kept; see Totals.
+    let (total_packets, total_seen) = match (&filter, packet_id) {
+        (None, None) => state.caches.totals.get(db).await.map_err(failed)?,
+        (None, Some(packet_id)) => (
+            state.caches.totals.get(db).await.map_err(failed)?.0,
+            db.count_sightings(SightingsOf::Packet(packet_id))
+                .await
+                .map_err(failed)?,
+        ),
+        (Some(filter), packet_id) => (
+            db.count_packets(Some(filter)).await.map_err(failed)?,
+            db.count_sightings(match packet_id {
+                Some(packet_id) => SightingsOf::Packet(packet_id),
+                None => SightingsOf::Packets(filter),
+            })
+            .await
+            .map_err(failed)?,
+        ),
+    };
 
     Ok(Json(Counts {
         total_packets,

@@ -430,5 +430,6 @@
   "The hours that had packets, the earliest first, one entry for each port in each.": "Las horas que tuvieron paquetes, primero la más antigua, una entrada por cada puerto en cada una.",
   "The port, null for a packet that did not say.": "El puerto, null para un paquete que no lo indicaba.",
   "The start of the hour, in microseconds since the epoch.": "El comienzo de la hora, en microsegundos desde la época Unix.",
-  "`node_id` or `since` is not an integer": "`node_id` o `since` no es un entero"
+  "`node_id` or `since` is not an integer": "`node_id` o `since` no es un entero",
+  "The totals of everything take reading both tables whole, so they are counted again at most every five minutes, when asked for, and can be that far behind.": "Los totales de todo obligan a leer ambas tablas enteras, así que se vuelven a contar como mucho cada cinco minutos, cuando se piden, y pueden ir hasta ese tiempo por detrás."
 }

@@ -620,12 +620,17 @@ pub async fn node(pool: &PgPool, node_id: i64) -> Result<Option<Node>> {
     .context("reading a node")
 }
 
-pub async fn nodeinfo_payloads(pool: &PgPool, node_id: i64) -> Result<Vec<Option<Vec<u8>>>> {
+pub async fn nodeinfo_payloads(
+    pool: &PgPool,
+    node_id: i64,
+    limit: i64,
+) -> Result<Vec<Option<Vec<u8>>>> {
     sqlx::query_scalar(
         "SELECT payload FROM packet WHERE from_node_id = $1 AND portnum = 4 \
-         ORDER BY import_time_us DESC NULLS LAST, id DESC",
+         ORDER BY import_time_us DESC NULLS LAST, id DESC LIMIT $2",
     )
     .bind(node_id)
+    .bind(limit)
     .fetch_all(pool)
     .await
     .context("reading a node's node info")

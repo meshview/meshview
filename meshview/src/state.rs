@@ -6,11 +6,13 @@
 use crate::config::Config;
 use crate::db::Edge;
 use crate::db::Reader;
+use crate::db::SightingsOf;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Instant;
+use std::time::{Duration, Instant};
+use tracing::warn;
 
 /// The things that have to be true before this process is worth sending
 /// traffic to, each of which turns true on its own schedule.
@@ -98,6 +100,77 @@ pub type Cached<T> = (Instant, Arc<T>);
 pub struct Caches {
     /// `/api/v1/edges`, by the type asked for.
     pub edges: Mutex<HashMap<Option<&'static str>, Cached<Vec<Edge>>>>,
+    /// `/api/v1/stats/count` without filters.
+    pub totals: Arc<Totals>,
+}
+
+/// How many packets and sightings there are in all, which takes reading the
+/// whole of both tables: seconds, or on a slow disk with a cold cache, tens of
+/// them. Counted once and kept; once old, the count kept is still answered
+/// while a new one is made in the background, so that no visitor ever waits
+/// for one but the very first.
+#[derive(Debug, Default)]
+pub struct Totals {
+    /// The latest count, packets and sightings, and when it was made.
+    pub counted: Mutex<Option<(Instant, (i64, i64))>>,
+    /// Held while counting, so that only one count runs at a time.
+    pub counting: tokio::sync::Mutex<()>,
+    /// Whether a count is on its way in the background.
+    pub refreshing: AtomicBool,
+}
+
+/// How long a count of everything is answered before a new one is made.
+pub const TOTALS_FRESH_FOR: Duration = Duration::from_secs(5 * 60);
+
+impl Totals {
+    /// The packets and sightings there are, as last counted. The first time it
+    /// counts, and whoever asks meanwhile waits for that count; once the count
+    /// kept is older than [`TOTALS_FRESH_FOR`], it is still answered, and a new
+    /// one is made in the background for whoever asks next.
+    pub async fn get(self: &Arc<Self>, db: &Reader) -> anyhow::Result<(i64, i64)> {
+        if let Some((counts, stale)) = self.latest() {
+            if stale && !self.refreshing.swap(true, Ordering::AcqRel) {
+                let totals = Arc::clone(self);
+                let db = db.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = totals.count(&db).await {
+                        warn!("counting the packets and sightings: {e:#}");
+                    }
+                    totals.refreshing.store(false, Ordering::Release);
+                });
+            }
+            return Ok(counts);
+        }
+        let _counting = self.counting.lock().await;
+        // Whoever counted while this waited has the answer.
+        if let Some((counts, _)) = self.latest() {
+            return Ok(counts);
+        }
+        self.count_now(db).await
+    }
+
+    /// Counts now, once any count already running is done, and keeps it.
+    pub async fn count(&self, db: &Reader) -> anyhow::Result<(i64, i64)> {
+        let _counting = self.counting.lock().await;
+        self.count_now(db).await
+    }
+
+    async fn count_now(&self, db: &Reader) -> anyhow::Result<(i64, i64)> {
+        let counts = (
+            db.count_packets(None).await?,
+            db.count_sightings(SightingsOf::All).await?,
+        );
+        *self.counted.lock().expect("never poisoned") = Some((Instant::now(), counts));
+        Ok(counts)
+    }
+
+    /// The count kept, and whether it is old.
+    fn latest(&self) -> Option<((i64, i64), bool)> {
+        self.counted
+            .lock()
+            .expect("never poisoned")
+            .map(|(at, counts)| (counts, at.elapsed() >= TOTALS_FRESH_FOR))
+    }
 }
 
 impl AppState {

@@ -430,5 +430,6 @@
   "The hours that had packets, the earliest first, one entry for each port in each.": "Часы, в которые были пакеты, сначала самый ранний, по записи на каждый порт в каждом.",
   "The port, null for a packet that did not say.": "Порт; null для пакета, который его не указал.",
   "The start of the hour, in microseconds since the epoch.": "Начало часа, в микросекундах с начала эпохи Unix.",
-  "`node_id` or `since` is not an integer": "`node_id` или `since` не является целым числом"
+  "`node_id` or `since` is not an integer": "`node_id` или `since` не является целым числом",
+  "The totals of everything take reading both tables whole, so they are counted again at most every five minutes, when asked for, and can be that far behind.": "Общие итоги требуют прочитать обе таблицы целиком, поэтому они пересчитываются не чаще раза в пять минут, по запросу, и могут отставать на это время."
 }

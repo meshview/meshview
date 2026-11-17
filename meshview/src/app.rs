@@ -13,7 +13,7 @@ use crate::db::Pool;
 use crate::db::{self, Compatibility};
 use crate::ingest::{self, store::Store};
 use crate::jobs;
-use crate::state::{AppState, CHECK_DATABASE, CHECK_MQTT, Readiness};
+use crate::state::{AppState, CHECK_DATABASE, CHECK_MQTT, Readiness, Totals};
 use crate::web;
 use anyhow::{Context, Result, bail};
 use std::sync::Arc;
@@ -121,6 +121,7 @@ pub async fn run_until(
             .await
     });
 
+    let totals = state.caches.totals.clone();
     let prepared = tokio::select! {
         prepared = prepare(role, database.clone(), state) => prepared,
         _ = wait_until(stopping.clone()) => Ok(None),
@@ -129,7 +130,7 @@ pub async fn run_until(
     // Once the web can answer, the first requests to the busiest pages should
     // not be the ones that read their part of the database from the disk.
     let warming = (role.serves() && prepared.is_ok() && !*stopping.borrow())
-        .then(|| tokio::spawn(warm_cache(database, stopping.clone())));
+        .then(|| tokio::spawn(warm_cache(database, totals, stopping.clone())));
 
     // Kept here as well as in the store, so that it can be closed properly
     // however the ingester ends.
@@ -202,12 +203,12 @@ pub async fn backup(config: &Config, output: &std::path::Path) -> Result<()> {
 const TOP_WINDOW_US: i64 = 86_400 * 1_000_000;
 
 /// Reads, once and in the background, what the busiest pages read first: the
-/// totals of the home page and the statistics, and the window of the top
-/// nodes. Right after a start none of it is in memory, and on a slow disk the
+/// totals of the home page and the statistics, which are kept for them, and the
+/// window of the top nodes. Right after a start none of it is in memory, and on a slow disk the
 /// first visitor waits seconds for each, after which it is instant. Done on a
 /// connection of its own, which does not warn about slow statements as the
 /// web's do, and given up as soon as the process stops.
-async fn warm_cache(database: DatabaseUrl, stopping: watch::Receiver<bool>) {
+async fn warm_cache(database: DatabaseUrl, totals: Arc<Totals>, stopping: watch::Receiver<bool>) {
     let started = std::time::Instant::now();
     let pool = match db::open_quietly_for_reading(&database).await {
         Ok(pool) => pool,
@@ -218,8 +219,7 @@ async fn warm_cache(database: DatabaseUrl, stopping: watch::Receiver<bool>) {
     };
     let reader = db::Reader::new(pool.clone());
     let work = async {
-        reader.count_packets(None).await?;
-        reader.count_sightings(db::SightingsOf::All).await?;
+        totals.get(&reader).await?;
         reader
             .top_nodes(&db::TopQuery {
                 window_us: TOP_WINDOW_US,

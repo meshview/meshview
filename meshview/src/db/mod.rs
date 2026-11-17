@@ -249,9 +249,14 @@ impl Reader {
         on!(self, node(node_id))
     }
 
-    /// The stored node info packets a node sent, the latest first.
-    pub async fn nodeinfo_payloads(&self, node_id: i64) -> Result<Vec<Option<Vec<u8>>>> {
-        on!(self, nodeinfo_payloads(node_id))
+    /// The latest node info packets a node sent, at most `limit`, the latest
+    /// first.
+    pub async fn nodeinfo_payloads(
+        &self,
+        node_id: i64,
+        limit: i64,
+    ) -> Result<Vec<Option<Vec<u8>>>> {
+        on!(self, nodeinfo_payloads(node_id, limit))
     }
 
     /// The latest position packet and map report of each of these nodes: the
