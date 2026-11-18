@@ -92,8 +92,8 @@ async fn pages_speak_the_api_version_and_the_sites_language() {
     // With the version, and the commit it was built from when that is known.
     let build = meshview::web::api::version::current();
     let shown = match build.git_revision_short {
-        "unknown" => format!("Meshview {}<", build.version),
-        revision => format!("Meshview {} ({revision})<", build.version),
+        "unknown" => format!("Meshview Rust {}<", build.version),
+        revision => format!("Meshview Rust {} ({revision})<", build.version),
     };
     assert!(page.contains(&shown), "{shown}");
 

@@ -3,13 +3,13 @@
     development build from the next, opens the about dialog. -#}
 <span class="mesh-footer-project">
     <a class="mesh-footer-github" href="https://github.com/meshview/meshview" target="_blank" rel="noopener" title="{{ "Meshview on GitHub" | tr }}" aria-label="{{ "Meshview on GitHub" | tr }}"><span class="ti ti-brand-github" aria-hidden="true"></span></a>
-    <button type="button" id="site-version" class="mesh-footer-about" aria-haspopup="dialog" aria-controls="mesh-about" title="{{ "About Meshview" | tr }}">Meshview {{ build_version }}{% if build_revision %} ({{ build_revision }}){% endif %}</button>
+    <button type="button" id="site-version" class="mesh-footer-about" aria-haspopup="dialog" aria-controls="mesh-about" title="{{ "About Meshview" | tr }}">Meshview Rust {{ build_version }}{% if build_revision %} ({{ build_revision }}){% endif %}</button>
 </span>
 <dialog id="mesh-about" class="mesh-dialog mesh-about" aria-labelledby="mesh-about-title">
     <button type="button" class="mesh-dialog-close" aria-label="{{ "Close" | tr }}" title="{{ "Close" | tr }}"><span class="ti ti-x" aria-hidden="true"></span></button>
     <div class="mesh-about-body">
         <img src="/static/meshview-icon.svg" width="72" height="72" alt="">
-        <h2 id="mesh-about-title">Meshview</h2>
+        <h2 id="mesh-about-title">Meshview Rust</h2>
         <p class="mesh-about-version">{{ build_version }}{% if build_revision %} ({{ build_revision }}){% endif %}</p>
         <p>{{ "Meshview reads a Meshtastic mesh network from an MQTT broker and shows it as it happens: a map of its nodes, the packets they send, the paths those packets take, and statistics about all of it." | tr }}</p>
         <nav class="mesh-about-links" aria-label="{{ "About Meshview" | tr }}">

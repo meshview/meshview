@@ -2,7 +2,7 @@
 
 <img src="meshview/assets/static/meshview-icon.svg" alt="Meshview" width="128" height="128">
 
-# Meshview
+# Meshview Rust
 
 **Real-time monitoring and diagnostics for [Meshtastic](https://meshtastic.org/) mesh networks**
 
@@ -25,12 +25,11 @@
 
 ---
 
-Meshview reads packets from an MQTT broker into a database and serves a web
+Meshview Rust reads packets from an MQTT broker into a database and serves a web
 interface and an API over them: a live map of the nodes, the packets they send,
-the paths those packets take, and statistics about all of it. This is its
-rewrite in Rust, which takes over from the
-Python version: its
-databases, its configuration and its API carry over.
+the paths those packets take, and statistics about all of it. It is Meshview
+rewritten in Rust, which takes over from the Python version: its databases, its
+configuration and its API carry over.
 
 Meshview began as a Python project, which carries on in parallel in
 [its original repository](https://github.com/pablorevilla-meshtastic/meshview):
