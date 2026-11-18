@@ -173,7 +173,7 @@ pub struct Site {
     #[schema(example = "monday")]
     pub net_week_start: &'static str,
     /// Meshview's version.
-    #[schema(example = "5.0.0")]
+    #[schema(example = "1.0.0")]
     pub version: &'static str,
 }
 

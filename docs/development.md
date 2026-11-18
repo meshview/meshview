@@ -198,11 +198,11 @@ so it passes `--build-arg BINARY_SOURCE=prebuilt` and puts them under `dist/` as
 ## Releases
 
 A release is a tag named exactly the version in `Cargo.toml`, with no `v`
-(`5.0.0`), and annotated: its message becomes the release notes.
+(`1.0.0`), and annotated: its message becomes the release notes.
 
 ```sh
-git tag -a 5.0.0 -m "What changed"
-git push origin 5.0.0
+git tag -a 1.0.0 -m "What changed"
+git push origin 1.0.0
 ```
 
 CI refuses a tag that does not match `Cargo.toml`, and then publishes the image
