@@ -6,6 +6,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     const status = document.getElementById('chat-status');
     const pause = document.getElementById('chat-pause');
     const latest = document.getElementById('chat-latest');
+    // A channel's tag tells its whole name on hover only when it is cut short.
+    log.addEventListener('mouseover', event => {
+        const tag = event.target.closest?.('.chat-channel');
+        const name = tag?.querySelector('.chat-channel-name');
+        if (!name) return;
+        if (name.scrollWidth > name.clientWidth) tag.title = name.textContent;
+        else tag.removeAttribute('title');
+    });
+    // Where there is no hover, a tap opens a cut-short tag to its whole name, at
+    // the sender's expense; another tap, or one anywhere else, closes it.
+    document.addEventListener('click', event => {
+        const tag = event.target.closest?.('.chat-channel');
+        for (const open of log.querySelectorAll('.chat-channel.is-open')) {
+            if (open !== tag) open.classList.remove('is-open');
+        }
+        if (!tag) return;
+        const name = tag.querySelector('.chat-channel-name');
+        if (tag.classList.contains('is-open')) tag.classList.remove('is-open');
+        else if (name && name.scrollWidth > name.clientWidth) tag.classList.add('is-open');
+    });
     // A channel in the filter, in its place among the others, unless it is
     // there already: those of the last day, and any other as its first message
     // arrives, so that a new channel shows without a reload.
@@ -65,9 +85,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             row.dataset.packetId = packet.id;
             let hash = 0;
             for (const char of String(packet.from_node_id)) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+            // The time is the message's link to its packet, as a chat's timestamps are.
             const time = document.createElement('time');
-            time.className = 'chat-time'; time.dateTime = date.toISOString(); time.title = date.toLocaleString(MeshI18n.language);
+            time.dateTime = date.toISOString();
             time.textContent = date.toLocaleTimeString(MeshI18n.language, {hour:'2-digit', minute:'2-digit', hour12:false});
+            const stamp = document.createElement('a');
+            stamp.className = 'chat-time'; stamp.href = packetUrl(packet.id);
+            stamp.title = `${date.toLocaleString(MeshI18n.language)} · ${chatLang.view_packet_details || MeshI18n.t("View packet details")}`;
+            stamp.append(time);
             const nick = document.createElement('a');
             nick.className = 'chat-nick'; nick.href = `/node/${encodeURIComponent(packet.from_node_id)}`;
             nick.textContent = nodeName(packet); nick.title = nodeName(packet); nick.style.color = colors[hash % colors.length];
@@ -87,11 +112,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             const meta = document.createElement('span'); meta.className = 'chat-meta';
             const tag = document.createElement('span'); tag.className = 'chat-channel';
-            tag.textContent = packet.channel ? `# ${packet.channel}` : MeshI18n.t("Unknown channel"); tag.title = packet.channel || MeshI18n.t("Unknown channel");
-            const details = document.createElement('a'); details.className = 'chat-details'; details.href = packetUrl(packet.id);
-            details.textContent = MeshI18n.t("Details ↗"); details.title = chatLang.view_packet_details || MeshI18n.t("View packet details");
-            details.setAttribute('aria-label', details.title);
-            meta.append(tag, details); row.append(time, nick, message, meta); fragment.append(row);
+            const tagName = document.createElement('span'); tagName.className = 'chat-channel-name';
+            tagName.textContent = packet.channel || MeshI18n.t("Unknown channel");
+            tag.append(tagName);
+            if (packet.channel && window.MeshChannels) tag.style.setProperty('--channel-color', MeshChannels.color(packet.channel));
+            meta.append(tag); row.append(stamp, nick, message, meta); fragment.append(row);
         }
         if (!visible.length) {
             const empty = document.createElement('p'); empty.className = 'chat-empty';
@@ -115,7 +140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             top.textContent = MeshI18n.t("Loading earlier messages…");
         } else {
             const button = document.createElement('button');
-            button.type = 'button'; button.className = 'chat-control';
+            button.type = 'button'; button.className = 'mesh-button';
             button.textContent = MeshI18n.t("Load earlier messages");
             button.addEventListener('click', loadOlder);
             top.append(button);
@@ -218,7 +243,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     (async () => {
         try {
             const cfg = await window._siteConfigPromise;
-            const response = await fetch(`/api/v1/lang?lang=${encodeURIComponent(cfg?.site?.language || 'en')}&section=chat`);
+            const response = await fetch(`/api/v1/lang?lang=${encodeURIComponent(window.meshLanguage || cfg?.site?.language || 'en')}&section=chat`);
             if (!response.ok) return;
             chatLang = await response.json();
             document.querySelectorAll('[data-chat-translate]').forEach(el => {

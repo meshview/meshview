@@ -10,8 +10,9 @@ its type (quoted strings, lowercase booleans, numbers without leading zeros,
 lists), in its section. What Meshview has no use for is left out, with a
 note on standard error saying why:
 
-- the deprecated keys: [server] tls_cert, [cleanup] backup_*, [logging]
-  db_cleanup_logfile, which Meshview would accept with a warning and ignore;
+- the deprecated keys: [server] tls_cert, [site] language, [cleanup]
+  backup_*, [logging] db_cleanup_logfile, which Meshview would accept with a
+  warning and ignore;
 - keys the Python version no longer used either, such as [site] starting;
 - keys neither knows, with the known one they look like, if any: Python ignored
   them, so leaving them out keeps the configuration doing what it did;
@@ -54,7 +55,6 @@ SCHEMA = {
     "server": {"bind": STRING, "port": INTEGER},
     "site": {
         "domain": STRING,
-        "language": STRING,
         "title": STRING,
         "message": STRING,
         "announcement": STRING,
@@ -120,6 +120,10 @@ LEFT_OUT = {
         "site",
         "starting",
     ): "not used since the Python version dropped it: / is the dashboard",
+    (
+        "site",
+        "language",
+    ): "deprecated: each visitor reads the pages in their browser's language, or the one they choose",
     (
         "cleanup",
         "backup_enabled",

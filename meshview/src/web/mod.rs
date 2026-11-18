@@ -23,12 +23,13 @@ mod reference;
 
 use crate::app::Role;
 use crate::state::AppState;
+use crate::web::api::lang;
 use crate::web::api::params::Params;
 use axum::Router;
 use axum::extract::Path;
-use axum::http::header::{CONTENT_TYPE, HeaderMap, HeaderValue, LINK, LOCATION};
+use axum::http::header::{CONTENT_TYPE, HeaderMap, HeaderValue, LINK, LOCATION, VARY};
 use axum::http::{Extensions, StatusCode, Uri, Version};
-use axum::response::{IntoResponse, Response};
+use axum::response::{Html, IntoResponse, Response};
 use axum::routing::get;
 use bytes::Bytes;
 use std::collections::BTreeMap;
@@ -38,7 +39,7 @@ use tower_http::compression::predicate::{Predicate, SizeAbove};
 use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
-use utoipa_scalar::{Scalar, Servable};
+use utoipa_scalar::Scalar;
 
 /// Where the reference is served.
 const DOCS_PATH: &str = "/api/docs";
@@ -62,7 +63,7 @@ const REFERENCE_LANGUAGE: &str = "en";
 
 /// Scalar's page with a title of our own, the sidebar listing paths rather
 /// than summaries, as a reference is navigated by URL, and Scalar's own words
-/// in the site's language. Scalar is pinned, so that the page does not change
+/// in the visitor's language. Scalar is pinned, so that the page does not change
 /// under us from one day to the next.
 const SCALAR_HTML: &str = r#"<!doctype html>
 <html>
@@ -109,27 +110,49 @@ pub fn router(role: Role, state: AppState) -> Router {
 
     let router = if role.serves() {
         let documents = Arc::new(documents(&reference));
-        let site_language = state.config.site.language.as_str();
-        let language = if documents.contains_key(site_language) {
-            site_language
-        } else {
-            REFERENCE_LANGUAGE
+        // The reference's page in each language, Scalar's words in it too.
+        let pages: Arc<BTreeMap<String, String>> = Arc::new(
+            documents
+                .iter()
+                .map(|(code, document)| {
+                    let page: serde_json::Value = serde_json::from_slice(document)
+                        .expect("the reference was just serialized");
+                    let html = SCALAR_HTML.replace("$locale", code);
+                    (code.clone(), Scalar::new(page).custom_html(html).to_html())
+                })
+                .collect(),
+        );
+        let visitor = |documents: &BTreeMap<String, Bytes>, headers: &HeaderMap| {
+            lang::visitor_language(headers, |code| documents.contains_key(code))
         };
-        let page: serde_json::Value = serde_json::from_slice(&documents[language])
-            .expect("the reference was just serialized");
-        let html = SCALAR_HTML.replace("$locale", language);
-        let default = language.to_string();
+        let in_language = Arc::clone(&documents);
         router
-            .merge(Scalar::with_url(DOCS_PATH, page).custom_html(html))
+            .route(
+                DOCS_PATH,
+                get(move |headers: HeaderMap| async move {
+                    let code = visitor(&in_language, &headers);
+                    let html = pages.get(&code).unwrap_or(&pages[REFERENCE_LANGUAGE]);
+                    ([(VARY, lang::VARY_LANGUAGE)], Html(html.clone()))
+                }),
+            )
             .route(
                 OPENAPI_PATH,
-                get(move |params: Params| async move {
-                    let asked = params.get("lang").filter(|code| !code.is_empty());
-                    let body = asked
-                        .map_or(documents.get(&default), |code| documents.get(code))
+                get(move |headers: HeaderMap, params: Params| async move {
+                    let code = match params.get("lang").filter(|code| !code.is_empty()) {
+                        Some(code) => code.to_string(),
+                        None => visitor(&documents, &headers),
+                    };
+                    let body = documents
+                        .get(&code)
                         .unwrap_or(&documents[REFERENCE_LANGUAGE])
                         .clone();
-                    ([(CONTENT_TYPE, "application/json")], body)
+                    (
+                        [
+                            (CONTENT_TYPE, HeaderValue::from_static("application/json")),
+                            (VARY, lang::VARY_LANGUAGE),
+                        ],
+                        body,
+                    )
                 }),
             )
             .route("/api/{*rest}", get(legacy_api))

@@ -2,8 +2,8 @@
 (() => {
     const byId = id => document.getElementById(id);
     const panel = byId('mesh-node-panel');
-    // Home stacks the node list under the map below 1000px; there it starts folded.
-    const STACKED = matchMedia('(max-width: 1000px)');
+    // Home stacks the node list under the map below 1200px; there it starts folded.
+    const STACKED = matchMedia('(max-width: 1199px)');
     const listToggle = byId('node-panel-toggle');
     const listBody = byId('mesh-node-browser-body');
     function setNodeListOpen(open) {
@@ -11,9 +11,9 @@
         listToggle.setAttribute('aria-expanded', String(open));
         listBody.hidden = !open;
     }
+    // It folds on any screen: beside the map it starts open, under it folded.
     function syncNodeListLayout() {
         if (!listToggle) return;
-        listToggle.disabled = !STACKED.matches;
         setNodeListOpen(!STACKED.matches);
     }
     if (listToggle) {
@@ -65,7 +65,8 @@
                 facts.append(dt, dd);
             }
             panel.hidden = false;
-            closeButton.focus({preventScroll:true});
+            // Focus goes to the card, for the keyboard, without the ring a click does not need.
+            closeButton.focus({preventScroll:true, focusVisible:false});
         };
         L.DomEvent.disableClickPropagation(panel);
         L.DomEvent.disableScrollPropagation(panel);
@@ -257,7 +258,7 @@
         byId('mesh-node-browser').hidden = true;
         byId('mesh-node-inspector').hidden = false;
         byId('inspector-node-link').href = `/node/${encodeURIComponent(id)}`;
-        byId('inspector-reliability-link').href = `/reliability?node_id=${encodeURIComponent(id)}`;
+        byId('inspector-reliability-link').href = `/reliability/${encodeURIComponent(id)}`;
         facts(node);
         note(byId('inspector-telemetry'), MeshI18n.t("Loading telemetry…"), true);
         note(byId('inspector-recent'), MeshI18n.t("Loading recent packets…"), true);

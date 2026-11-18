@@ -95,7 +95,11 @@ impl Default for Server {
 #[serde(default, deny_unknown_fields)]
 pub struct Site {
     pub domain: String,
-    pub language: String,
+    /// Deprecated, and ignored: each visitor reads the pages in the language
+    /// their browser asks for, or the one they choose in the preferences. Kept
+    /// for one version so that an older configuration still starts, with a
+    /// warning; see [`Config::deprecations`].
+    pub language: Option<String>,
     pub title: String,
     pub message: String,
     pub announcement: String,
@@ -120,6 +124,9 @@ pub struct Site {
     pub map_tile_attribution: String,
     pub map_tile_max_zoom: u8,
     pub map_tile_name: String,
+    /// Kiosk screens (`/map?kiosk`) without the full screen button, so that
+    /// nothing on them leaves it: for a kiosk proper. New in Meshview.
+    pub map_kiosk_lock: bool,
     pub firehose_interval: i64,
     pub weekly_net_message: String,
     pub net_tag: String,
@@ -170,7 +177,7 @@ impl Default for Site {
     fn default() -> Self {
         Self {
             domain: String::new(),
-            language: "en".into(),
+            language: None,
             title: String::new(),
             message: String::new(),
             announcement: String::new(),
@@ -194,6 +201,7 @@ impl Default for Site {
             map_tile_attribution: String::new(),
             map_tile_max_zoom: 19,
             map_tile_name: String::new(),
+            map_kiosk_lock: false,
             firehose_interval: 3,
             // Empty, the weekly net page explains the net itself, in the
             // visitor's language.
@@ -444,6 +452,15 @@ impl Config {
                      <file>` from your scheduler instead."
                 ));
             }
+        }
+
+        if self.site.language.is_some() {
+            warnings.push(
+                "[site] language is deprecated and ignored, and will be removed in the next \
+                 version: each visitor reads the pages in the language their browser asks for, \
+                 or the one they choose in the preferences."
+                    .to_string(),
+            );
         }
 
         if self.logging.db_cleanup_logfile.is_some() {
@@ -788,12 +805,13 @@ mod tests {
         let config = Config::parse(
             "[server]\ntls_cert = \"\"\n\
              [cleanup]\nbackup_enabled = true\nbackup_dir = \"/b\"\n\
+             [site]\nlanguage = \"es\"\n\
              [logging]\ndb_cleanup_logfile = \"x.log\"\n",
         )
         .unwrap();
         let warnings = config.deprecations();
 
-        assert_eq!(warnings.len(), 4);
+        assert_eq!(warnings.len(), 5);
         assert!(
             warnings
                 .iter()
@@ -801,6 +819,7 @@ mod tests {
         );
         assert!(warnings[0].contains("reverse proxy"));
         assert!(warnings[1].contains("meshview backup"));
+        assert!(warnings[3].contains("their browser asks for"));
     }
 
     #[test]
@@ -866,6 +885,7 @@ mod tests {
         config.cleanup.backup_hour = Some(2);
         config.cleanup.backup_minute = Some(0);
         config.logging.db_cleanup_logfile = Some("dbcleanup.log".into());
+        config.site.language = Some("en".into());
 
         Table::try_from(config)
             .unwrap()

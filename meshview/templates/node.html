@@ -1,27 +1,33 @@
 {% extends "base.html" %}
-{% block theme %}light{% endblock %}
+{% block leaflet %}{% include "leaflet.html" %}{% endblock %}
 {% block body_class %}mesh-data-page mesh-node-page{% endblock %}
 
 {% block css %}
 {% include "data-page-styles.html" %}
 {% include "chart-styles.html" %}
 <style>
-.node-info { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; margin-bottom:20px; font-size:13px; }
-.node-info-col { background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; padding:20px; overflow-wrap:anywhere; }
-.node-info-col > div { padding:5px 0; }
+.node-info { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:14px; font-size:13px; }
+.node-info-col { background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); padding:16px 20px; overflow-wrap:anywhere; }
+/* Each fact a line: its label, muted, and its value at the right. */
+.node-info-col > div { display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:6px 0; }
+.node-info-col > div + div { border-top:1px solid var(--mesh-border-soft); }
+.node-info-col > div > strong + strong { display:none; }
+.node-info-col > div > strong { flex-shrink:0; }
+.node-info-col > div > span { min-width:0; text-align:right; font-weight:500; }
 .node-info-col { position:relative; }
-.node-info-loading { position:absolute; left:20px; top:62px; margin:0; color:var(--mesh-muted); }
+/* Loading: in the middle of the room under the card's heading. */
+.node-info-loading { position:absolute; inset:52px 0 0; display:flex; align-items:center; justify-content:center; margin:0; color:var(--mesh-muted); }
 .node-info:not(.is-ready) .node-info-col > div { visibility:hidden; }
 .node-info.is-ready .node-info-loading { display:none; }
-.node-info-col h2 { display:flex; align-items:center; gap:8px; margin:0 0 10px; padding-bottom:10px; border-bottom:1px solid var(--mesh-border); color:var(--mesh-text); font-size:15px; font-weight:650; }
+.node-info-col h2 { display:flex; align-items:center; gap:8px; margin:0 0 6px; padding-bottom:10px; border-bottom:1px solid var(--mesh-border); color:var(--mesh-text); font-size:15px; font-weight:650; }
 .node-info-col h2 .ti { color:var(--mesh-primary); font-size:18px; }
 .node-info strong { color:var(--mesh-muted); font-weight:500; }
-.node-actions { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+.node-actions { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
 .node-action-notes { margin-bottom:16px; }
 .node-action-note { display:flex; align-items:center; gap:6px; margin:4px 0 0; color:var(--mesh-muted); font-size:13px; }
 .node-action-note[hidden] { display:none; }
 .node-action-note.is-warning { color:#9a5b00; }
-[data-bs-theme="dark"] .node-action-note.is-warning { color:#f1d38a; }
+[data-theme="dark"] .node-action-note.is-warning { color:#f1d38a; }
 .mesh-data-page .mesh-content #toggleCoverageBtn[aria-pressed="true"] { background:var(--mesh-primary); color:var(--mesh-surface); }
 .mesh-data-page .mesh-content #toggleCoverageBtn[aria-busy="true"] .ti-broadcast { display:none; }
 /* Coverage and its help button read as one split button. */
@@ -44,7 +50,7 @@
 #map { position:relative; }
 .map-loading { position:absolute; inset:0; z-index:500; display:flex; align-items:center; justify-content:center; margin:0; color:var(--mesh-muted); pointer-events:none; }
 .packet-filter-actions { display:flex; align-items:center; gap:8px; margin-left:auto; }
-.filter-container { display:flex; gap:10px; flex-wrap:wrap; padding:16px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; margin-bottom:18px; }
+.filter-container { display:flex; gap:10px; flex-wrap:wrap; padding:12px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); margin-bottom:18px; }
 #qrModal { display:none; position:fixed; inset:0; background:#17263c99; z-index:9999; align-items:center; justify-content:center; padding:16px; }
 #qrModal > div { background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:12px; padding:24px; width:380px; max-width:100%; text-align:center; }
 .qr-header { display:flex; justify-content:space-between; align-items:center; gap:10px; }
@@ -58,21 +64,21 @@
 .mesh-data-page .copied { background:#e8f5ee; color:#187346; }
 /* On a phone the longest actions are said short and the buttons pressed a little
    closer, so that they take two rows and coverage stays whole beside its help. */
-.node-actions .label-short { display:none; }
+:is(.node-actions,.data-actions) .label-short { display:none; }
 @media(max-width:700px) {
   .node-actions { gap:6px; }
-  .node-actions .label-long { display:none; }
-  .node-actions .label-short { display:inline; }
+  :is(.node-actions,.data-actions) .label-long { display:none; }
+  :is(.node-actions,.data-actions) .label-short { display:inline; }
   .mesh-data-page .mesh-content .node-actions button { padding-left:10px; padding-right:10px; }
   .mesh-data-page .mesh-content .node-actions .node-help-btn { width:34px; padding:0; }
 }
 /* Too narrow for one row: two, as wide as the page, the three ways to see or
    share the node above and the two reports below; with nothing to share, the
    three left in one. */
-@media(max-width:820px) {
+@media(max-width:940px) {
   .node-actions { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); }
   .node-actions > * { grid-column:span 2; }
-  .node-actions.can-share > :nth-last-child(-n+2) { grid-column:span 3; }
+  .node-actions.can-share > :last-child { grid-column:span 4; }
   .mesh-data-page .mesh-content .node-actions > button { display:inline-flex; align-items:center; justify-content:center; gap:4px; min-width:0; white-space:nowrap; }
   .node-actions > .node-action-group { display:flex; min-width:0; }
   .mesh-data-page .mesh-content .node-action-group > button:first-child { flex:1 1 auto; display:inline-flex; align-items:center; justify-content:center; gap:4px; min-width:0; white-space:nowrap; }
@@ -83,7 +89,7 @@
   .node-actions .label-wide { display:none; }
   .node-actions .label-narrow { display:inline; }
 }
-.node-checks { margin-bottom:20px; padding:20px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; font-size:13px; }
+.node-checks { margin-bottom:14px; padding:16px 20px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); font-size:13px; }
 .node-checks[hidden] { display:none; }
 .node-checks h2 { display:flex; align-items:center; gap:8px; margin:0 0 10px; padding-bottom:10px; border-bottom:1px solid var(--mesh-border); color:var(--mesh-text); font-size:15px; font-weight:650; }
 .node-checks h2 .ti { color:var(--mesh-primary); font-size:18px; }
@@ -93,12 +99,13 @@
 .node-checks-list li + li { border-top:1px solid var(--mesh-border); }
 .node-checks-list .ti { grid-row:span 2; font-size:17px; line-height:1.2; color:var(--mesh-muted); }
 .node-checks-list .is-warning .ti { color:#c27c0e; }
-[data-bs-theme="dark"] .node-checks-list .is-warning .ti { color:#f1d38a; }
+[data-theme="dark"] .node-checks-list .is-warning .ti { color:#f1d38a; }
 .node-checks-list strong { color:var(--mesh-text); font-weight:600; }
 .node-checks-list span { color:var(--mesh-muted); }
 .node-checks-list a { color:var(--mesh-text); font-weight:600; text-decoration:none; }
 .node-checks-list a:hover { color:var(--mesh-primary); }
-@media(max-width:900px) { .node-info { grid-template-columns:minmax(0,1fr); gap:10px; } }
+@media(max-width:1199px) { .node-info { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:700px) { .node-info { grid-template-columns:minmax(0,1fr); gap:10px; } }
 @media(max-width:700px) { #node-packets { gap:8px !important; padding:12px; } #node-packets select { flex:1 1 0; min-width:0; padding-left:8px; padding-right:2px; } #node-packets #packet_port { flex-grow:1.2; } }
 </style>
 {% endblock %}
@@ -106,27 +113,27 @@
 {% block body %}
 <div class="container">
 
-<header class="data-heading is-compact"><div class="data-title"><h1><span id="nodeLabel">{{ "Node details" | tr }}</span></h1></div><div class="data-actions"><a class="mesh-secondary-button" href="/nodelist">{{ "All nodes ↗" | tr }}</a></div></header>
+<header class="data-heading is-compact"><div class="data-title"><h1><span id="nodeLabel">{{ "Node details" | tr }}</span></h1></div><div class="data-actions"><a class="mesh-button" href="/nodelist"><span class="label-long">{{ "All nodes" | tr }}</span><span class="label-short">{{ "Nodes" | tr }}</span><span class="mesh-go" aria-hidden="true">↗</span></a></div></header>
 
     <!-- Node Actions -->
     <div class="node-actions" id="nodeActions" style="display:none;">
-        <button onclick="copyImportUrl()" id="copyUrlBtn">
+        <button type="button" class="mesh-button" onclick="copyImportUrl()" id="copyUrlBtn">
             <span class="ti ti-copy" aria-hidden="true"></span> <span class="label-long" data-translate-lang="copy_import_url">Copy Import URL</span><span class="label-short">{{ "Copy URL" | tr }}</span>
         </button>
-        <button onclick="showQrCode()" id="showQrBtn">
+        <button type="button" class="mesh-button" onclick="showQrCode()" id="showQrBtn">
             <span class="ti ti-qrcode" aria-hidden="true"></span> <span class="label-long" data-translate-lang="show_qr_code">Show QR Code</span><span class="label-short">{{ "QR code" | tr }}</span>
         </button>
-        <button onclick="openRadio()" id="radioBtn">
+        <button type="button" class="mesh-button" onclick="openRadio()" id="radioBtn">
             <span class="ti ti-antenna" aria-hidden="true"></span> <span>{{ "Radio" | tr }}</span>
         </button>
-        <button onclick="openReachReport()" id="reachReportBtn">
+        <button type="button" class="mesh-button" onclick="openReachReport()" id="reachReportBtn">
             <span class="ti ti-chart-line" aria-hidden="true"></span> <span>{{ "Reliability" | tr }}</span>
         </button>
         <span class="node-action-group">
-            <button onclick="toggleCoverage()" id="toggleCoverageBtn" aria-pressed="false" disabled title="{{ "Location required for coverage" | tr }}">
+            <button type="button" class="mesh-button" onclick="toggleCoverage()" id="toggleCoverageBtn" aria-pressed="false" disabled title="{{ "Location required for coverage" | tr }}">
                 <span class="ti ti-broadcast" aria-hidden="true"></span> <span class="label-wide" data-translate-lang="toggle_coverage">Predicted Coverage</span><span class="label-narrow">{{ "Coverage" | tr }}</span>
             </button>
-            <button type="button" id="coverageHelpBtn" class="node-help-btn" aria-haspopup="dialog" aria-controls="coverage-help" aria-label="{{ "Coverage help" | tr }}" title="{{ "Coverage help" | tr }}">
+            <button type="button" id="coverageHelpBtn" class="mesh-button node-help-btn" aria-haspopup="dialog" aria-controls="coverage-help" aria-label="{{ "Coverage help" | tr }}" title="{{ "Coverage help" | tr }}">
                 <span class="ti ti-help-circle" aria-hidden="true"></span>
             </button>
         </span>
@@ -211,7 +218,7 @@
         <div class="chart-header">
             <h2 class="chart-title"><span class="ti ti-battery-2" aria-hidden="true"></span> <span data-translate-lang="battery_voltage">Battery & Voltage</span></h2>
             <div class="chart-actions">
-                <select class="chart-period" data-chart="battery_voltage" aria-label="{{ "Chart time range" | tr }}">
+                <select class="mesh-select chart-period" data-chart="battery_voltage" aria-label="{{ "Chart time range" | tr }}">
                     <option value="1" data-long="{{ "Last 24 hours" | tr }}" data-short="{{ "24 hours" | tr }}">{{ "Last 24 hours" | tr }}</option>
                     <option value="7" selected data-long="{{ "Last 7 days" | tr }}" data-short="{{ "7 days" | tr }}">{{ "Last 7 days" | tr }}</option>
                     <option value="30" data-long="{{ "Last 30 days" | tr }}" data-short="{{ "30 days" | tr }}">{{ "Last 30 days" | tr }}</option>
@@ -230,7 +237,7 @@
         <div class="chart-header">
             <h2 class="chart-title"><span class="ti ti-bolt" aria-hidden="true"></span> <span data-translate-lang="power">Power Metrics</span></h2>
             <div class="chart-actions">
-                <select class="chart-period" data-chart="power" aria-label="{{ "Chart time range" | tr }}">
+                <select class="mesh-select chart-period" data-chart="power" aria-label="{{ "Chart time range" | tr }}">
                     <option value="1" data-long="{{ "Last 24 hours" | tr }}" data-short="{{ "24 hours" | tr }}">{{ "Last 24 hours" | tr }}</option>
                     <option value="7" selected data-long="{{ "Last 7 days" | tr }}" data-short="{{ "7 days" | tr }}">{{ "Last 7 days" | tr }}</option>
                     <option value="30" data-long="{{ "Last 30 days" | tr }}" data-short="{{ "30 days" | tr }}">{{ "Last 30 days" | tr }}</option>
@@ -249,7 +256,7 @@
         <div class="chart-header">
             <h2 class="chart-title"><span class="ti ti-antenna-bars-5" aria-hidden="true"></span> <span data-translate-lang="air_channel">Air & Channel Utilization</span></h2>
             <div class="chart-actions">
-                <select class="chart-period" data-chart="air_channel" aria-label="{{ "Chart time range" | tr }}">
+                <select class="mesh-select chart-period" data-chart="air_channel" aria-label="{{ "Chart time range" | tr }}">
                     <option value="1" data-long="{{ "Last 24 hours" | tr }}" data-short="{{ "24 hours" | tr }}">{{ "Last 24 hours" | tr }}</option>
                     <option value="7" selected data-long="{{ "Last 7 days" | tr }}" data-short="{{ "7 days" | tr }}">{{ "Last 7 days" | tr }}</option>
                     <option value="30" data-long="{{ "Last 30 days" | tr }}" data-short="{{ "30 days" | tr }}">{{ "Last 30 days" | tr }}</option>
@@ -268,7 +275,7 @@
         <div class="chart-header">
             <h2 class="chart-title"><span class="ti ti-temperature" aria-hidden="true"></span> <span data-translate-lang="environment">Environment Metrics</span></h2>
             <div class="chart-actions">
-                <select class="chart-period" data-chart="environment" aria-label="{{ "Chart time range" | tr }}">
+                <select class="mesh-select chart-period" data-chart="environment" aria-label="{{ "Chart time range" | tr }}">
                     <option value="1" data-long="{{ "Last 24 hours" | tr }}" data-short="{{ "24 hours" | tr }}">{{ "Last 24 hours" | tr }}</option>
                     <option value="7" selected data-long="{{ "Last 7 days" | tr }}" data-short="{{ "7 days" | tr }}">{{ "Last 7 days" | tr }}</option>
                     <option value="30" data-long="{{ "Last 30 days" | tr }}" data-short="{{ "30 days" | tr }}">{{ "Last 30 days" | tr }}</option>
@@ -287,7 +294,7 @@
     <div class="chart-header">
         <h2 class="chart-title"><span class="ti ti-chart-bar" aria-hidden="true"></span> <span data-translate-lang="packets_per_day">Packets per Day (Last 7 Days)</span></h2>
         <div class="chart-actions">
-                <select class="chart-period" data-chart="packet_histogram" aria-label="{{ "Chart time range" | tr }}">
+                <select class="mesh-select chart-period" data-chart="packet_histogram" aria-label="{{ "Chart time range" | tr }}">
                     <option value="1" data-long="{{ "Last 24 hours" | tr }}" data-short="{{ "24 hours" | tr }}">{{ "Last 24 hours" | tr }}</option>
                     <option value="7" selected data-long="{{ "Last 7 days" | tr }}" data-short="{{ "7 days" | tr }}">{{ "Last 7 days" | tr }}</option>
                     <option value="30" data-long="{{ "Last 30 days" | tr }}" data-short="{{ "30 days" | tr }}">{{ "Last 30 days" | tr }}</option>
@@ -303,7 +310,7 @@
 
     <!-- Packet Filters -->
 <div id="node-packets" class="filter-container" style="scroll-margin-top:20px; margin-bottom:10px; display:flex; gap:12px; flex-wrap:wrap;">
-    <select id="packet_since" aria-label="{{ "Packet time range" | tr }}">
+    <select id="packet_since" class="mesh-select" aria-label="{{ "Packet time range" | tr }}">
         <option value="">{{ "All time" | tr }}</option>
         <option value="3600">{{ "Last hour" | tr }}</option>
         <option value="21600">{{ "Last 6 hours" | tr }}</option>
@@ -314,7 +321,7 @@
         <option value="604800">{{ "Last 7 days" | tr }}</option>
     </select>
 
-    <select id="packet_port" aria-label="{{ "Packet port" | tr }}">
+    <select id="packet_port" class="mesh-select" aria-label="{{ "Packet port" | tr }}">
         <option value="">{{ "All ports" | tr }}</option>
     </select>
 
@@ -340,7 +347,7 @@
         </tr>
     </thead>
 
-        <tbody id="packet_list"><tr class="packet-loading"><td colspan="6"><span class="is-loading">{{ "Loading..." | tr }}</span></td></tr></tbody>
+        <tbody id="packet_list"><tr class="packet-loading"><td colspan="6" class="data-empty"><span class="is-loading">{{ "Loading..." | tr }}</span></td></tr></tbody>
     </table>
     </div>
     <p id="packet-load-more" class="packet-load-more" hidden><span class="is-loading">{{ "Loading more packets…" | tr }}</span></p>
@@ -393,7 +400,8 @@ let nodeTranslations = {};
 async function loadTranslationsNode() {
     try {
         const cfg = await window._siteConfigPromise;
-        const lang = cfg?.site?.language || "en";
+        // The visitor's language, the page's, else the site's.
+        const lang = window.meshLanguage || cfg?.site?.language || "en";
 
         const res = await fetch(`/api/v1/lang?lang=${lang}&section=node`);
         nodeTranslations = await res.json();
@@ -427,17 +435,9 @@ function applyTranslationsNode(dict, root=document) {
 
 function makeNodePopup(node) {
     const id = node.node_id;
-    const hex = Number.isInteger(Number(id)) ? ` (!${Number(id).toString(16).padStart(8, "0")})` : "";
-    const name = node.long_name || node.short_name || MeshI18n.t("Node {id}", {id});
-    const shortName = node.short_name && node.short_name !== name
-        ? ` <span class="node-popup-short">(${escapeHtml(node.short_name)})</span>` : "";
-    // A link to any node but the one whose page this is.
-    const title = String(id) === String(fromNodeId)
-        ? escapeHtml(name)
-        : `<a href="/node/${encodeURIComponent(id)}">${escapeHtml(name)}</a>`;
-    // As the map's inspector shows a node, leaving out what the node never sent;
-    // last seen always closes.
-    const facts = [
+    // As the map's inspector shows a node; last seen always closes. A link to
+    // any node but the one whose page this is.
+    return meshNodePopup({id, node, link: String(id) !== String(fromNodeId), facts: [
         [MeshI18n.t("Role"), node.role],
         [MeshI18n.t("Channel"), node.channel],
         ["Hardware", node.hw_model],
@@ -445,16 +445,7 @@ function makeNodePopup(node) {
         [MeshI18n.t("Last seen"), node.last_seen_us
             ? new Date(Number(node.last_seen_us) / 1000).toLocaleString(MeshI18n.language)
             : MeshI18n.t("Unknown")],
-    ].filter(([, value]) => value)
-        .map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`)
-        .join("");
-    return `
-        <div class="node-popup">
-            <div class="node-popup-title">${title}${shortName}</div>
-            <p class="node-popup-meta">${escapeHtml(MeshI18n.t("Node {id}", {id}) + hex)}</p>
-            <dl class="node-popup-facts">${facts}</dl>
-        </div>
-    `;
+    ]});
 }
 
 function formatLastSeen(us) {
@@ -621,7 +612,7 @@ function nodeLink(id, labelOverride = null) {
     // Normal node
     const label = labelOverride || nodeMap[id] || id;
 
-    return `<a href="/node/${id}" style="text-decoration:underline; color:inherit;">
+    return `<a href="/node/${id}">
                 ${escapeHtml(label)}
             </a>`;
 }
@@ -1048,13 +1039,12 @@ function packetRowHtml(pkt) {
 
     const sizeBytes = packetSizeBytes(pkt);
     const packetIdCell = pkt.packet_id
-        ? `<a href="/packet/${pkt.storage_id || pkt.id}"
-              style="text-decoration:underline; color:inherit;">
+        ? `<a href="/packet/${pkt.storage_id || pkt.id}">
                ${pkt.packet_id}
            </a>`
         : pkt.portnum === 73
-        ? `<span class="text-secondary" title="${MeshI18n.h("MQTT map report")}">${MeshI18n.h("Not a Packet")}</span>`
-        : `<span class="text-secondary" title="${MeshI18n.h("No Meshtastic packet ID")}">—</span>`;
+        ? `<span class="to-mqtt" title="${MeshI18n.h("MQTT map report")}">${MeshI18n.h("Not a Packet")}</span>`
+        : `<span class="to-mqtt" title="${MeshI18n.h("No Meshtastic packet ID")}">—</span>`;
 
     return `
     <tr class="packet-row">
@@ -1228,6 +1218,9 @@ function telemetryLine(ts, name, color, values, yAxisIndex = 0) {
         type: 'line',
         smooth: true,
         connectNulls: true,
+        // No highlight under the pointer: its filled area would flash brighter
+        // as the pointer moves over it; the tooltip marks the point.
+        emphasis: { disabled: true },
         yAxisIndex,
         // Points only while there are few enough to tell apart.
         showSymbol: ts.length <= 200,
@@ -1252,7 +1245,9 @@ function telemetryLine(ts, name, color, values, yAxisIndex = 0) {
                 { offset: 1,   color: 'rgba(0,0,0,0)' }
             ])
         },
-        data: ts.map((t, i) => [t, isNaN(values[i]) ? null : values[i]])
+        // Only its own points: the times are every telemetry packet's, and a
+        // tooltip on a time of another kind's would find nothing here.
+        data: ts.map((t, i) => [t, values[i]]).filter(([, value]) => !isNaN(value) && value !== null)
     };
 }
 
@@ -1315,7 +1310,7 @@ function renderTelemetry(key, data) {
         };
     }
     drawChart(document.getElementById(`chart_${key}`),
-        { tooltip: { trigger: 'axis' }, xAxis: timeAxis, ...spanZoomOption(), ...option });
+        { tooltip: { trigger: 'axis' }, xAxis: timeAxis, ...option });
 }
 
 async function loadTelemetry(key, first = false) {
@@ -1454,7 +1449,7 @@ async function loadPacketHistogram(first = false) {
         xAxis: { type: "category", data: labels, axisLabel: { color: "#64748b" } },
         yAxis: { type: "value", axisLabel: { color: "#64748b" } },
         series
-    }, false);
+    });
 }
 
 
@@ -1844,13 +1839,13 @@ function showQrCode() {
 
 function openReachReport() {
     if (!fromNodeId) return;
-    window.location.href = `/reliability?node_id=${encodeURIComponent(fromNodeId)}`;
+    window.location.href = `/reliability/${encodeURIComponent(fromNodeId)}`;
 }
 
 // Who the node hears and who hears it: direct receptions, relays, neighbors.
 function openRadio() {
     if (!fromNodeId) return;
-    window.location.href = `/radio?node_id=${encodeURIComponent(fromNodeId)}`;
+    window.location.href = `/radio/${encodeURIComponent(fromNodeId)}`;
 }
 
 function closeQrModal() {

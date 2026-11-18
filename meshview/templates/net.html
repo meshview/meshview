@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% block theme %}light{% endblock %}
 {% block body_class %}mesh-data-page mesh-net-page{% endblock %}
 
 {% block css %}
@@ -8,15 +7,17 @@
 #weekly-message { display:grid; grid-template-columns:auto minmax(0,1fr); column-gap:12px; align-items:start; padding:14px 18px; background:var(--mesh-soft); border:1px solid var(--mesh-border); border-radius:9px; color:var(--mesh-text); font-size:13px; line-height:1.5; margin-bottom:16px; overflow-wrap:anywhere; }
 /* The icon sits beside the first paragraph (centred on it); the rules line runs below. */
 #weekly-message > div { display:contents; }
-#weekly-message > .ti { grid-row:1; align-self:center; }
+#weekly-message > .weekly-icon { grid-row:1; align-self:center; width:18px; height:18px; color:var(--mesh-primary); }
 #weekly-message p { grid-column:2; }
-#weekly-message .ti { flex-shrink:0; font-size:18px; color:var(--mesh-primary); }
 #weekly-message-text { margin:0 0 4px; white-space:pre-wrap; }
 #weekly-message-text[hidden] { display:none; }
 .weekly-rules { margin:0; color:var(--mesh-muted); font-size:12px; }
 .net-table .c-num { width:1%; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .net-table td.c-num { color:var(--mesh-muted); }
 .net-table .c-time { white-space:nowrap; }
+/* The time is the link to the packet, as in the chat. */
+.net-table .c-time a { color:inherit; font-weight:400; text-decoration:none; }
+.net-table .c-time a:hover { color:var(--mesh-primary); text-decoration:underline; }
 .net-table .c-node { font-weight:600; }
 /* What each one said, the tag marked: at most two lines (three on cards),
    the whole of it on hover, and unfolded or folded again by a tap. Long words
@@ -28,10 +29,8 @@
 .net-message { display:flex; align-items:flex-start; gap:8px; }
 .net-message .net-text { flex:1; min-width:0; }
 .net-sent { flex-shrink:0; padding:0 6px; border-radius:9px; background:var(--mesh-soft); color:var(--mesh-muted); font-size:11px; line-height:18px; font-variant-numeric:tabular-nums; }
-.net-details { flex-shrink:0; color:var(--mesh-muted); text-decoration:none; font-size:12px; }
-.net-details:hover { color:var(--mesh-primary); }
 /* Sortable headers, as on the reliability gateway table. */
-.mesh-data-page .mesh-content .net-sort { display:inline-flex; align-items:center; gap:2px; padding:0; border:0; background:transparent; color:inherit; font:inherit; cursor:pointer; }
+.mesh-data-page .mesh-content .net-sort { display:inline-flex; align-items:center; gap:2px; padding:0; border:0; background:transparent; color:inherit; font:inherit; letter-spacing:inherit; text-transform:inherit; cursor:pointer; }
 .mesh-data-page .mesh-content .net-sort:hover { background:transparent; }
 .mesh-data-page .mesh-content .net-sort:focus-visible { outline:2px solid #fff; outline-offset:2px; }
 .net-sort .sort-icon { font-size:10px; }
@@ -50,9 +49,10 @@
 /* Each net under a heading row: its week, its days and its check-ins. */
 .net-table tr.net-week-head th { padding:10px 14px; background:var(--mesh-soft); border-top:2px solid var(--mesh-primary); color:var(--mesh-text); font-size:13px; font-weight:600; text-align:left; }
 .net-table tbody:first-of-type tr.net-week-head th { border-top:0; }
-/* The heading of the net in view stays under the column headings as the page scrolls. */
-.mesh-data-page .data-table-wrap > .net-table tr.net-week-head th { top:calc(var(--header-offset,0px) + 40px); z-index:1; height:auto; }
-.mesh-data-page .data-table-wrap.is-wide > .net-table tr.net-week-head th { top:40px; }
+/* The heading of the net in view stays right under the column headings (36px
+   high, data-page-styles.html) as the page scrolls. */
+.mesh-data-page .data-table-wrap > .net-table tr.net-week-head th { top:calc(var(--header-offset,0px) + 36px); z-index:1; height:auto; }
+.mesh-data-page .data-table-wrap.is-wide > .net-table tr.net-week-head th { top:36px; }
 .net-week-title { margin-right:10px; }
 .net-week-dates { color:var(--mesh-muted); font-weight:400; }
 .net-week-count { float:right; padding:0 8px; border-radius:10px; background:var(--mesh-surface); border:1px solid var(--mesh-border); color:var(--mesh-primary); font-size:12px; font-variant-numeric:tabular-nums; }
@@ -65,9 +65,9 @@
 {% endblock %}
 
 {% block body %}
-<header class="data-heading is-compact"><div class="data-title"><h1><span data-translate-lang="net_title">Weekly Net</span></h1></div><div class="data-actions"><a class="mesh-secondary-button" href="/map">{{ "View map ↗" | tr }}</a></div></header>
+<header class="data-heading is-compact"><div class="data-title"><h1><span data-translate-lang="net_title">Weekly Net</span></h1></div><div class="data-actions"><a class="mesh-button is-icon-mobile" href="/map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l6 -3l6 3l6 -3v13l-6 3l-6 -3l-6 3v-13"/><path d="M9 4v13"/><path d="M15 7v13"/></svg><span class="mesh-button-label">{{ "View map" | tr }}</span><span class="mesh-go" aria-hidden="true">↗</span></a></div></header>
 
-<div id="weekly-message" role="note"><span class="ti ti-info-circle" aria-hidden="true"></span><div><p id="weekly-message-text" hidden></p><p class="weekly-rules">{{ "Grouped by week, the latest first · only each node's latest message of the week is listed." | tr }}</p></div></div>
+<div id="weekly-message" role="note"><svg class="weekly-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 9h.01"/><path d="M11 12h1v4h1"/></svg><div><p id="weekly-message-text" hidden></p><p class="weekly-rules">{{ "Grouped by week, the latest first · only each node's latest message of the week is listed." | tr }}</p></div></div>
 
 <div class="data-table-wrap" role="region" aria-label="{{ "Check-ins" | tr }}" tabindex="0">
 <table class="net-table card-table" data-cards-below="760">
@@ -288,10 +288,13 @@ document.addEventListener("DOMContentLoaded", async () => {
             const row = net.body.insertRow();
             const date = new Date(packet.import_time_us / 1000);
             cell(row, "c-num", String(num));
-            const time = cell(row, "c-time", date.toLocaleString(MeshI18n.language, {
+            const when = document.createElement("a");
+            when.href = `/packet/${encodeURIComponent(packet.storage_id ?? packet.id)}`;
+            when.textContent = date.toLocaleString(MeshI18n.language, {
                 weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
-            }));
-            time.title = date.toLocaleString(MeshI18n.language);
+            });
+            when.title = `${date.toLocaleString(MeshI18n.language)} · ${netTranslations.view_packet_details || MeshI18n.t("View packet details")}`;
+            cell(row, "c-time", when);
             const node = document.createElement("a");
             node.href = `/node/${encodeURIComponent(packet.from_node_id)}`;
             node.textContent = name;
@@ -319,12 +322,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                     if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggle(); }
                 });
             }
-            const details = document.createElement("a");
-            details.className = "net-details";
-            details.href = `/packet/${encodeURIComponent(packet.storage_id ?? packet.id)}`;
-            details.title = netTranslations.view_packet_details || MeshI18n.t("View packet details");
-            details.setAttribute("aria-label", details.title);
-            details.textContent = "↗";
             message.append(text);
             if (sent > 1) {
                 const count = document.createElement("span");
@@ -333,7 +330,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                 count.title = MeshI18n.t("{count} messages in the week", {count: sent});
                 message.append(count);
             }
-            message.append(details);
             cell(row, "c-message", message);
         });
     }
@@ -371,7 +367,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
         const site = (await window._siteConfigPromise)?.site || {};
         try {
-            const res = await fetch(`/api/v1/lang?lang=${encodeURIComponent(site.language || "en")}&section=net`);
+            const res = await fetch(`/api/v1/lang?lang=${encodeURIComponent(window.meshLanguage || site.language || "en")}&section=net`);
             netTranslations = await res.json();
             applyTranslations();
         } catch (error) {

@@ -10,9 +10,9 @@
 
 use super::error::{ApiError, ErrorBody};
 use super::params::Params;
-use crate::state::AppState;
 use axum::Json;
-use axum::extract::State;
+use axum::http::header::{ACCEPT_LANGUAGE, COOKIE, HeaderMap, HeaderValue, VARY};
+use axum::response::IntoResponse;
 use rust_embed::RustEmbed;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
@@ -40,6 +40,81 @@ pub(crate) fn is_language_code(code: &str) -> bool {
         && rest.is_none_or(|rest| {
             (2..=8).contains(&rest.len()) && rest.bytes().all(|b| b.is_ascii_alphanumeric())
         })
+}
+
+/// The languages there is a catalog for, by code, English first.
+pub(crate) fn available() -> Vec<String> {
+    let mut codes: Vec<String> = Catalogs::iter()
+        .filter_map(|name| name.strip_suffix(".json").map(str::to_string))
+        .collect();
+    codes.sort_by_key(|code| (code != "en", code.clone()));
+    codes
+}
+
+/// The cookie in which a visitor keeps the language they chose in the
+/// preferences dialog.
+pub(crate) const LANGUAGE_COOKIE: &str = "meshview-lang";
+
+/// What an answer in the visitor's language varies with, for caches.
+pub(crate) const VARY_LANGUAGE: HeaderValue = HeaderValue::from_static("Cookie, Accept-Language");
+
+/// The language to answer a visitor in, of those `known` has: the one they
+/// chose in the preferences, kept in a cookie; else the first their browser
+/// asks for in its `Accept-Language`, a regional variant taken as its
+/// language (`es-ES` as `es`) when there is none for the variant; else
+/// English.
+pub(crate) fn visitor_language(headers: &HeaderMap, known: impl Fn(&str) -> bool) -> String {
+    let chosen = headers
+        .get_all(COOKIE)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(|value| value.split(';'))
+        .filter_map(|pair| pair.trim().split_once('='))
+        .find(|(name, _)| *name == LANGUAGE_COOKIE)
+        .map(|(_, value)| value.trim())
+        .filter(|code| known(code));
+    if let Some(code) = chosen {
+        return code.to_string();
+    }
+
+    // The browser's, most wanted first, in its order among equals.
+    let mut asked: Vec<(f32, &str)> = headers
+        .get_all(ACCEPT_LANGUAGE)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(|value| value.split(','))
+        .filter_map(|entry| {
+            let mut parts = entry.split(';');
+            let tag = parts.next()?.trim();
+            let quality = parts
+                .filter_map(|part| part.trim().strip_prefix("q="))
+                .find_map(|q| q.trim().parse::<f32>().ok())
+                .unwrap_or(1.0);
+            (quality > 0.0 && !tag.is_empty() && tag != "*").then_some((quality, tag))
+        })
+        .collect();
+    asked.sort_by(|a, b| b.0.total_cmp(&a.0));
+    asked
+        .into_iter()
+        .find_map(|(_, tag)| {
+            let tag = tag.replace('-', "_");
+            let language = tag
+                .split('_')
+                .next()
+                .unwrap_or_default()
+                .to_ascii_lowercase();
+            [tag, language].into_iter().find(|code| known(code))
+        })
+        .unwrap_or_else(|| "en".to_string())
+}
+
+/// A language's own name for itself, for choosing it.
+pub(crate) fn native_name(code: &str) -> &str {
+    match code {
+        "en" => "English",
+        "es" => "Español",
+        other => other,
+    }
 }
 
 fn read(code: &str) -> Option<Map<String, Value>> {
@@ -96,7 +171,7 @@ pub(crate) fn merged(code: &str) -> Value {
     path = "/lang",
     tag = "meta",
     params(
-        ("lang" = Option<String>, Query, description = "A language code, such as `es`. Default: `[site] language`. One there is no catalog for gets English."),
+        ("lang" = Option<String>, Query, description = "A language code, such as `es`. Default: the visitor's, as the pages': the one chosen in their preferences, else the first their browser asks for that there is a catalog for, else English. One there is no catalog for gets English."),
         ("section" = Option<String>, Query, description = "Only this section of the catalog, such as `top`."),
     ),
     responses(
@@ -107,9 +182,15 @@ pub(crate) fn merged(code: &str) -> Value {
         (status = 404, description = "No such section", body = ErrorBody),
     )
 )]
-pub async fn lang(State(state): State<AppState>, params: Params) -> Result<Json<Value>, ApiError> {
+pub async fn lang(headers: HeaderMap, params: Params) -> Result<impl IntoResponse, ApiError> {
+    let visitor;
     let requested = match params.get("lang") {
-        None | Some("") => state.config.site.language.as_str(),
+        None | Some("") => {
+            visitor = visitor_language(&headers, |code| {
+                Catalogs::get(&format!("{code}.json")).is_some()
+            });
+            visitor.as_str()
+        }
         Some(code) => code,
     };
     let code = if is_language_code(requested) {
@@ -126,15 +207,16 @@ pub async fn lang(State(state): State<AppState>, params: Params) -> Result<Json<
     };
     let catalog = merged(served);
 
-    match params.get("section").filter(|section| !section.is_empty()) {
-        None => Ok(Json(catalog)),
+    let body = match params.get("section").filter(|section| !section.is_empty()) {
+        None => catalog,
         Some(section) => {
             let section = section.to_lowercase();
-            catalog.get(&section).cloned().map(Json).ok_or_else(|| {
+            catalog.get(&section).cloned().ok_or_else(|| {
                 ApiError::not_found(format!("Section '{section}' not found in {code}"))
-            })
+            })?
         }
-    }
+    };
+    Ok(([(VARY, VARY_LANGUAGE)], Json(body)))
 }
 
 #[cfg(test)]

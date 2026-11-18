@@ -28,12 +28,12 @@ function showChartEmpty(card, empty) {
     card.querySelectorAll(".chart-tool").forEach(tool => { tool.disabled = empty; });
 }
 
-// With a mouse, dragging selects the span to zoom into and the wheel moves
-// along time. On a touch screen a finger on the page has to scroll it, so the
-// charts there do not zoom: expanded, they pinch and drag as usual. The box zoom
-// only works with its toolbox shown: it is, out of sight.
-function spanZoomOption(expanded = false) {
-    if (!FINE_POINTER && !expanded) return {};
+// The zoom of an expanded chart; on its page a chart does not zoom, so the
+// wheel or a finger scrolls the page. With a mouse, dragging selects the span to
+// zoom into and the wheel moves along time; on a touch screen it pinches and
+// drags as usual. The box zoom only works with its toolbox shown: it is, out of
+// sight.
+function spanZoomOption() {
     return {
         toolbox: { show: true, left: -1000, top: -1000, showTitle: false,
             feature: { dataZoom: { yAxisIndex: "none" } } },
@@ -82,13 +82,12 @@ function enableLegendSolo(chart) {
 }
 
 // A chart drawn into its card, with the option replacing what was there.
-function drawChart(el, option, zoom = true) {
+function drawChart(el, option) {
     const chart = echarts.getInstanceByDom(el) || initMeshChart(el);
     // Shown again after being hidden, the chart has to take its size anew.
     chart.resize();
     chart.setOption(option, { replaceMerge: ["series", "xAxis", "yAxis", "legend"] });
     fitLegend(chart);
-    if (zoom) enableSpanZoom(chart);
     return chart;
 }
 
@@ -148,35 +147,81 @@ function pressToggle(button) {
     placeToggleThumbs(button.closest(".pill-toggle").parentElement);
 }
 
-/* Expanding a chart: a copy of it in the modal of chart-modal.html. Its
-   canvas says what it does there: data-zoom="false" for one that does not
-   zoom (bars), data-solo="true" for a legend whose items show alone. */
+/* Expanding a chart: a copy of it in the modal of chart-modal.html, under its
+   card's title and a copy of the card's selects (its period, its channel),
+   which drive the card's own and so the copy. Its canvas says what it does
+   there: data-zoom="false" for one that does not zoom (bars, pies),
+   data-solo="true" for a legend whose items show alone. It returns the copy,
+   for a page to add what clicking it does. */
+let expanded = null;
 function expandChart(type) {
     const srcEl = document.getElementById(`chart_${type}`);
     const sourceChart = srcEl && echarts.getInstanceByDom(srcEl);
-    if (!sourceChart) return;
+    if (!sourceChart) return null;
 
     // A tooltip left open on the page would float above the modal.
     document.querySelectorAll("[_echarts_instance_]").forEach(el =>
         echarts.getInstanceByDom(el)?.dispatchAction({ type: "hideTip" }));
     const modal = document.getElementById("chartModal");
+    const card = srcEl.closest(".chart-container, .card-section");
+    document.getElementById("chart-modal-title").textContent =
+        card?.querySelector(".chart-title, .section-header")?.textContent.trim() || "";
+
     const modalChart = initMeshChart(document.getElementById("modalChart"));
+    const draw = () => {
+        modalChart.setOption(sourceChart.getOption(), true);
+        modalChart.resize();
+        fitLegend(modalChart);
+        // Every chart over time zooms here, and only here.
+        if (srcEl.dataset.zoom !== "false") {
+            modalChart.setOption(spanZoomOption());
+            enableSpanZoom(modalChart);
+        }
+        if (srcEl.dataset.solo === "true") enableLegendSolo(modalChart);
+    };
+
+    // The card's selects, copied: a change goes to the card's, whose chart,
+    // once drawn again, is copied once more.
+    const controls = document.getElementById("chart-modal-controls");
+    controls.replaceChildren(...[...(card?.querySelectorAll("select") || [])].map(select => {
+        const copy = select.cloneNode(true);
+        copy.removeAttribute("id");
+        copy.className = "mesh-select";
+        copy.value = select.value;
+        if (!copy.getAttribute("aria-label")) {
+            copy.setAttribute("aria-label", select.labels?.[0]?.textContent.trim() || "");
+        }
+        copy.addEventListener("change", () => {
+            const redrawn = () => { sourceChart.off("finished", redrawn); draw(); };
+            sourceChart.on("finished", redrawn);
+            select.value = copy.value;
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+        return copy;
+    }));
+
     modal.style.display = "flex";
-    modalChart.setOption(sourceChart.getOption());
-    modalChart.resize();
-    fitLegend(modalChart);
-    // Every chart over time zooms, as on the page with a mouse, or by pinching
-    // on a touch screen, where only here it does.
-    if (srcEl.dataset.zoom !== "false") {
-        if (!FINE_POINTER) modalChart.setOption(spanZoomOption(true));
-        enableSpanZoom(modalChart);
-    }
-    if (srcEl.dataset.solo === "true") enableLegendSolo(modalChart);
+    draw();
+    expanded = { modalChart, sourceChart };
+    modal.querySelector(".mesh-dialog-close")?.focus({ focusVisible: false });
+    return modalChart;
 }
 
 function closeModal() {
     document.getElementById("chartModal").style.display = "none";
+    document.getElementById("chart-modal-controls").replaceChildren();
+    expanded?.modalChart.dispose();
+    expanded = null;
 }
+
+// The modal closes with Escape, or a click outside its box.
+document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && expanded) closeModal();
+});
+document.addEventListener("click", event => {
+    if (expanded && event.target.id === "chartModal") closeModal();
+});
+window.addEventListener("resize", () => expanded?.modalChart.resize());
 
 // A CSV file of these rows, downloaded.
 function downloadCsv(rows, filename) {

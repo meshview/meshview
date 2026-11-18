@@ -56,9 +56,8 @@ async fn every_page_is_served_where_the_python_version_served_it() {
         "/packet/123",
         "/node/1234",
         "/traceroute/123",
-        "/kiosk",
-        "/kiosk.html",
-        "/heatmap",
+        "/reliability/123",
+        "/radio/123",
     ] {
         let response = get(&app, path, &[]).await;
         assert_eq!(response.status(), StatusCode::OK, "{path}");
@@ -73,13 +72,14 @@ async fn every_page_is_served_where_the_python_version_served_it() {
 }
 
 #[tokio::test]
-async fn pages_speak_the_api_version_and_the_sites_language() {
+async fn pages_speak_the_api_version_and_the_visitors_language() {
     let mut config = Config::default();
-    config.site.language = "es".into();
     config.site.message = "Nuestra malla".into();
     let app = app(config);
 
-    let page = text(get(&app, "/nodelist", &[]).await).await;
+    let response = get(&app, "/nodelist", &[(header::ACCEPT_LANGUAGE, "es")]).await;
+    assert_eq!(response.headers()[header::VARY], "Cookie, Accept-Language");
+    let page = text(response).await;
     assert!(page.contains(r#"<html lang="es""#));
     assert!(page.contains(r#"window.meshLanguage = "es";"#));
     assert!(page.contains(r#"<meta name="description" content="Nuestra malla">"#));
@@ -105,6 +105,43 @@ async fn pages_speak_the_api_version_and_the_sites_language() {
 }
 
 #[tokio::test]
+async fn a_visitor_reads_the_pages_in_the_language_they_chose() {
+    let app = app(Config::default());
+    let spanish = |headers: &'static [(header::HeaderName, &'static str)]| {
+        let app = app.clone();
+        async move {
+            let page = text(get(&app, "/nodelist", headers).await).await;
+            page.contains(r#"<html lang="es""#)
+        }
+    };
+
+    // The cookie of the preferences asks for Spanish.
+    assert!(spanish(&[(header::COOKIE, "theme=x; meshview-lang=es")]).await);
+    // A language there is no translation for, or none, is the browser's.
+    assert!(!spanish(&[(header::COOKIE, "meshview-lang=xx")]).await);
+    assert!(!spanish(&[(header::COOKIE, "other=es")]).await);
+    // The browser's: the first known, by preference, a region as its language.
+    assert!(spanish(&[(header::ACCEPT_LANGUAGE, "es-ES,es;q=0.9,en;q=0.8")]).await);
+    assert!(spanish(&[(header::ACCEPT_LANGUAGE, "fr-FR, en;q=0.5, es;q=0.7")]).await);
+    assert!(!spanish(&[(header::ACCEPT_LANGUAGE, "fr, de;q=0.8")]).await);
+    assert!(!spanish(&[(header::ACCEPT_LANGUAGE, "en, es;q=0.9")]).await);
+    assert!(!spanish(&[(header::ACCEPT_LANGUAGE, "es;q=0, en")]).await);
+    // The choice in the preferences wins over the browser's.
+    assert!(
+        !spanish(&[
+            (header::COOKIE, "meshview-lang=en"),
+            (header::ACCEPT_LANGUAGE, "es")
+        ])
+        .await
+    );
+    // The page the menu marks as the current one is the one asked for.
+    let page = text(get(&app, "/firehose", &[]).await).await;
+    assert!(page.contains(
+        r#"<a href="/firehose" data-group="everything" class="active" aria-current="page">"#
+    ));
+}
+
+#[tokio::test]
 async fn a_planet_is_linked_only_when_its_address_is_set() {
     const LINK: &str = r#"<a href="https://planet.example.org" target="_blank""#;
     let page = text(get(&app(Config::default()), "/nodelist", &[]).await).await;
@@ -122,6 +159,34 @@ async fn a_planet_is_linked_only_when_its_address_is_set() {
 }
 
 #[tokio::test]
+async fn pages_come_in_their_language_from_the_first_paint() {
+    let app = app(Config::default());
+    const SPANISH: &[(header::HeaderName, &str)] = &[(header::ACCEPT_LANGUAGE, "es")];
+    let page = text(get(&app, "/nodelist", SPANISH).await).await;
+    assert!(page.contains(r#"<span id="favorites-label" data-translate-lang="show_favorites">Mostrar favoritos</span>"#));
+    // A field: its placeholder, and nothing written after it.
+    assert!(page.contains(r#"placeholder="Buscar por nombre o ID...""#));
+    assert_eq!(page.matches("Buscar por nombre o ID...").count(), 1);
+    let page = text(get(&app, "/top", SPANISH).await).await;
+    assert!(
+        page.contains(r#"data-translate-lang="top_traffic_nodes">Nodos con mayor tráfico</h1>"#)
+    );
+}
+
+#[tokio::test]
+async fn a_locked_kiosk_keeps_no_way_out() {
+    const LOCK: &str = "classList.add('mesh-kiosk-locked')";
+    let page = text(get(&app(Config::default()), "/map", &[]).await).await;
+    assert!(page.contains(r#"id="kiosk-button""#));
+    assert!(!page.contains(LOCK));
+
+    let mut config = Config::default();
+    config.site.map_kiosk_lock = true;
+    let page = text(get(&app(config), "/map", &[]).await).await;
+    assert!(page.contains(LOCK));
+}
+
+#[tokio::test]
 async fn old_addresses_lead_to_their_new_places() {
     let app = app(Config::default());
     for (path, status, location) in [
@@ -133,6 +198,12 @@ async fn old_addresses_lead_to_their_new_places() {
         ),
         ("/api.html", StatusCode::MOVED_PERMANENTLY, "/api/docs"),
         ("/api-chat.html", StatusCode::MOVED_PERMANENTLY, "/api/docs"),
+        (
+            "/reliability?node_id=42",
+            StatusCode::FOUND,
+            "/reliability/42",
+        ),
+        ("/radio?node_id=42", StatusCode::FOUND, "/radio/42"),
     ] {
         let response = get(&app, path, &[]).await;
         assert_eq!(response.status(), status, "{path}");
@@ -191,12 +262,10 @@ async fn what_is_not_there_is_a_page_saying_so() {
 
 #[tokio::test]
 async fn the_coverage_help_comes_with_the_node_page() {
-    let mut config = Config::default();
-    config.site.language = "ru".into();
-    let app = app(config);
+    let app = app(Config::default());
 
-    let page = text(get(&app, "/node/1234", &[]).await).await;
-    assert!(page.contains("<h4>Как это работает</h4>"));
+    let page = text(get(&app, "/node/1234", &[(header::ACCEPT_LANGUAGE, "es")]).await).await;
+    assert!(page.contains("<h4>Cómo funciona</h4>"));
     // It was fetched from these, which are not served any more.
     assert_eq!(
         get(&app, "/docs/COVERAGE.md", &[]).await.status(),

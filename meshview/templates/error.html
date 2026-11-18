@@ -1,19 +1,37 @@
 {% extends "base.html" %}
+{% block body_class %}mesh-error-page{% endblock %}
+
+{% block css %}
+<style>
+/* A card in the middle of the page: what went wrong and the ways on. */
+.mesh-error-page .mesh-content { display:flex; align-items:center; justify-content:center; }
+.error-card { width:min(480px,100%); padding:32px 28px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); text-align:center; }
+.error-code { display:block; color:var(--mesh-primary); font-size:56px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+.error-card h1 { margin:14px 0 6px; font-size:20px; }
+.error-card p { margin:0; color:var(--mesh-muted); font-size:14px; }
+.error-details { margin-top:18px; text-align:left; font-size:13px; }
+.error-details summary { cursor:pointer; color:var(--mesh-text); font-weight:600; }
+.error-details pre { margin:10px 0 0; padding:10px 12px; overflow:auto; background:var(--mesh-surface-2); border-radius:var(--mesh-radius-sm); }
+.error-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:22px; }
+</style>
+{% endblock %}
 
 {% block body %}
-<div class="container mt-4 text-center">
-  <h2>{{ "Error" | tr }}</h2>
-  <p>{{ error_message }}</p>
+<section class="error-card">
+    <span class="error-code" aria-hidden="true">404</span>
+    <h1>{{ error_message | tr }}</h1>
+    <p>{{ "The address you followed does not exist, or it has moved." | tr }}</p>
 
-  {% if error_details %}
-    <details>
-      <summary>{{ "Error Details" | tr }}</summary>
-      <code style="text-align: start;">
-        <pre>{{error_details}}</pre>
-      </code>
+    {% if error_details %}
+    <details class="error-details">
+        <summary>{{ "Error Details" | tr }}</summary>
+        <pre><code>{{ error_details }}</code></pre>
     </details>
-  {% endif %}
+    {% endif %}
 
-  <button class="btn btn-primary mt-3" onclick="window.history.back()">{{ "Go Back" | tr }}</button>
-</div>
+    <div class="error-actions">
+        <button type="button" class="mesh-button" onclick="window.history.back()"><span class="mesh-back" aria-hidden="true">←</span>{{ "Go Back" | tr }}</button>
+        <a class="mesh-button is-primary" href="/">{{ "Go to the home page" | tr }}</a>
+    </div>
+</section>
 {% endblock %}

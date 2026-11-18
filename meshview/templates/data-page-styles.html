@@ -1,78 +1,114 @@
-{# Shared presentation for the diagnostic pages; no backend changes. #}
+{#- The data pages' shared look: a compact heading (title, live state and
+    actions in one line), tables with a light heading that stays in view, the
+    toolbars and the maps some of them have. Packets' own pieces (port tags,
+    payloads, cards) are in meshview.css, which Home shares. -#}
 <style>
-.mesh-data-page .mesh-content > .container { max-width:none; padding:0; }
-.mesh-data-page .data-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:10px; }
-.mesh-data-page .data-heading h1 { font-size:28px; font-weight:650; margin:2px 0 3px; overflow-wrap:anywhere; }
+/* Heading: title and context on the left, actions on the right; on narrow
+   screens the actions drop under the title. */
+.mesh-data-page .data-heading { display:flex; align-items:center; flex-wrap:wrap; gap:10px 16px; min-height:40px; margin-bottom:14px; }
+.mesh-data-page .data-heading h1 { margin:0; font-size:22px; line-height:1.2; overflow-wrap:anywhere; }
 .mesh-data-page .data-heading p { margin:0; color:var(--mesh-muted); font-size:14px; }
-.mesh-data-page .data-heading a { white-space:nowrap; }
-.mesh-data-page .data-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:10px; background:var(--mesh-surface); border:1px solid var(--mesh-border); padding:16px; border-radius:9px; margin:0 0 10px; }
-.mesh-data-page select,.mesh-data-page input[type="text"],.mesh-data-page input[type="search"] { min-width:0; max-width:100%; padding:8px 10px; border:1px solid var(--mesh-border); border-radius:5px; background:var(--mesh-surface); color:var(--mesh-text); font-size:13px; }
-.mesh-data-page .mesh-content button { border:1px solid var(--mesh-border); border-radius:5px; background:var(--mesh-soft); color:var(--mesh-primary); padding:8px 12px; font-size:12px; cursor:pointer; }
-.mesh-data-page .mesh-content button:hover { background:var(--mesh-hover); }
-.mesh-data-page .mesh-content button:disabled { opacity:.5; cursor:default; }
-.mesh-data-page :is(button,a,input,select):focus-visible { outline:2px solid var(--mesh-primary); outline-offset:2px; }
-/* clip, not auto: a scroll container would stop the sticky header from following the page.
-   base.html adds .is-wide, and with it sideways scrolling, only when the table cannot fit. */
-.mesh-data-page .data-table-wrap { width:100%; overflow:clip; border:1px solid var(--mesh-border); border-radius:9px; background:var(--mesh-surface); margin-bottom:20px; }
-.mesh-data-page table { width:100%; border-collapse:collapse; font-size:13px; margin:0; color:var(--mesh-text); }
-.mesh-data-page .data-table-wrap.is-wide { overflow:auto; }
-/* Sticky column headers. Only tables whose wrapper does not scroll stick to the page, so only
-   those sit under the auto-hiding header (--header-offset, base.html); inside a scrolling box
-   the offset would push the header over the first rows. */
-.mesh-data-page .data-table-wrap:not(.is-wide) > table th { top:var(--header-offset,0px); }
-.mesh-data-page table th { position:sticky; top:0; z-index:2; vertical-align:middle; transition:top .2s ease; height:40px; padding:0 14px; background:var(--mesh-brand); color:white; border:0; font-weight:600; font-size:12px; white-space:nowrap; text-align:left; }
-.mesh-data-page table td { vertical-align:middle; height:40px; padding:6px 14px; border:0; border-bottom:1px solid var(--mesh-border); text-align:left; }
-/* Compact page heading: title, live context and actions on one line. */
-.mesh-data-page .data-heading.is-compact { flex-wrap:wrap; gap:8px 14px; min-height:40px; margin-bottom:12px; }
-.mesh-data-page .data-heading.is-compact h1 { font-size:22px; line-height:1.2; margin:0; }
 .mesh-data-page .data-title { display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; min-width:0; }
 .mesh-data-page .data-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-left:auto; }
-/* Once the actions drop under the title (base.html marks it), they line up on the left. */
-.mesh-data-page .data-heading.is-wrapped .data-actions { margin-left:0; }
-.mesh-data-page .data-actions label { margin:0; font-size:12px; color:var(--mesh-muted); }
-.mesh-data-page .data-actions .mesh-secondary-button { padding:7px 12px; }
-.mesh-data-page .data-count { display:inline-flex; align-items:center; height:24px; padding:0 9px; border-radius:6px; background:var(--mesh-soft); color:var(--mesh-primary); font-size:12px; font-weight:600; font-variant-numeric:tabular-nums; }
-.mesh-data-page .data-context { font-size:12px; color:var(--mesh-muted); }
-.mesh-data-page table tbody tr { background:var(--mesh-surface); }
-.mesh-data-page table tbody tr:nth-child(even) { background:var(--mesh-stripe); }
-.mesh-data-page table tbody tr:hover { background:var(--mesh-hover); }
-.mesh-data-page table a { text-decoration:none; }
-.mesh-data-page table a:hover { text-decoration:underline; }
-.mesh-data-page .port-tag { display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 9px; border-radius:11px; background:var(--mesh-soft); color:var(--mesh-text); font-size:12px; font-weight:500; line-height:1; white-space:nowrap; vertical-align:middle; }
-.mesh-data-page .port-tag::before { content:""; flex-shrink:0; width:8px; height:8px; border-radius:50%; background:var(--port-color,#6c757d); box-shadow:inset 0 0 0 1px rgba(0,0,0,.18); }
-.mesh-data-page .to-mqtt { color:var(--mesh-muted); font-size:12px; font-style:italic; }
+.mesh-data-page .data-actions label { margin:0; font-size:13px; color:var(--mesh-muted); }
+.mesh-data-page .data-count { display:inline-flex; align-items:center; height:24px; padding:0 9px; border-radius:999px; background:var(--mesh-soft); color:var(--mesh-primary); font-size:12.5px; font-weight:600; }
+/* Loading, the count keeps its width and shows a spinner in its figures' place. */
+.mesh-data-page .data-count[aria-busy="true"] { position:relative; color:transparent; }
+.mesh-data-page .data-count[aria-busy="true"]::before { position:absolute; inset:0; margin:auto; color:var(--mesh-primary); }
+.mesh-data-page .data-context { font-size:12.5px; color:var(--mesh-muted); }
+/* The live state as a pill beside the title. */
+.mesh-data-page .data-title .live-status { height:26px; padding:0 10px; border-radius:13px; background:var(--mesh-soft); color:var(--mesh-primary); font-weight:600; }
+.mesh-data-page .data-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:0 0 14px; padding:12px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); }
+
+/* Tables. The wrapper clips rather than scrolls, so that the heading row can
+   follow the page under the header; it scrolls sideways only when the table
+   cannot fit (.is-wide, below). */
+.mesh-data-page .data-table-wrap { width:100%; overflow:clip; margin-bottom:20px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); }
+.mesh-data-page .data-table-wrap.is-wide { overflow:auto; }
+/* Separate borders, none between: collapsed ones do not move with the heading
+   cells that stay in view, and the rows under them show through. */
+.mesh-data-page table { width:100%; font-size:13px; border-collapse:separate; border-spacing:0; }
+.mesh-data-page table th { position:sticky; top:0; z-index:2; height:36px; padding:8px 14px; background:var(--mesh-surface-2); border-bottom:1px solid var(--mesh-border); color:var(--mesh-muted); font-size:11.5px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; white-space:nowrap; text-align:left; vertical-align:middle; transition:top .2s ease; }
+.mesh-data-page .data-table-wrap:not(.is-wide) > table th { top:var(--header-offset,0px); }
+.mesh-data-page .data-table-wrap.is-switching > table th { transition:none; }
+.mesh-data-page table td { height:40px; padding:4px 14px; border-bottom:1px solid var(--mesh-border-soft); vertical-align:middle; }
+.mesh-data-page table tbody tr:hover { background:var(--mesh-surface-2); }
+.mesh-data-page table a { color:var(--mesh-text); font-weight:500; }
+/* In packet tables the packet id is the row's link out, in the accent. */
+.packet-table .c-id a { color:var(--mesh-primary); font-weight:400; }
+.packet-table .c-time { color:var(--mesh-muted); }
+.mesh-data-page .data-empty { padding:30px 16px; text-align:center; color:var(--mesh-muted); }
 .mesh-data-page .payload-row { display:none; }
 .mesh-data-page .packet-table tr.expanded + .payload-row { display:table-row; }
-.mesh-data-page .payload-cell { font:12px/1.7 ui-monospace,Consolas,monospace; white-space:pre-wrap; overflow-wrap:anywhere; background:var(--mesh-soft); color:var(--mesh-text); }
-.mesh-data-page .inline-link { margin-left:6px; color:var(--mesh-primary); text-decoration:none; }
-.mesh-data-page #map { width:100%; height:650px; border:1px solid var(--mesh-border); border-radius:9px; margin:18px 0 24px; }
-.mesh-data-page .leaflet-container { background:var(--mesh-stripe); z-index:1; }
-/* A node's popup on the node and packet maps, laid out as the map's node inspector. */
-.node-popup { min-width:240px; font-size:12px; }
-.node-popup-title { font-size:15px; font-weight:650; overflow-wrap:anywhere; }
-.node-popup-short { color:var(--mesh-muted); font-weight:500; }
-.node-popup-meta { color:var(--mesh-muted); font-size:11px; margin:3px 0 10px; overflow-wrap:anywhere; }
-.node-popup-facts { display:grid; grid-template-columns:auto minmax(0,1fr); gap:5px 12px; margin:0; }
-.node-popup-facts dt { color:var(--mesh-muted); font-weight:500; }
-.node-popup-facts dd { margin:0; overflow-wrap:anywhere; }
-.mesh-data-page .data-empty { padding:30px 16px; text-align:center; color:var(--mesh-muted); }
+/* As cards, the table needs no frame of its own. */
+.mesh-data-page .data-table-wrap:has(> .card-table.is-cards) { border:0; background:none; overflow:visible; }
+
+/* Maps on data pages; a node's popup on them is in meshview.css. */
+.mesh-data-page #map { width:100%; height:650px; margin:18px 0 24px; border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); }
+.mesh-data-page .leaflet-container { background:var(--mesh-surface-2); z-index:1; }
+
+/* Icon buttons on chart and table toolbars (expand, export, refresh). */
+.chart-tool { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; padding:0; border:1px solid transparent; border-radius:var(--mesh-radius-sm); background:transparent; color:var(--mesh-muted); }
+.chart-tool .ti { width:18px; height:18px; vertical-align:0; }
+.chart-tool:hover:not(:disabled),.chart-tool:focus-visible { background:var(--mesh-soft); color:var(--mesh-primary); border-color:var(--mesh-border); }
+.chart-tool:disabled { opacity:.4; cursor:default; }
+
+/* No subject asked for (no node in the address): a note where the page would be. */
+.mesh-data-page .page-missing { margin:0 0 14px; padding:30px 16px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); color:var(--mesh-muted); text-align:center; }
+.mesh-data-page .page-missing[hidden] { display:none; }
+
+/* What a page shows, folded under its heading: its title and a chevron that
+   turns down when open. */
+.mesh-data-page .page-explain { margin-bottom:14px; padding:12px 16px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); color:var(--mesh-muted); font-size:13px; }
+.mesh-data-page .page-explain summary { display:flex; align-items:center; gap:6px; list-style:none; cursor:pointer; color:var(--mesh-text); font-weight:600; }
+.mesh-data-page .page-explain summary::-webkit-details-marker { display:none; }
+.mesh-data-page .page-explain summary svg { width:14px; height:14px; color:var(--mesh-muted); transition:transform .15s ease; }
+.mesh-data-page .page-explain[open] summary svg { transform:rotate(90deg); }
+.mesh-data-page .page-explain p { margin:12px 0 0; line-height:1.7; }
+
+/* What a page reports on and the choices it gives, in a bar right over the
+   report: each its label over its value or its control. */
+.mesh-data-page .subject-bar { display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px 20px; margin-bottom:14px; padding:12px 16px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); }
+.mesh-data-page .subject-field { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.mesh-data-page .subject-node { flex:1 1 260px; }
+.mesh-data-page .subject-label { margin:0; color:var(--mesh-muted); font-size:12px; }
+.mesh-data-page .subject-value { display:flex; align-items:center; gap:8px; min-height:var(--mesh-control); margin:0; font-size:14px; overflow-wrap:anywhere; }
+.mesh-data-page .subject-value a { color:var(--mesh-primary); font-weight:650; }
+.mesh-data-page .subject-id { color:var(--mesh-muted); font-size:12.5px; }
+/* Where all do not fit on one line, the node takes its own, its name, which says
+   what it is by itself, without its label (kept for screen readers); the rest
+   share the next one. */
+@media(max-width:1000px) {
+    .mesh-data-page .subject-node { flex-basis:100%; }
+    .mesh-data-page .subject-node .subject-label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+    .mesh-data-page .subject-node .subject-value { min-height:0; }
+    .mesh-data-page .subject-field:not(.subject-node) { flex:1 1 0; }
+}
+/* Phones: a label said short. */
+.mesh-data-page .subject-label .label-short { display:none; }
 @media(max-width:700px) {
-    .mesh-data-page .data-heading { align-items:flex-start; gap:10px; }
-    /* Compact headings keep title and actions on one line when they fit; actions that drop
-       below get .is-wrapped (base.html) and align left. */
-    .mesh-data-page .data-heading.is-compact { align-items:center; }
-    .mesh-data-page .data-heading h1 { font-size:23px; }
-    .mesh-data-page .data-heading p { font-size:12px; }
-    .mesh-data-page .data-toolbar { padding:12px; gap:8px; }
+    .mesh-data-page .subject-label .label-long { display:none; }
+    .mesh-data-page .subject-label .label-short { display:inline; }
+}
+
+/* The actions under the title (.is-stacked, set by base.html) take the whole
+   line, and a select grows into the room. */
+.mesh-data-page .data-heading.is-stacked .data-actions { width:100%; margin-left:0; }
+.mesh-data-page .data-heading.is-stacked .data-actions select { flex:1; min-width:0; width:auto; }
+
+@media(max-width:700px) {
+    .mesh-data-page .data-heading { align-items:flex-start; }
+    /* The actions take the whole line under the title; a select grows into the room. */
+    .mesh-data-page .data-actions { width:100%; margin-left:0; }
+    .mesh-data-page .data-actions select { flex:1; min-width:0; width:auto; }
+    /* A lone button stays beside the title. */
+    .mesh-data-page .data-heading:has(.data-actions > .mesh-button:only-child) { flex-wrap:nowrap; align-items:center; }
+    .mesh-data-page .data-heading .data-actions:has(> .mesh-button:only-child) { width:auto; margin-left:auto; }
+    /* The select says what it filters by itself: its label stays for screen readers. */
+    .mesh-data-page .data-actions label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
     .mesh-data-page .data-table-wrap { overflow:auto; }
     .mesh-data-page .data-table-wrap table { min-width:700px; }
     .mesh-data-page .data-table-wrap table.card-table { min-width:0; }
     .mesh-data-page #map { height:500px; }
-    .mesh-data-page .data-heading a { font-size:11px; padding:8px; }
 }
-/* Icon buttons on chart and table toolbars (expand, export, refresh). */
-.chart-tool { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; padding:0; border:1px solid transparent; border-radius:7px; background:transparent; color:var(--mesh-muted); }
-.chart-tool .ti { width:18px; height:18px; vertical-align:0; }
-.chart-tool:hover:not(:disabled),.chart-tool:focus-visible { background:var(--mesh-soft); color:var(--mesh-primary); border-color:var(--mesh-border); }
-.chart-tool:disabled { opacity:.4; cursor:default; }
 </style>

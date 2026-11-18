@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% block theme %}light{% endblock %}
 {% block body_class %}mesh-data-page mesh-firehose-page{% endblock %}
 
 {% block css %}
@@ -7,13 +6,18 @@
 <style>
 .firehose-filter { width:190px; }
 @media(max-width:700px) { .firehose-filter { flex:1; width:120px; } }
+/* The packet id is the row's link out, in the accent; the nodes, in the text's. */
 /* How each packet was heard, between its channel and its port. */
 .packet-table :is(.c-time,.c-id,.c-gw,.c-hops) { white-space:nowrap; }
 .packet-table :is(.c-gw,.c-rssi,.c-snr,.c-hops) { font-variant-numeric:tabular-nums; }
 .packet-table td.is-empty { color:var(--mesh-muted); }
-.mesh-firehose-page .packet-table.card-table.is-cards tr.packet-row { grid-template-columns:repeat(4,minmax(0,1fr)); grid-template-areas:"port port time time" "from from to to" "meta meta id id" "gw gw hops hops" "rssi rssi snr snr"; }
-.mesh-firehose-page .card-table.is-cards :is(.c-gw,.c-rssi,.c-snr,.c-hops) { font-size:12px; }
-.mesh-firehose-page .card-table.is-cards :is(.c-gw,.c-rssi,.c-snr,.c-hops)::before { content:attr(data-label) " "; color:var(--mesh-muted); }
+/* As cards: the port over three quarters of the first line and the time in the last;
+   from → to; channel and id; and how it was heard, four small figures, each under
+   its label. */
+.mesh-firehose-page .packet-table.card-table.is-cards tr.packet-row { grid-template-columns:repeat(4,minmax(0,1fr)); grid-template-areas:"port port port time" "from from to to" "meta meta id id" "gw hops rssi snr"; }
+.mesh-firehose-page .card-table.is-cards .c-time { justify-self:end; }
+.mesh-firehose-page .card-table.is-cards :is(.c-gw,.c-rssi,.c-snr,.c-hops) { margin-top:4px; font-size:12.5px; line-height:1.3; }
+.mesh-firehose-page .card-table.is-cards :is(.c-gw,.c-rssi,.c-snr,.c-hops)::before { content:attr(data-label); display:block; color:var(--mesh-muted); font-size:11px; }
 .mesh-firehose-page .card-table.is-cards .c-gw { grid-area:gw; }
 .mesh-firehose-page .card-table.is-cards .c-hops { grid-area:hops; }
 .mesh-firehose-page .card-table.is-cards .c-rssi { grid-area:rssi; }
@@ -22,24 +26,23 @@
 {% endblock %}
 
 {% block body %}
-<div class="container">
-<header class="data-heading is-compact">
+<header class="data-heading">
     <div class="data-title">
         <h1>{{ "Live Traffic" | tr }}</h1>
         <span id="live-status" class="live-status" role="status" data-state="loading">{{ "Loading packets…" | tr }}</span>
     </div>
     <div class="data-actions">
         <label for="channel-filter" data-translate-lang="channel">Channel</label>
-        <select id="channel-filter" class="firehose-filter">
+        <select id="channel-filter" class="firehose-filter mesh-select">
             <option value="" data-translate-lang="all_channels">All Channels</option>
         </select>
-        <button type="button" id="pause-button" aria-pressed="false" data-translate-lang="pause">Pause</button>
-        <a class="mesh-secondary-button" href="/map">{{ "View map ↗" | tr }}</a>
+        <button type="button" id="pause-button" class="mesh-button" aria-pressed="false" data-translate-lang="pause">Pause</button>
+        <a class="mesh-button is-icon-mobile" href="/map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l6 -3l6 3l6 -3v13l-6 3l-6 -3l-6 3v-13"/><path d="M9 4v13"/><path d="M15 7v13"/></svg><span class="mesh-button-label">{{ "View map" | tr }}</span><span class="mesh-go" aria-hidden="true">↗</span></a>
     </div>
 </header>
 
     <div class="data-table-wrap" role="region" aria-label="{{ "Live packet table" | tr }}" tabindex="0">
-    <table class="packet-table card-table" data-cards-below="1300">
+    <table class="packet-table card-table" data-cards-below="1100">
         <thead>
             <tr>
                 <th data-translate-lang="time">Time</th>
@@ -57,8 +60,6 @@
         <tbody id="packet_list"></tbody>
     </table>
     </div>
-
-</div>
 
 <script src="/static/portmaps.js"></script>
 <script>
@@ -85,7 +86,8 @@ function applyTranslationsFirehose(translations, root=document) {
 async function loadTranslationsFirehose() {
     try {
         const cfg = await window._siteConfigPromise;
-        const lang = cfg?.site?.language || "en";
+        // The visitor's language, the page's, else the site's.
+        const lang = window.meshLanguage || cfg?.site?.language || "en";
 
         const res = await fetch(`/api/v1/lang?lang=${lang}&section=firehose`);
         firehoseTranslations = await res.json();
@@ -164,17 +166,6 @@ function formatTimes(importTimeUs) {
         timeZoneName: "short"
     });
     return { local, utc, epoch: String(importTimeUs) };
-}
-
-function logPacketTimes(packet) {
-    const times = formatTimes(packet.import_time_us);
-    console.log(
-        "[firehose] packet time",
-        "id=" + (packet.packet_id ?? packet.id),
-        "epoch_us=" + times.epoch,
-        "local=" + times.local,
-        "utc=" + times.utc
-    );
 }
 
 /* ======================================================
@@ -357,15 +348,13 @@ async function fetchUpdates() {
             addChannel(pkt.channel);
             if (!matchesSelectedChannel(pkt)) continue;
 
-            logPacketTimes(pkt);
-
             /* FROM — includes translation */
             const from =
                 pkt.from_node_id === 4294967295
                     ? `<span class="to-mqtt" data-translate-lang="all_broadcast">
                            ${firehoseTranslations.all_broadcast || MeshI18n.t("All")}
                        </span>`
-                    : `<a href="/node/${pkt.from_node_id}" style="text-decoration:underline; color:inherit;">
+                    : `<a href="/node/${pkt.from_node_id}">
                            ${escapeHtml(nodeMap[pkt.from_node_id] || pkt.from_node_id)}
                        </a>`;
 
@@ -379,7 +368,7 @@ async function fetchUpdates() {
                     ? `<span class="to-mqtt" data-translate-lang="all_broadcast">
                            ${firehoseTranslations.all_broadcast || MeshI18n.t("All")}
                        </span>`
-                    : `<a href="/node/${pkt.to_node_id}" style="text-decoration:underline; color:inherit;">
+                    : `<a href="/node/${pkt.to_node_id}">
                            ${escapeHtml(nodeMap[pkt.to_node_id] || pkt.to_node_id)}
                        </a>`;
 
@@ -415,13 +404,12 @@ async function fetchUpdates() {
 
             const safePayload = escapeHtml(pkt.payload || MeshI18n.t("(No decoded payload)"));
             const packetIdCell = pkt.packet_id
-                ? `<a href="/packet/${pkt.storage_id || pkt.id}"
-                      style="text-decoration:underline; color:inherit;">
+                ? `<a href="/packet/${pkt.storage_id || pkt.id}">
                        ${pkt.packet_id}
                    </a>`
                 : pkt.portnum === 73
-                ? `<span class="text-secondary" title="${MeshI18n.h("MQTT map report")}">${MeshI18n.h("Not a Packet")}</span>`
-                : `<span class="text-secondary" title="${MeshI18n.h("No Meshtastic packet ID")}">—</span>`;
+                ? `<span class="to-mqtt" title="${MeshI18n.h("MQTT map report")}">${MeshI18n.h("Not a Packet")}</span>`
+                : `<span class="to-mqtt" title="${MeshI18n.h("No Meshtastic packet ID")}">—</span>`;
 
             const storageId = pkt.storage_id ?? pkt.id;
             const html = `

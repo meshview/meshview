@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block theme %}light{% endblock %}
+{% block leaflet %}{% include "leaflet.html" %}{% endblock %}
 {% block body_class %}mesh-data-page mesh-packet-page{% endblock %}
 
 
@@ -10,18 +10,22 @@
 {% block css %}
 {% include "data-page-styles.html" %}
 <style>
-.packet-card { background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; overflow:hidden; color:var(--mesh-text); }
-.packet-card .card-header { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; background:var(--mesh-soft); padding:18px 22px; border-bottom:1px solid var(--mesh-border); color:var(--mesh-primary-dark); font-size:15px; font-weight:600; }
-.packet-card .card-header small { font-size:11px; font-weight:400; }
-.packet-card .card-body { padding:24px; }
-.packet-card dl { display:grid; grid-template-columns:180px minmax(0,1fr); gap:16px 24px; margin:0; font-size:13px; }
+.packet-card { background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); overflow:hidden; color:var(--mesh-text); }
+.packet-card .card-header { display:flex; align-items:baseline; justify-content:space-between; gap:6px 12px; flex-wrap:wrap; padding:14px 20px; border-bottom:1px solid var(--mesh-border); font-size:15px; font-weight:650; }
+.packet-card .card-header .packet-id { font-variant-numeric:tabular-nums; }
+.packet-card .card-header time { color:var(--mesh-muted); font-size:12.5px; font-weight:400; }
+.packet-card .card-body { padding:18px 20px; }
+.packet-card .packet-port-number { margin-left:6px; color:var(--mesh-muted); }
+/* Each label on its value's line, also beside a taller tag. */
+.packet-card dl { display:grid; grid-template-columns:180px minmax(0,1fr); align-items:baseline; gap:16px 24px; margin:0; font-size:13px; }
 .packet-card dt { color:var(--mesh-muted); font-weight:500; }
 .packet-card dd { margin:0; overflow-wrap:anywhere; }
 /* Monospaced and as sent, but no box of its own within the card. */
 .packet-card pre { padding:0; background:none; border:0; color:var(--mesh-text); font:12px/1.6 ui-monospace,Consolas,monospace; white-space:pre-wrap; overflow-wrap:anywhere; margin:0; }
-#map { display:none; }
+#map { display:none; margin:14px 0; }
 .source-marker { width:24px; height:24px; background:#f4484866; border:3px solid #e33; border-radius:50%; box-shadow:0 0 6px #f007; }
-#seen-container { background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; overflow:hidden; }
+#seen-container { background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); overflow:hidden; }
+#seen-container[hidden] { display:none; }
 #seen-container h5 { padding:16px 20px; margin:0!important; color:var(--mesh-text); font-size:15px; }
 .seen-table { margin:0; }
 /* "Seen by" cards: gateway and time / RSSI, SNR, channel and hops; hop groups stay as headings. */
@@ -37,28 +41,35 @@
 .mesh-data-page .seen-table.card-table.is-cards :is(.c-rssi,.c-snr)::before { content:attr(data-label) " "; color:var(--mesh-muted); }
 .mesh-data-page .seen-table.card-table.is-cards .c-channel { grid-area:chan; font-size:12px; color:var(--mesh-muted); }
 .mesh-data-page .seen-table.card-table.is-cards .c-hops { grid-area:hops; justify-self:end; font-size:12px; color:var(--mesh-muted); }
-#loading { color:var(--mesh-muted); padding:24px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; }
-@media(max-width:700px) { .packet-card dl { grid-template-columns:minmax(0,1fr); gap:6px; } .packet-card dd { margin-bottom:14px; } .packet-card .card-body { padding:18px; } }
+#loading { color:var(--mesh-muted); text-align:center; padding:20px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); }
+#loading[hidden] { display:none; }
+/* Phones: each fact beside its label, but the payloads, under theirs. */
+@media(max-width:700px) {
+    .packet-card dl { grid-template-columns:auto minmax(0,1fr); gap:12px 16px; }
+    .packet-card :is(dt,dd).is-block { grid-column:1 / -1; }
+    .packet-card dd.is-block { margin-top:-6px; }
+    .packet-card .card-body { padding:18px; }
+}
 </style>
 {% endblock %}
 
 {% block body %}
 <div class="container packet-container">
-<header class="data-heading is-compact"><div class="data-title"><h1>{{ "Packet details" | tr }}</h1></div><div class="data-actions"><a class="mesh-secondary-button" href="/firehose">{{ "Live packets ↗" | tr }}</a></div></header>
+<header class="data-heading is-compact"><div class="data-title"><h1>{{ "Packet details" | tr }}</h1></div><div class="data-actions"><a class="mesh-button is-icon-mobile" href="/firehose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3 8l4 -16l3 8h4"/></svg><span class="mesh-button-label">{{ "Live packets" | tr }}</span><span class="mesh-go" aria-hidden="true">↗</span></a></div></header>
 
     <div id="loading" class="is-loading" data-translate-lang="loading">Loading packet information...</div>
-    <div id="packet-card" class="packet-card d-none"></div>
+    <div id="packet-card" class="packet-card" hidden></div>
 
     <div id="map"></div>
 
-    <div id="seen-container" class="mt-4 d-none">
+    <div id="seen-container" hidden>
         <h5 >
             <span class="ti ti-access-point" aria-hidden="true"></span> <span data-translate-lang="seen_by">Seen By</span>
             <span id="seen-count" style="color:var(--mesh-primary);"></span>
         </h5>
 
-        <div class="table-responsive">
-            <table class="table table-sm seen-table card-table">
+        <div>
+            <table class="seen-table card-table">
                 <thead>
                     <tr>
                         <th data-translate-lang="gateway">Gateway</th>
@@ -85,7 +96,8 @@ let packetTranslations = {};
 async function loadTranslationsPacket() {
     try {
         const cfg = await window._siteConfigPromise;
-        const lang = cfg?.site?.language || "en";
+        // The visitor's language, the page's, else the site's.
+        const lang = window.meshLanguage || cfg?.site?.language || "en";
         const res = await fetch(`/api/v1/lang?lang=${lang}&section=packet`);
         packetTranslations = await res.json();
         applyTranslationsPacket(packetTranslations);
@@ -197,9 +209,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         <div class="card-header">
             <span>
                 <span data-translate-lang="packet_id_label">${packetTranslations.packet_id_label || MeshI18n.t("Packet ID:")}</span>
-                <i>${p.id}</i>
+                <span class="packet-id">${p.id}</span>
             </span>
-            <small>${time}</small>
+            <time>${time}</time>
         </div>
 
         <div class="card-body">
@@ -210,9 +222,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                 <dt data-translate-lang="to_node">${packetTranslations.to_node || MeshI18n.t("To Node")}:</dt>
                 <dd>${
                     p.to_node_id === 4294967295
-                        ? `<i data-translate-lang="all_broadcast">${packetTranslations.all_broadcast || MeshI18n.t("All")}</i>`
+                        ? `<span class="to-mqtt" data-translate-lang="all_broadcast">${packetTranslations.all_broadcast || MeshI18n.t("All")}</span>`
                         : p.to_node_id === 1
-                            ? `<i data-translate-lang="direct_to_mqtt">${packetTranslations.direct_to_mqtt || MeshI18n.t("Direct to MQTT")}</i>`
+                            ? `<span class="to-mqtt" data-translate-lang="direct_to_mqtt">${packetTranslations.direct_to_mqtt || MeshI18n.t("Direct to MQTT")}</span>`
                             : `<a href="/node/${p.to_node_id}">${toNodeLabel}</a>`
                 }</dd>
 
@@ -220,15 +232,15 @@ document.addEventListener("DOMContentLoaded", async () => {
                 <dd>${escapeHtml(p.channel ?? "—")}</dd>
 
                 <dt data-translate-lang="port">${packetTranslations.port || MeshI18n.t("Port")}:</dt>
-                <dd><i>${PORT_NAMES[p.portnum] || MeshI18n.t("UNKNOWN APP")}</i> (${p.portnum})</dd>
+                <dd><span class="port-tag" style="--port-color:${(window.PORT_COLORS || {})[p.portnum] || "#6c757d"}">${PORT_NAMES[p.portnum] || MeshI18n.t("UNKNOWN APP")}</span><span class="packet-port-number">${p.portnum}</span></dd>
 
-                <dt data-translate-lang="raw_payload">${packetTranslations.raw_payload || MeshI18n.t("From Raw Payload")}:</dt>
-                <dd><pre>${escapeHtml(p.payload ?? "—")}</pre></dd>
+                <dt class="is-block" data-translate-lang="raw_payload">${packetTranslations.raw_payload || MeshI18n.t("From Raw Payload")}:</dt>
+                <dd class="is-block"><pre>${escapeHtml(p.payload ?? "—")}</pre></dd>
 
                 ${
                     telemetryExtras.length
-                    ? `<dt data-translate-lang="decoded_telemetry">${packetTranslations.decoded_telemetry || MeshI18n.t("Decoded Telemetry")}:</dt>
-                       <dd><pre>${escapeHtml(telemetryExtras.join("\n"))}</pre></dd>`
+                    ? `<dt class="is-block" data-translate-lang="decoded_telemetry">${packetTranslations.decoded_telemetry || MeshI18n.t("Decoded Telemetry")}:</dt>
+                       <dd class="is-block"><pre>${escapeHtml(telemetryExtras.join("\n"))}</pre></dd>`
                     : ""
                 }
 
@@ -242,33 +254,20 @@ document.addEventListener("DOMContentLoaded", async () => {
         </div>
     `;
 
-    loading.classList.add("d-none");
-    packetCard.classList.remove("d-none");
+    loading.hidden = true;
+    packetCard.hidden = false;
 
     /* ---------------------------------------------
        Map setup
     ----------------------------------------------*/
-    // A node's popup, laid out as the map's node inspector and the node page's:
-    // its names, linked to its page, what it is in this packet beside its id,
-    // and the facts given, leaving out those it has none for.
-    function nodePopup(id, node, role, facts) {
-        const hex = Number.isInteger(Number(id)) ? ` (!${Number(id).toString(16).padStart(8, "0")})` : "";
-        const name = node?.long_name || node?.short_name || MeshI18n.t("Node {id}", {id});
-        const shortName = node?.short_name && node.short_name !== name
-            ? ` <span class="node-popup-short">(${escapeHtml(node.short_name)})</span>` : "";
-        const meta = [role, MeshI18n.t("Node {id}", {id}) + hex].filter(Boolean).join(" · ");
-        const rows = facts
-            .filter(([, value]) => value != null && value !== "")
-            .map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`)
-            .join("");
-        return `
-            <div class="node-popup">
-                <div class="node-popup-title"><a href="/node/${encodeURIComponent(id)}">${escapeHtml(name)}</a>${shortName}</div>
-                <p class="node-popup-meta">${escapeHtml(meta)}</p>
-                <dl class="node-popup-facts">${rows}</dl>
-            </div>
-        `;
+    // A node's popup (node-popup.js): what it is in this packet, its facts and
+    // its figures.
+    function nodePopup(id, node, role, facts, figures) {
+        return meshNodePopup({id, node, role, facts, figures});
     }
+    const decimal = value => value == null || value === "" ? null
+        : Number(value).toLocaleString(MeshI18n.language, {maximumFractionDigits: 2});
+    const oneDecimal = value => value.toLocaleString(MeshI18n.language, {minimumFractionDigits: 1, maximumFractionDigits: 1});
 
     const map = L.map("map");
     mapDiv.style.display = "block";
@@ -350,7 +349,7 @@ const seenSorted = seenList.slice().sort((a,b)=>{
 });
 
 if (seenSorted.length){
-    seenContainer.classList.remove("d-none");
+    seenContainer.hidden = false;
     seenCountSpan.textContent = `(${seenSorted.length})`;
 }
 
@@ -437,9 +436,10 @@ seenTableBody.innerHTML = Object.keys(hopGroups)
                     ["Hardware", node?.hw_model],
                     [MeshI18n.t("Channel"), s.channel],
                     [MeshI18n.t("Distance"), distanceKm !== null
-                        ? `${distanceKm.toFixed(1)} km / ${distanceMi.toFixed(1)} mi` : null],
-                    ["RSSI", s.rx_rssi],
-                    ["SNR", s.rx_snr],
+                        ? `${oneDecimal(distanceKm)} km / ${oneDecimal(distanceMi)} mi` : null],
+                ], [
+                    ["RSSI", decimal(s.rx_rssi) && `${decimal(s.rx_rssi)} dBm`],
+                    ["SNR", decimal(s.rx_snr) && `${decimal(s.rx_snr)} dB`],
                     [MeshI18n.t("Hops"), hopDisplay],
                 ]), {closeButton:false});
 

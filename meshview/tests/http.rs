@@ -104,7 +104,7 @@ async fn an_ingester_only_answers_the_probes() {
 }
 
 #[tokio::test]
-async fn the_reference_is_in_the_sites_language() {
+async fn the_reference_is_in_the_visitors_language() {
     let catalog: std::collections::HashMap<String, String> =
         serde_json::from_str(include_str!("../assets/api-lang/es.json")).unwrap();
     let nodes = |document: &serde_json::Value| {
@@ -113,21 +113,43 @@ async fn the_reference_is_in_the_sites_language() {
             .unwrap()
             .to_string()
     };
-    let mut config = Config::default();
-    config.site.language = "es".into();
-    let state = AppState::new(Arc::new(Readiness::new([CHECK_DATABASE])), config);
+    let state = AppState::new(
+        Arc::new(Readiness::new([CHECK_DATABASE])),
+        Config::default(),
+    );
     let app = web::router(Role::Serve, state);
+    let in_spanish = |uri: &str| {
+        let request = Request::get(uri)
+            .header(header::ACCEPT_LANGUAGE, "es-ES,es;q=0.9,en;q=0.8")
+            .body(Body::empty())
+            .unwrap();
+        app.clone().oneshot(request)
+    };
 
-    let spanish = json(get(&app, "/api/openapi.json").await).await;
+    let spanish = json(in_spanish("/api/openapi.json").await.unwrap()).await;
     assert_eq!(nodes(&spanish), catalog["Nodes"]);
+    // Asked for none, English.
+    let plain = json(get(&app, "/api/openapi.json").await).await;
+    assert_eq!(nodes(&plain), "Nodes");
     let english = json(get(&app, "/api/openapi.json?lang=en").await).await;
     assert_eq!(nodes(&english), "Nodes");
     let unknown = json(get(&app, "/api/openapi.json?lang=xx").await).await;
     assert_eq!(nodes(&unknown), "Nodes");
 
-    let page = get(&app, "/api/docs").await;
+    let page = in_spanish("/api/docs").await.unwrap();
+    assert_eq!(page.headers()[header::VARY], "Cookie, Accept-Language");
     let html = page.into_body().collect().await.unwrap().to_bytes();
     let html = String::from_utf8(html.to_vec()).unwrap();
     assert!(html.contains(r#""localization":{"locale":"es"}"#));
     assert!(html.contains(&catalog["Nodes"]));
+
+    // The pages' catalog and the configuration they read say the same.
+    let top = json(in_spanish("/api/v1/lang?section=top").await.unwrap()).await;
+    assert_eq!(top["top_traffic_nodes"], "Nodos con mayor tráfico");
+    let top = json(get(&app, "/api/v1/lang?section=top").await).await;
+    assert_eq!(top["top_traffic_nodes"], "Top Traffic Nodes");
+    let config = json(in_spanish("/api/v1/config").await.unwrap()).await;
+    assert_eq!(config["site"]["language"], "es");
+    let config = json(get(&app, "/api/v1/config").await).await;
+    assert_eq!(config["site"]["language"], "en");
 }

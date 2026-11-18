@@ -1,7 +1,7 @@
 <!doctype html>
-<html lang="{{ ui_language }}" data-bs-theme="{% block theme %}dark{% endblock %}">
+<html lang="{{ ui_language }}" data-theme="light" data-accent="blue">
 <head>
-    <title>Meshview{% if site_title %} - {{ site_title }}{% endif %}</title>
+    <title>{% if site_title %}{{ site_title }}{% else %}Meshview Rust{% endif %}</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     {% if site_description %}<meta name="description" content="{{ site_description }}">{% endif %}
@@ -20,14 +20,15 @@
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     {% endif %}
-    <meta property="og:image:alt" content="Meshview">
+    <meta property="og:image:alt" content="Meshview Rust">
     <!-- A small picture beside the words where they are what matters, a node's. -->
     <meta name="twitter:card" content="{% if preview_small %}summary{% else %}summary_large_image{% endif %}">
 
-    <link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48 64x64 256x256" href="/static/favicon.ico">
+    <link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48" href="/static/favicon.ico">
     <link rel="icon" type="image/svg+xml" sizes="any" href="/static/meshview-icon.svg">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
 
+    <script src="/static/theme.js"></script>
     <script>
         window.meshTranslations = {{ ui_translations|tojson }};
         window.meshLanguage = {{ ui_language|tojson }};
@@ -63,381 +64,146 @@
         });
     </script>
     <script src="/static/i18n.js"></script>
-    <script src="/static/theme.js"></script>
-
-    <!-- Scripts -->
-    <script src="/static/vendor/bootstrap-5.3.9/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
-    <link href="/static/vendor/bootstrap-5.3.9/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
     <link rel="stylesheet" href="/static/vendor/inter-5.3.0/wght.css">
-    <link rel="stylesheet" href="/static/vendor/inter-5.3.0/wght-italic.css">
+    {#- Leaflet, on the pages with a map: they include leaflet.html here. #}
+    {% block leaflet %}{% endblock %}
+    <link rel="stylesheet" href="/static/meshview.css">
     <link rel="stylesheet" href="/static/icons.css">
-    <link rel="stylesheet" href="/static/vendor/leaflet-1.9.4/dist/leaflet.css" crossorigin=""/>
-    <script src="/static/vendor/leaflet-1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/static/html-escape.js"></script>
     <script src="/static/csv.js"></script>
     <script src="/static/packet-arrival.js"></script>
-
     {% block head %}{% endblock %}
-
-    <style>
-        body {
-            opacity: 0;
-            transition: opacity 0.3s ease-in-out;
-        }
-        body.ready {
-            opacity: 1;
-        }
-
-        .htmx-indicator {
-            opacity: 0;
-            transition: opacity 500ms ease-in;
-        }
-        .htmx-request .htmx-indicator {
-            opacity: 1;
-        }
-
-        #search_form {
-            z-index: 4000;
-        }
-
-        #details_map {
-            width: 100%;
-            height: 500px;
-        }
-
-    </style>
-
     {% block css %}{% endblock %}
-    <style>
-/* Shared dashboard chrome and map explorer. */
-:root,[data-bs-theme="light"],[data-bs-theme="dark"] {
-    --bs-body-font-family:"Inter Variable",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-    --bs-primary:var(--mesh-brand);
-    --bs-primary-rgb:var(--mesh-primary-rgb);
-    --bs-link-color:var(--mesh-primary);
-    --bs-link-color-rgb:var(--mesh-primary-rgb);
-    --bs-link-hover-color:var(--mesh-primary-dark);
-    --bs-link-hover-color-rgb:25,70,127;
-    --bs-focus-ring-color:rgba(var(--mesh-primary-rgb),.25);
-}
-[data-bs-theme="dark"] { --bs-link-color:#8bbcff; --bs-link-color-rgb:139,188,255; --bs-link-hover-color:#b6d5ff; --bs-link-hover-color-rgb:182,213,255; }
-.btn-primary {
-    --bs-btn-bg:var(--mesh-brand); --bs-btn-border-color:var(--mesh-brand);
-    --bs-btn-hover-bg:var(--mesh-brand-deep); --bs-btn-hover-border-color:var(--mesh-brand-deep);
-    --bs-btn-active-bg:var(--mesh-brand-deep); --bs-btn-active-border-color:var(--mesh-brand-deep);
-    --bs-btn-disabled-bg:var(--mesh-brand); --bs-btn-disabled-border-color:var(--mesh-brand);
-    --bs-btn-focus-shadow-rgb:var(--mesh-primary-rgb);
-}
-.btn-outline-primary {
-    --bs-btn-color:var(--mesh-primary); --bs-btn-border-color:var(--mesh-brand);
-    --bs-btn-hover-bg:var(--mesh-brand); --bs-btn-hover-border-color:var(--mesh-brand);
-    --bs-btn-active-bg:var(--mesh-brand-deep); --bs-btn-active-border-color:var(--mesh-brand-deep);
-    --bs-btn-focus-shadow-rgb:var(--mesh-primary-rgb);
-}
-.form-control:focus,.form-select:focus { border-color:#91bda1; box-shadow:0 0 0 .25rem rgba(var(--mesh-primary-rgb),.2); }
-input[type="checkbox"],input[type="radio"] { accent-color:var(--mesh-primary); }
-.leaflet-popup-content a,.leaflet-control-attribution a { color:var(--mesh-primary); }
-.form-check-input:checked { background-color:var(--mesh-primary); border-color:var(--mesh-primary); }
-.form-check-input:focus { border-color:#91bda1; box-shadow:0 0 0 .25rem rgba(var(--mesh-primary-rgb),.2); }
-.page-link { --bs-pagination-color:var(--mesh-primary); --bs-pagination-hover-color:var(--mesh-primary-dark); --bs-pagination-active-bg:var(--mesh-primary); --bs-pagination-active-border-color:var(--mesh-primary); }
-[data-bs-theme="light"] body { background:var(--mesh-page); color:var(--mesh-text); }
-/* Tint whole cells, evenly: an edge-only shadow is too subtle on wide packet
-   tables, and a shadow inside each cell leaves a lighter box around its text. */
-.packet-arrival-glow > td {
-    animation:packet-arrival-beat 1s ease-in-out 1;
-    animation-delay:var(--packet-glow-delay,0ms);
-}
-.packet-arrival-glow > td:first-child {
-    box-shadow:inset 4px 0 0 var(--mesh-primary);
-}
-@keyframes packet-arrival-beat {
-    0%,100% { background-color:transparent; }
-    45% { background-color:var(--mesh-pulse-peak); }
-    75% { background-color:var(--mesh-pulse-mid); }
-}
-@media(prefers-reduced-motion:reduce) {
-    .packet-arrival-glow > td { animation:none; background:var(--mesh-soft); }
-}
-/* Sticky header that hides while scrolling down and returns on the way up (script below). */
-.mesh-header { position:sticky; top:0; z-index:1100; background:var(--mesh-brand); color:white; box-shadow:0 2px 8px #193d6918; transition:transform .2s ease; }
-.mesh-header.is-hidden { transform:translateY(-100%); }
-@media(prefers-reduced-motion:reduce) { .mesh-header { transition:none; } }
-.mesh-header-inner { max-width:1600px; margin:auto; padding:0 20px; min-height:48px; display:flex; align-items:center; gap:20px; }
-.mesh-brand { display:flex; align-items:center; gap:8px; font-size:17px; font-weight:700; color:white; text-decoration:none; flex-shrink:0; }
-.mesh-brand:hover { color:white; }
-.mesh-brand-icon { width:28px; height:28px; display:block; flex-shrink:0; }
-#site-menu { display:flex; align-items:center; gap:4px; flex:1 1 auto; min-width:0; }
-.mesh-nav-items { display:flex; align-items:center; gap:4px; min-width:0; overflow:hidden; }
-.mesh-more { position:relative; flex-shrink:0; }
-.mesh-more[hidden] { display:none; }
-.mesh-more-button { display:inline-flex; align-items:center; gap:4px; color:#e6effb; background:transparent; border:0; padding:6px 8px 6px 10px; border-radius:6px; font-size:14px; line-height:20px; white-space:nowrap; cursor:pointer; }
-.mesh-more-button svg { width:16px; height:16px; flex-shrink:0; }
-.mesh-more-button:hover { color:white; background:#ffffff14; }
-.mesh-more-button.active,.mesh-more-button[aria-expanded="true"] { color:white; background:#ffffff2e; }
-.mesh-more-button:focus-visible,#site-menu a:focus-visible { outline:2px solid white; outline-offset:2px; }
-.mesh-more-menu { position:absolute; top:calc(100% + 8px); right:0; min-width:230px; padding:6px; display:flex; flex-direction:column; gap:2px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; box-shadow:0 8px 24px rgba(16,25,37,.22); }
-.mesh-more-menu[hidden] { display:none; }
-#site-menu .mesh-more-menu a { color:var(--mesh-text); padding:9px 12px; }
-#site-menu .mesh-more-menu a:hover { color:var(--mesh-text); background:var(--mesh-soft); }
-#site-menu .mesh-more-menu a.active { color:var(--mesh-primary); background:var(--mesh-soft); font-weight:600; }
-#site-menu .mesh-more-menu a:focus-visible { outline-color:var(--mesh-primary); outline-offset:-2px; }
-.mesh-nav-external { margin-left:4px; font-size:12px; opacity:.75; }
-#site-menu .mesh-more-menu a:has(.mesh-nav-external) { display:flex; justify-content:space-between; gap:12px; }
-#site-menu .mesh-more-menu .mesh-nav-external { color:var(--mesh-muted); opacity:1; }
-.mesh-more-separator { height:1px; margin:4px; background:var(--mesh-border); }
-#site-menu a { color:#e6effb; text-decoration:none; padding:6px 10px; border-radius:6px; font-size:14px; line-height:20px; white-space:nowrap; }
-#site-menu a:hover { color:white; background:#ffffff14; }
-#site-menu a.active { color:white; background:#ffffff2e; font-weight:500; }
-.mesh-menu-toggle { display:none; align-items:center; justify-content:center; color:white; background:none; border:1px solid #ffffff70; border-radius:6px; width:36px; height:36px; padding:0; font-size:20px; line-height:1; }
-.mesh-menu-toggle:hover { background:#ffffff20; }
-.mesh-menu-toggle:focus-visible { outline:2px solid white; outline-offset:3px; }
-.mesh-nav-section { display:none; }
-/* Short pages (an empty search, a missing node) keep the footer at the bottom of the window. */
-body { min-height:100dvh; display:flex; flex-direction:column; }
-.mesh-content { flex:1 0 auto; width:100%; max-width:1600px; margin:0 auto; padding:16px 28px; box-sizing:border-box; }
-.mesh-announcement { background:var(--mesh-soft); border-bottom:1px solid var(--mesh-border); color:var(--mesh-text); font-size:14px; }
-.mesh-announcement[hidden] { display:none; }
-.mesh-announcement-inner { display:flex; align-items:center; gap:10px; max-width:1600px; margin:auto; padding:8px 12px 8px 28px; }
-.mesh-announcement-inner > .ti { color:var(--mesh-primary); font-size:18px; }
-.mesh-announcement-inner p { flex:1; margin:0; overflow-wrap:anywhere; }
-#site-announcement-close { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; width:32px; height:32px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--mesh-muted); font-size:16px; cursor:pointer; }
-#site-announcement-close:hover { background:var(--mesh-hover); color:var(--mesh-text); }
-#site-announcement-close:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:1px; }
-.mesh-footer { display:flex; justify-content:space-between; gap:16px; padding:20px 28px; border-top:1px solid var(--mesh-border); color:var(--mesh-muted); font-size:12px; }
-.mesh-footer-tagline:empty { display:none; }
-.mesh-footer-project { display:inline-flex; align-items:center; gap:6px; margin-left:auto; white-space:nowrap; }
-.mesh-footer-github, .mesh-footer-about { display:inline-flex; color:var(--mesh-muted); text-decoration:none; }
-.mesh-footer-about { padding:0; border:0; background:none; font:inherit; cursor:pointer; }
-.mesh-footer-github:hover, .mesh-footer-about:hover { color:var(--mesh-primary); }
-.mesh-footer-github .ti { font-size:15px; }
-.mesh-footer-github:focus-visible, .mesh-footer-about:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:2px; border-radius:4px; }
-/* On two lines, the tagline and the project are centred one above the other. */
-@media(max-width:700px) { .mesh-announcement-inner { padding-left:14px; } .mesh-footer { flex-direction:column; align-items:center; text-align:center; } .mesh-footer-project { margin-left:0; } }
-/* Dialogs: the node page's coverage help and the about dialog. */
-.mesh-dialog { width:min(640px, calc(100vw - 32px)); max-height:min(80vh, 720px); padding:0; border:1px solid var(--mesh-border); border-radius:12px; background:var(--mesh-surface); color:var(--mesh-text); box-shadow:0 20px 48px rgba(16,25,37,.3); }
-.mesh-dialog::backdrop { background:rgba(16,25,37,.45); }
-.mesh-dialog[open] { display:flex; flex-direction:column; }
-.mesh-dialog-header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px 12px 22px; border-bottom:1px solid var(--mesh-border); }
-.mesh-dialog-header h2 { margin:0; font-size:17px; font-weight:650; }
-.mesh-dialog-close { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--mesh-muted); font-size:18px; cursor:pointer; }
-.mesh-dialog-close:hover { background:var(--mesh-soft); color:var(--mesh-text); }
-.mesh-about { width:min(480px, calc(100vw - 32px)); }
-.mesh-about .mesh-dialog-close { position:absolute; top:10px; right:10px; }
-.mesh-about-body { overflow:auto; padding:28px 28px 24px; text-align:center; font-size:14px; line-height:1.55; }
-.mesh-about-body > img { display:block; margin:0 auto 10px; }
-.mesh-about-body h2 { margin:0; font-size:22px; font-weight:650; }
-.mesh-about-body p { margin:0 0 14px; }
-.mesh-about-body .mesh-about-version { margin-bottom:16px; color:var(--mesh-muted); font-size:13px; }
-.mesh-about-links { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; margin:0 0 18px; }
-.mesh-about-links a { display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:8px 10px; border:1px solid var(--mesh-border); border-radius:6px; color:var(--mesh-text); text-decoration:none; font-weight:500; white-space:nowrap; }
-.mesh-about-links a:hover { background:var(--mesh-soft); color:var(--mesh-text); }
-.mesh-about-links .ti { color:var(--mesh-primary); }
-.mesh-about-body .mesh-about-small { margin-bottom:6px; color:var(--mesh-muted); font-size:12.5px; text-wrap:balance; }
-.mesh-about-small a { color:var(--mesh-muted); text-decoration:none; }
-.mesh-about-small a:hover { color:var(--mesh-primary); text-decoration:underline; }
-.mesh-about-heart { color:#d93848; }
-.mesh-about-name { white-space:nowrap; }
-/* Flags as pictures: emoji flags do not show on Windows. */
-.mesh-about-flag { display:inline; height:.95em; width:auto; vertical-align:-.12em; border-radius:1.5px; }
-@media(max-width:420px) { .mesh-about-links { grid-template-columns:1fr; } }
-.mesh-page-heading { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:10px; }
-.mesh-eyebrow { font-size:10px; letter-spacing:1.6px; font-weight:700; color:var(--mesh-primary); }
-.mesh-page-heading h1 { font-size:28px; font-weight:650; margin:2px 0 3px; }
-.mesh-page-heading p { color:var(--mesh-muted); font-size:14px; margin:0; }
-.mesh-page-heading.is-compact { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:0 16px; min-height:40px; margin-bottom:12px; }
-.mesh-page-heading.is-compact h1 { font-size:22px; line-height:1.2; margin:0; }
-.mesh-secondary-button { border:1px solid var(--mesh-border); background:var(--mesh-surface); color:var(--mesh-text); padding:9px 14px; border-radius:6px; text-decoration:none; font-size:13px; }
-.mesh-secondary-button:hover { background:var(--mesh-soft); }
-/* Shared loading spinner: .is-loading on placeholder text, aria-busy="true" on status chips. */
-@keyframes mesh-spin { to { transform:rotate(360deg); } }
-:is(.is-loading,[aria-busy="true"])::before { content:""; display:inline-block; flex-shrink:0; width:.95em; height:.95em; margin-right:.5em; vertical-align:-.15em; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; opacity:.8; animation:mesh-spin .8s linear infinite; }
-@media(prefers-reduced-motion:reduce) { :is(.is-loading,[aria-busy="true"])::before { animation-duration:2.4s; } }
-/* Live feed status: green live, grey paused, amber stale, red offline. */
-.live-status { display:inline-flex; align-items:center; gap:7px; font-size:12px; color:var(--mesh-muted); }
-.live-status::before { content:""; width:8px; height:8px; border-radius:50%; background:#198754; }
-.live-status[data-state="paused"]::before { background:var(--mesh-muted); }
-.live-status[data-state="loading"]::before { width:10px; height:10px; background:none; border:2px solid currentColor; border-right-color:transparent; animation:mesh-spin .8s linear infinite; }
-.live-status[data-state="stale"]::before { background:#d99a00; }
-.live-status[data-state="offline"] { color:#b42318; font-weight:600; }
-.live-status[data-state="offline"]::before { background:#dc3545; }
-[data-bs-theme="dark"] .live-status[data-state="offline"] { color:#ffb4a6; }
-/* Payload toggle shared by every packet table. */
-:is(.mesh-data-page .mesh-content,.mesh-dashboard) .packet-toggle { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; margin-right:6px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--mesh-muted); font-size:16px; vertical-align:middle; cursor:pointer; }
-:is(.mesh-data-page .mesh-content,.mesh-dashboard) .packet-toggle:hover { background:var(--mesh-soft); color:var(--mesh-primary); }
-.packet-toggle .ti { transition:transform .15s ease; }
-.packet-toggle[aria-expanded="true"] .ti { transform:rotate(90deg); }
-.packet-toggle:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:1px; }
-/* Tables marked .card-table switch to cards (.is-cards, set below) under the viewport width in
-   their data-cards-below attribute, 700px by default. Cards flow in a grid: one column on
-   phones, two or three at medium widths. */
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards { display:block; min-width:0; }
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards thead { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tbody { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr)); gap:10px; }
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tbody tr { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:4px 12px; padding:12px 14px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; }
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tbody td { display:block; height:auto; min-width:0; padding:0; border:0; background:none; overflow-wrap:anywhere; }
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tbody td[colspan] { grid-column:1 / -1; }
-:is(.mesh-data-page,.mesh-dashboard) .data-table-wrap:has(> .card-table.is-cards) { border:0; background:none; overflow:visible; }
-.mesh-traffic-list:has(> .card-table.is-cards) { padding:12px; max-height:70vh; }
-/* Packets: port and time / sender → recipient / channel or size and packet ID. */
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tr:is(.packet-row,.mesh-traffic-row) { grid-template-columns:minmax(0,max-content) minmax(0,1fr) auto; grid-template-areas:"port port time" "from to to" "meta meta id"; }
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards .c-port { grid-area:port; }
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards .c-time { grid-area:time; text-align:right; white-space:nowrap; font-size:12px; color:var(--mesh-muted); }
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards .c-from { grid-area:from; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards .c-to { grid-area:to; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards .c-to::before { content:" → "; color:var(--mesh-muted); }
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards :is(.c-channel,.c-size) { grid-area:meta; font-size:12px; color:var(--mesh-muted); }
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards .c-id { grid-area:id; text-align:right; white-space:nowrap; font-size:12px; }
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tr.payload-row { display:none; grid-column:1 / -1; padding:0; overflow:hidden; }
-:is(.mesh-data-page,.mesh-dashboard) .packet-table.card-table.is-cards tr.expanded + .payload-row { display:block; }
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards .payload-cell { padding:12px 14px; }
-/* As cards, the arrival cue tints the whole card instead of each of its cells. */
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tr.packet-arrival-glow > td { animation:none; box-shadow:none; background:none; }
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tr.packet-arrival-glow { animation:packet-arrival-beat-card 1s ease-in-out 1; animation-delay:var(--packet-glow-delay,0ms); box-shadow:inset 4px 0 0 var(--mesh-primary),inset 0 0 14px rgba(24,115,70,.12); }
-@keyframes packet-arrival-beat-card {
-    0%,100% { background-color:var(--mesh-surface); }
-    45% { background-color:var(--mesh-pulse-peak); }
-    75% { background-color:var(--mesh-pulse-mid); }
-}
-@media(prefers-reduced-motion:reduce) {
-    :is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tr.packet-arrival-glow { animation:none; background:var(--mesh-soft); }
-}
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tr.mesh-traffic-payload { display:block; grid-column:1 / -1; padding:0; overflow:hidden; }
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tr.mesh-traffic-payload td { padding:12px 14px; }
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tr[hidden] { display:none; }
-/* An open packet takes the full row and its payload joins the card from below. */
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tr:is(.packet-row.expanded,.mesh-traffic-row:has(+ .mesh-traffic-payload:not([hidden]))) { grid-column:1 / -1; border-bottom-left-radius:0; border-bottom-right-radius:0; }
-:is(.mesh-data-page,.mesh-dashboard) .card-table.is-cards tr:is(.payload-row,.mesh-traffic-payload) { margin-top:-11px; border-top:0; border-top-left-radius:0; border-top-right-radius:0; background:var(--mesh-soft); }
-/* Top nodes: name, short name and average gateways / channel, sent and seen. */
-:is(.mesh-data-page,.mesh-dashboard) .top-table.is-cards tbody tr { grid-template-columns:minmax(0,1fr) auto auto; grid-template-areas:"name short avg" "channel sent seen"; }
-:is(.mesh-data-page,.mesh-dashboard) .top-table.is-cards .c-name { grid-area:name; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-:is(.mesh-data-page,.mesh-dashboard) .top-table.is-cards .c-short { grid-area:short; font-size:12px; color:var(--mesh-muted); }
-:is(.mesh-data-page,.mesh-dashboard) .top-table.is-cards .c-avg { grid-area:avg; justify-self:end; }
-:is(.mesh-data-page,.mesh-dashboard) .top-table.is-cards .c-channel { grid-area:channel; font-size:12px; color:var(--mesh-muted); }
-:is(.mesh-data-page,.mesh-dashboard) .top-table.is-cards :is(.c-sent,.c-seen) { font-size:13px; white-space:nowrap; text-align:right; }
-:is(.mesh-data-page,.mesh-dashboard) .top-table.is-cards .c-sent { grid-area:sent; }
-:is(.mesh-data-page,.mesh-dashboard) .top-table.is-cards .c-seen { grid-area:seen; }
-:is(.mesh-data-page,.mesh-dashboard) .top-table.is-cards :is(.c-sent,.c-seen)::before { content:attr(data-label) " "; color:var(--mesh-muted); }
-/* Four columns while every card fits on its lines, then two; all cards share one height. */
-.mesh-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); grid-auto-rows:1fr; gap:12px; margin-bottom:12px; }
-@media(max-width:1199px) { .mesh-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-.mesh-metric { display:grid; grid-template-columns:auto minmax(0,1fr); column-gap:14px; row-gap:1px; align-items:center; align-content:start; padding:14px 18px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; box-shadow:0 2px 4px var(--mesh-text)04; }
-.mesh-metric > :not(.mesh-metric-icon) { grid-column:2; min-width:0; }
-.mesh-metric-icon { grid-row:1 / span 3; display:inline-flex; align-items:center; justify-content:center; width:42px; height:42px; border-radius:10px; background:var(--mesh-soft); color:var(--mesh-primary); font-size:20px; }
-.mesh-metric-icon .ti { width:22px; height:22px; vertical-align:0; }
-.mesh-metric>span:not(.mesh-metric-icon) { font-size:12px; font-weight:500; color:var(--mesh-muted); }
-.mesh-metric strong { font-size:24px; line-height:1.25; font-weight:650; color:var(--mesh-primary); font-variant-numeric:tabular-nums; }
-.mesh-metric:nth-child(2) strong { color:var(--mesh-primary); }
-.mesh-metric:nth-child(3) strong { color:var(--mesh-primary); }
-.mesh-metric small { font-size:11px; color:var(--mesh-muted); }
-.mesh-explorer { display:grid; grid-template-columns:290px minmax(0,1fr); gap:12px; }
-.mesh-node-panel,.mesh-map-panel { background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; overflow:hidden; min-width:0; }
-.mesh-panel-title { display:flex; justify-content:space-between; align-items:center; padding:16px 18px; border-bottom:1px solid var(--mesh-border); gap:8px; min-height:64px; }
-.mesh-panel-title h2 { font-size:15px; font-weight:650; margin:0; }
-.mesh-count { color:var(--mesh-primary); background:var(--mesh-soft); padding:3px 8px; border-radius:5px; font-size:12px; }
-.mesh-search-label { margin:16px 16px 5px; font-size:11px; color:var(--mesh-muted); }
-.mesh-search { display:block; width:calc(100% - 32px); margin:0 16px 12px; border:1px solid var(--mesh-border); border-radius:6px; padding:10px; font-size:13px; }
-.mesh-search:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:2px; }
-.mesh-node-list { max-height:535px; overflow:auto; }
-.mesh-node-row { display:flex; align-items:center; gap:10px; width:100%; padding:14px 16px; border:0; border-top:1px solid var(--mesh-stripe); background:var(--mesh-surface); text-align:left; color:var(--mesh-text); }
-.mesh-node-row:hover,.mesh-node-row:focus-visible { background:var(--mesh-soft); }
-.mesh-node-dot { width:9px; height:9px; border-radius:50%; background:#198754; flex-shrink:0; }
-.mesh-node-dot.offline { background:#c0c9d5; }
-.mesh-node-copy { min-width:0; flex:1; }
-.mesh-node-copy strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; font-weight:600; }
-.mesh-node-copy small { display:block; color:var(--mesh-muted); font-size:11px; margin-top:4px; }
-.mesh-node-role { font-size:10px; color:var(--mesh-muted); }
-.mesh-empty { color:var(--mesh-muted); padding:20px 16px; font-size:13px; }
-.mesh-map-panel #map-wrapper { height:520px; }
-/* Home: with no heading above it, the map takes the panel's full height next to the node list. */
-@media(min-width:1001px) { .mesh-dashboard .mesh-map-panel { display:flex; flex-direction:column; } .mesh-dashboard .mesh-map-panel #map-wrapper { flex:1; height:auto; min-height:592px; } }
-@media(max-width:1000px) { .mesh-dashboard .mesh-map-panel #map-wrapper { height:512px; } }
-.mesh-map-panel #filter-container { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0; padding:10px 12px; font-size:12px; border-top:1px solid var(--mesh-border); }
-/* Map filters are pills: the checkbox and its text never wrap apart. */
-/* Groups flow as one row of pills, so a trailing button (map reset) can share the last line. */
-.map-filter-group { display:contents; }
-.map-filter-group:first-child > .map-filter:last-child { margin-right:10px; }
-.map-filter-group:empty { display:none; }
-.map-filter { display:inline-flex; align-items:center; gap:6px; min-height:30px; margin:0; padding:0 11px 0 9px; border:1px solid var(--mesh-border); border-radius:15px; background:var(--mesh-surface); color:var(--mesh-text); font-size:12px; white-space:nowrap; cursor:pointer; user-select:none; }
-.map-filter:has(input:checked) { background:var(--mesh-soft); border-color:var(--mesh-hover); }
-/* Hover only darkens the border: the tinted background means "selected". */
-.map-filter:hover,.map-filter:has(input:checked):hover { border-color:var(--mesh-muted); }
-.map-filter input { margin:0; accent-color:var(--mesh-primary); }
-.map-filter:has(input:focus-visible) { outline:2px solid var(--mesh-primary); outline-offset:2px; }
-.map-filter-dot { flex-shrink:0; width:8px; height:8px; border-radius:50%; background:var(--chip-color,#6c757d); box-shadow:inset 0 0 0 1px rgba(0,0,0,.18); }
-.mesh-map-panel #unmapped-packets { bottom:25px; right:10px; width:190px; }
-.mesh-map-panel .leaflet-control-layers { font-size:11px; border:1px solid var(--mesh-border); box-shadow:0 2px 8px #0001; }
-/* Below 1000px the node list stacks under the map instead of squeezing it. */
-@media(max-width:1000px) { .mesh-explorer { display:flex; flex-direction:column-reverse; gap:12px; } .mesh-node-list { max-height:300px; } }
-@media(max-width:700px) {
-    .mesh-header-inner { gap:8px; padding:0 12px 0 16px; min-height:52px; }
-    .mesh-brand { min-width:0; flex:1 1 auto; }
-    .mesh-brand #site-header { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .mesh-menu-toggle { display:inline-flex; order:3; }
-    /* The menu opens as a panel under the header, grouped by section. */
-    #site-menu { display:none; position:absolute; top:100%; left:0; right:0; max-height:calc(100dvh - 52px); overflow:auto; padding:4px 0 10px; background:var(--mesh-surface); border-bottom:1px solid var(--mesh-border); box-shadow:0 12px 24px rgba(16,25,37,.25); }
-    #site-menu.is-open { display:block; }
-    .mesh-nav-items { flex-direction:column; align-items:stretch; gap:0; overflow:visible; }
-    .mesh-nav-section { display:block; padding:14px 20px 4px; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--mesh-muted); }
-    #site-menu .mesh-nav-items a { display:flex; align-items:center; justify-content:space-between; min-height:48px; padding:0 20px; border-radius:0; color:var(--mesh-text); font-size:15px; }
-    #site-menu .mesh-nav-items a:hover { color:var(--mesh-text); background:var(--mesh-soft); }
-    #site-menu .mesh-nav-items a.active { color:var(--mesh-primary); background:var(--mesh-soft); font-weight:600; box-shadow:inset 3px 0 0 var(--mesh-primary); }
-    #site-menu .mesh-nav-items a:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:-2px; }
-    #site-menu .mesh-nav-external { color:var(--mesh-muted); opacity:1; }
-}
-@media(max-width:700px) { .mesh-content { padding:16px 14px; } .mesh-page-heading { align-items:flex-start; } .mesh-page-heading h1 { font-size:24px; } .mesh-secondary-button { white-space:nowrap; font-size:11px; padding:8px; } .mesh-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } .mesh-metric { padding:12px 14px; column-gap:8px; } .mesh-metric > :not(.mesh-metric-icon) { grid-column:1 / -1; } .mesh-metric > span:not(.mesh-metric-icon) { grid-column:2; grid-row:1; } .mesh-metric-icon { grid-row:1; width:24px; height:24px; border-radius:6px; } .mesh-metric-icon .ti { width:15px; height:15px; } .mesh-metric strong { font-size:22px; } .mesh-explorer { display:flex; flex-direction:column-reverse; gap:16px; } .mesh-map-panel #map-wrapper { height:440px; } .mesh-node-list { max-height:300px; } .mesh-map-panel #unmapped-packets { width:155px; font-size:10px; } }
-    </style>
-{% include "theme-styles.html" %}
 </head>
 
 <body class="{% block body_class %}{% endblock %}">
 <header class="mesh-header">
     <div class="mesh-header-inner">
-        <a class="mesh-brand" href="/"><img class="mesh-brand-icon" src="/static/meshview-icon.svg" width="28" height="28" alt=""> <span id="site-header">Meshview</span></a>
-        <button class="mesh-menu-toggle" type="button" aria-label="{{ "Toggle navigation" | tr }}" aria-expanded="false" aria-controls="site-menu"><span class="ti ti-menu-2" aria-hidden="true"></span></button>
-        <nav id="site-menu" aria-label="{{ "Main navigation" | tr }}"></nav>
-        <button class="mesh-theme-toggle" type="button" data-theme-toggle aria-label="{{ "Switch to night mode" | tr }}" aria-pressed="false" title="{{ "Night mode" | tr }}"><svg class="theme-icon theme-icon--sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg><svg class="theme-icon theme-icon--moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"/></svg></button>
+        <a class="mesh-brand" href="/">
+            {% include "logo.html" %}
+            <span class="mesh-brand-text">
+                <span class="mesh-brand-title">{% if site_title %}{{ site_title }}{% else %}Meshview Rust{% endif %}</span>
+                {% if site_title %}<span class="mesh-brand-product">Meshview Rust</span>{% endif %}
+            </span>
+        </a>
+        <nav id="site-menu" aria-label="{{ "Main navigation" | tr }}">
+            <div class="mesh-nav-items">
+                <span class="mesh-nav-section">{{ "Explore" | tr }}</span>
+                {% if site.map == "true" %}<a href="/map" data-group="map"{% if page == "map.html" %} class="active" aria-current="page"{% endif %}><svg class="mesh-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l6 -3l6 3l6 -3v13l-6 3l-6 -3l-6 3v-13M9 4v13M15 7v13"/></svg>{{ "Map" | tr }}</a>{% endif %}
+                {% if site.everything == "true" %}<a href="/firehose" data-group="everything"{% if page == "firehose.html" %} class="active" aria-current="page"{% endif %}><svg class="mesh-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3 8l4 -16l3 8h4"/></svg>{{ "Traffic" | tr }}</a>{% endif %}
+                {% if site.nodes == "true" %}<a href="/nodelist" data-group="nodes"{% if page == "nodelist.html" %} class="active" aria-current="page"{% endif %}><svg class="mesh-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 4v8M16 4.5v7M12 5v16M8 5.5v5M4 6v4M20 8h-16"/></svg>{{ "Nodes" | tr }}</a>{% endif %}
+                {% if site.chat == "true" %}<a href="/chat" data-group="chat"{% if page == "chat.html" %} class="active" aria-current="page"{% endif %}><svg class="mesh-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 9h8M8 13h6M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12z"/></svg>{{ "Chat" | tr }}</a>{% endif %}
+                {% if site.graphs == "true" %}<a href="/nodegraph" data-group="graphs"{% if page == "nodegraph.html" %} class="active" aria-current="page"{% endif %}><svg class="mesh-nav-icon" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="20" r="3"/><circle cx="14" cy="7" r="3"/><circle cx="23" cy="17" r="3"/><path d="M8.1 16.6L11.9 10.4M17 8l4 6M9 21l11 -3"/></svg>{{ "Mesh Graphs" | tr }}</a>{% endif %}
+                <span class="mesh-nav-section">{{ "Analysis" | tr }}</span>
+                {% if site.top == "true" %}<a href="/top" data-group="top"{% if page == "top.html" %} class="active" aria-current="page"{% endif %}><svg class="mesh-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 10.941c2.333 -3.308 .167 -7.823 -1 -8.941c0 3.395 -2.235 5.299 -3.667 6.706c-1.43 1.408 -2.333 3.621 -2.333 5.588c0 3.704 3.134 6.706 7 6.706s7 -3.002 7 -6.706c0 -1.712 -1.232 -4.403 -2.333 -5.588c-2.084 3.353 -3.257 3.353 -4.667 2.235"/></svg>{{ "Top Traffic Nodes" | tr }}</a>{% endif %}
+                {% if site.stats == "true" %}<a href="/stats" data-group="stats"{% if page == "stats.html" %} class="active" aria-current="page"{% endif %}><svg class="mesh-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1zM15 9a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1zM9 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1zM4 20h14"/></svg>{{ "Stats" | tr }}</a>{% endif %}
+                {% if site.net == "true" %}<a href="/net" data-group="net"{% if page == "net.html" %} class="active" aria-current="page"{% endif %}><svg class="mesh-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2zM16 3v4M8 3v4M4 11h16"/></svg>{{ "Weekly Net" | tr }}</a>{% endif %}
+                {% if site.api == "true" or planet_url %}<span class="mesh-nav-section">{{ "Links" | tr }}</span>{% endif %}
+                {% if site.api == "true" %}<a href="/api/docs" target="_blank" rel="noopener" data-group="links"><svg class="mesh-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 8l-4 4l4 4M17 8l4 4l-4 4M14 4l-4 16"/></svg>API<span class="mesh-nav-external" aria-hidden="true">↗</span></a>{% endif %}
+                {% if planet_url %}<a href="{{ planet_url }}" target="_blank" rel="noopener noreferrer" data-group="links"><svg class="mesh-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0M3.6 9h16.8M3.6 15h16.8M11.5 3a17 17 0 0 0 0 18M12.5 3a17 17 0 0 1 0 18"/></svg>Meshview Planet<span class="mesh-nav-external" aria-hidden="true">↗</span></a>{% endif %}
+            </div>
+            <div class="mesh-more" hidden>
+                <button type="button" class="mesh-more-button" aria-expanded="false" aria-controls="mesh-more-menu">{{ "More" | tr }}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+                <div class="mesh-more-menu" id="mesh-more-menu" hidden></div>
+            </div>
+        </nav>
+        <div class="mesh-header-actions">
+            <button type="button" class="mesh-icon-button" id="prefs-open" aria-haspopup="dialog" aria-controls="mesh-prefs" aria-label="{{ "Preferences" | tr }}" title="{{ "Preferences" | tr }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></svg></button>
+            <button type="button" class="mesh-icon-button mesh-menu-toggle" aria-label="{{ "Toggle navigation" | tr }}" aria-expanded="false" aria-controls="site-menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path class="when-closed" d="M4 6h16M4 12h16M4 18h16"/><path class="when-open" d="M18 6L6 18M6 6l12 12" hidden/></svg></button>
+        </div>
     </div>
 </header>
 <div id="site-announcement" class="mesh-announcement" role="region" aria-label="{{ "Announcement" | tr }}" hidden>
     <div class="mesh-announcement-inner">
-        <span class="ti ti-speakerphone" aria-hidden="true"></span>
-        <p id="site-announcement-text"></p>
-        <button id="site-announcement-close" type="button" aria-label="{{ "Dismiss announcement" | tr }}" title="{{ "Dismiss announcement" | tr }}"><span class="ti ti-x" aria-hidden="true"></span></button>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a3 3 0 0 1 0 6M10 8v11a1 1 0 0 1 -1 1h-1a1 1 0 0 1 -1 -1v-5M12 8h0l4.524 -3.77a.9 .9 0 0 1 1.476 .692v12.156a.9 .9 0 0 1 -1.476 .692l-4.524 -3.77h-8a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h8"/></svg>
+        <p id="site-announcement-text">{{ site.announcement }}</p>
+        <button id="site-announcement-close" class="mesh-icon-button" type="button" aria-label="{{ "Dismiss announcement" | tr }}" title="{{ "Dismiss announcement" | tr }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
     </div>
 </div>
 <main class="mesh-content">
 {% block body %}{% endblock %}
 </main>
 <footer class="mesh-footer">
-    <span id="site-tagline" class="mesh-footer-tagline">{{ site_description }}</span>
-    {% include "footer-project.html" %}
+    <div class="mesh-footer-inner">
+        <span id="site-tagline" class="mesh-footer-tagline">{{ site_description }}</span>
+        <span id="footer-attribution" class="mesh-footer-attribution"></span>
+        {% include "footer-project.html" %}
+    </div>
 </footer>
 
+<dialog id="mesh-prefs" class="mesh-dialog mesh-prefs" aria-labelledby="mesh-prefs-title">
+    <div class="mesh-dialog-header">
+        <h2 id="mesh-prefs-title">{{ "Preferences" | tr }}</h2>
+        <button type="button" class="mesh-dialog-close" aria-label="{{ "Close" | tr }}" title="{{ "Close" | tr }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+    <form class="mesh-dialog-body" method="dialog">
+        <fieldset>
+            <legend>{{ "Theme" | tr }}</legend>
+            <div class="mesh-segmented" style="--n:3">
+                <label><input type="radio" name="theme" value="auto">{{ "Automatic" | tr }}</label>
+                <label><input type="radio" name="theme" value="light"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7"/></svg>{{ "Light" | tr }}</label>
+                <label><input type="radio" name="theme" value="dark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z"/></svg>{{ "Dark" | tr }}</label>
+            </div>
+        </fieldset>
+        <fieldset>
+            <legend>{{ "Colour" | tr }}</legend>
+            <div class="mesh-segmented">
+                <label><input type="radio" name="accent" value="blue"><span class="mesh-swatch" style="--swatch:#245ea8"></span>{{ "Blue" | tr }}</label>
+                <label><input type="radio" name="accent" value="green"><span class="mesh-swatch" style="--swatch:#0b7a52"></span>{{ "Green" | tr }}</label>
+            </div>
+        </fieldset>
+        <fieldset>
+            <legend><label for="prefs-language">{{ "Language" | tr }}</label></legend>
+            <select class="mesh-select" id="prefs-language" name="language">
+                <option value="">{{ "The site's" | tr }}</option>
+                {% for language in languages %}<option value="{{ language.code }}">{{ language.name }}</option>{% endfor %}
+            </select>
+        </fieldset>
+        <p class="mesh-prefs-note">{{ "Kept in this browser only." | tr }}</p>
+    </form>
+</dialog>
+
 <script>
-// The about dialog, opened from the version in the footer.
-(() => {
-    const dialog = document.getElementById("mesh-about");
-    document.getElementById("site-version").addEventListener("click", () => dialog.showModal());
+// Dialogs: the about one, opened from the version in the footer, and the
+// preferences, from the gear. A click on the backdrop lands on the dialog itself.
+function meshDialog(dialog, opener) {
+    opener.addEventListener("click", () => dialog.showModal());
     dialog.querySelector(".mesh-dialog-close").addEventListener("click", () => dialog.close());
-    // A click on the backdrop lands on the dialog element itself.
     dialog.addEventListener("click", event => { if (event.target === dialog) dialog.close(); });
+}
+meshDialog(document.getElementById("mesh-about"), document.getElementById("site-version"));
+
+// Preferences: theme and colour apply at once; a language reloads the page in it.
+(() => {
+    const dialog = document.getElementById("mesh-prefs");
+    meshDialog(dialog, document.getElementById("prefs-open"));
+    const form = dialog.querySelector("form");
+    const LANGUAGE_COOKIE = "meshview-lang";
+    const chosenLanguage = (document.cookie.match(/(?:^|;\s*)meshview-lang=([^;]*)/) || [])[1] || "";
+    dialog.addEventListener("toggle", () => {
+        if (!dialog.open) return;
+        form.theme.value = MeshPrefs.theme;
+        form.accent.value = MeshPrefs.accent;
+        form.language.value = chosenLanguage;
+    });
+    form.addEventListener("change", event => {
+        const field = event.target;
+        if (field.name === "theme") MeshPrefs.theme = field.value;
+        if (field.name === "accent") MeshPrefs.accent = field.value;
+        if (field.name === "language") {
+            document.cookie = field.value
+                ? `${LANGUAGE_COOKIE}=${field.value}; path=/; max-age=31536000; samesite=lax`
+                : `${LANGUAGE_COOKIE}=; path=/; max-age=0; samesite=lax`;
+            location.reload();
+        }
+    });
 })();
 
-// --- Shared Promises ---
-if (!window._siteConfigPromise) {
-    window._siteConfigPromise = (async () => {
-        try {
-            const res = await fetch("/api/v1/config");
-            const cfg = await res.json();
-            window._siteConfig = cfg;
-            console.log("Loaded config:", cfg);
-            return cfg;
-        } catch (err) {
-            console.error("Failed to load /api/v1/config:", err);
-            return {};
-        }
-    })();
-}
+// The site's configuration, for the pages that read it.
+window._siteConfigPromise ||= fetch("/api/v1/config")
+    .then(res => res.json())
+    .then(cfg => (window._siteConfig = cfg))
+    .catch(err => { console.error("Failed to load /api/v1/config:", err); return {}; });
 
 // Starting view for Leaflet maps: a known position, else the configured map
 // area (usually loaded already), else the whole world until the config
@@ -461,310 +227,182 @@ window.meshMapStartView = (map, position, zoom = 12) => {
     });
 };
 
-// --- Load language AFTER config ---
-if (!window._langPromise) {
-    window._langPromise = (async () => {
-        try {
-            const cfg = await window._siteConfigPromise;
-            const site = cfg.site || {};
-            const userLang = site.language || "en";
-            const section = "base";
-
-            const url = `/api/v1/lang?lang=${userLang}&section=${section}`;
-            const res = await fetch(url);
-            const lang = await res.json();
-
-            window._lang = lang;
-            console.log(`Loaded language (${userLang}):`, lang);
-
-            return lang;
-        } catch (err) {
-            console.error("Failed to load language:", err);
-            return {};
-        }
-    })();
-}
-
-// --- Translation Helper ---
+// Elements marked data-translate take the string of that key from a page's dictionary.
 function applyTranslations(dict) {
     document.querySelectorAll("[data-translate]").forEach(el => {
-        const key = el.dataset.translate;
-        const value = dict[key];
+        const value = dict[el.dataset.translate];
         if (!value) return;
-
-        if (el.placeholder) {
-            el.placeholder = value;
-        } else if (el.tagName === "INPUT" && el.value) {
-            el.value = value;
-        } else {
-            el.textContent = value;
-        }
+        if (el.placeholder) el.placeholder = value;
+        else if (el.tagName === "INPUT" && el.value) el.value = value;
+        else el.textContent = value;
     });
 }
 
-// --- Fill portnum select dynamically ---
-function fillPortnumSelect(dict, selectedValue) {
-    const sel = document.getElementById("portnum_select");
-    if (!sel) return;
-
-    const portOptions = dict.portnum_options || {};
-    sel.innerHTML = "";
-
-    const allOption = document.createElement("option");
-    allOption.value = "";
-    allOption.textContent = dict.all || MeshI18n.t("All");
-    if (!selectedValue) allOption.selected = true;
-    sel.appendChild(allOption);
-
-    for (const [val, label] of Object.entries(portOptions)) {
-        const opt = document.createElement("option");
-        opt.value = val;
-        opt.textContent = label;
-        if (parseInt(val) === parseInt(selectedValue)) {
-            opt.selected = true;
-        }
-        sel.appendChild(opt);
-    }
-}
-
-// --- Main Init ---
-async function initializePage() {
-    try {
-        const [cfg, lang] = await Promise.all([
-            window._siteConfigPromise,
-            window._langPromise
-        ]);
-
-        const dict = lang || {};
-        const site = cfg.site || {};
-
-        // Title
-        document.title = site.title ? "Meshview - " + site.title : "Meshview";
-
-        // Header & Message
-        document.getElementById("site-header").textContent = site.title || "Meshview";
-
-        // [site] announcement: a dismissible banner on every page. Dismissing it hides that
-        // text in this browser until the announcement changes.
-        showAnnouncement((site.announcement || "").trim());
-
-        // Menu
-        const menu = document.getElementById("site-menu");
-        if (menu) {
-            const items = [{key: "home", html: '<a href="/"' + (["/", "/index", "/index.html"].includes(location.pathname) ? ' class="active" aria-current="page"' : "") + '>' + escapeHtml(MeshI18n.t("Home")) + '</a>'}];
-            // Most used sections first.
-            // Tables first, then the map, the analysis pages, and weekly net (often disabled).
-            const keys = ["nodes", "everything", "chat", "map", "graphs", "top", "stats", "net"];
-            const urls = ["/nodelist", "/firehose", "/chat", "/map", "/nodegraph", "/top", "/stats", "/net"];
-
-            for (let i = 0; i < keys.length; i++) {
-                const key = keys[i];
-                if (site[key] === "true" || site[key] === true) {
-                    items.push({key, html: `<a href="${urls[i]}"${(location.pathname === urls[i] || (key === "map" && location.pathname === "/map.html")) ? ' class="active" aria-current="page"' : ""}>${escapeHtml(dict[key] || (key === "everything" ? MeshI18n.t("Live Traffic") : key))}</a>`});
-                }
-            }
-            // Links outside the monitoring views: they overflow together and show an arrow.
-            if (site.api !== "false" && site.api !== false) {
-                items.push({key: "api", group: "links", html: '<a href="/api/docs" target="_blank" rel="noopener">API<span class="mesh-nav-external" aria-hidden="true">↗</span></a>'});
-            }
-            if (site.planet_url) {
-                items.push({key: "planet", group: "links", html: `<a href="${escapeHtml(site.planet_url)}" target="_blank" rel="noopener noreferrer">Meshview Planet<span class="mesh-nav-external" aria-hidden="true">↗</span></a>`});
-            }
-
-            setupSiteMenu(menu, items);
-        }
-
-        // Apply translations
-        applyTranslations(dict);
-        fillPortnumSelect(dict, "{{ portnum or '' }}");
-
-        document.body.classList.add("ready");
-    } catch (err) {
-        console.error("Failed to initialize page:", err);
-        document.body.classList.add("ready");
-    }
-}
-
-// --- Announcement banner ---
-const ANNOUNCEMENT_KEY = "meshview-announcement-dismissed";
-function showAnnouncement(text) {
+// The announcement: dismissing it hides that text in this browser until it changes.
+(() => {
+    const ANNOUNCEMENT_KEY = "meshview-announcement-dismissed";
     const banner = document.getElementById("site-announcement");
-    if (!banner || !text) return;
+    const text = document.getElementById("site-announcement-text").textContent.trim();
     let dismissed = null;
     try { dismissed = localStorage.getItem(ANNOUNCEMENT_KEY); } catch {}
-    if (dismissed === text) return;
-    document.getElementById("site-announcement-text").textContent = text;
+    if (!text || dismissed === text) return;
     banner.hidden = false;
     document.getElementById("site-announcement-close").addEventListener("click", () => {
         banner.hidden = true;
         try { localStorage.setItem(ANNOUNCEMENT_KEY, text); } catch {}
     }, {once: true});
-}
+})();
 
-// --- Site menu: every section on one line, overflow into "More" only when it does not fit ---
-// Groups that leave first when space runs out; anything not listed stays longest.
-const MENU_OVERFLOW_ORDER = ["links", "net", "stats", "top", "graphs", "chat", "home", "map", "everything", "nodes"];
-const MOBILE_MENU_QUERY = window.matchMedia("(max-width:700px)");
-// The mobile menu panel groups sections under these headings.
-const MENU_SECTIONS = {
-    home: "explore", nodes: "explore", everything: "explore", chat: "explore", map: "explore",
-    graphs: "analysis", top: "analysis", stats: "analysis", net: "analysis",
-    api: "links", planet: "links",
-};
-const MENU_SECTION_LABELS = {explore: "Explore", analysis: "Analysis", links: "Links"};
-
-function setupSiteMenu(menu, items) {
-    const template = document.createElement("template");
-    const entries = items.map(({key, group, html}) => {
-        template.innerHTML = html.trim();
-        return {key, group: group || key, section: MENU_SECTIONS[key] || "explore", el: template.content.firstElementChild};
-    });
-    const groups = [...new Set(entries.map(entry => entry.group))];
-
-    const list = document.createElement("div");
-    list.className = "mesh-nav-items";
-    const more = document.createElement("div");
-    more.className = "mesh-more";
-    more.hidden = true;
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "mesh-more-button";
-    button.setAttribute("aria-expanded", "false");
-    button.setAttribute("aria-controls", "mesh-more-menu");
-    button.innerHTML = escapeHtml(MeshI18n.t("More")) +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
-    const panel = document.createElement("div");
-    panel.className = "mesh-more-menu";
-    panel.id = "mesh-more-menu";
-    panel.hidden = true;
-    more.append(button, panel);
-    menu.replaceChildren(list, more);
-
+// The menu: every section on one line; what does not fit goes into "More", the
+// links first, then the least used sections. On a phone it is a panel instead.
+(() => {
+    const OVERFLOW_ORDER = ["links", "net", "stats", "top", "graphs", "chat", "nodes", "everything", "map"];
+    const MOBILE = window.matchMedia("(max-width:860px)");
+    const menu = document.getElementById("site-menu");
+    const list = menu.querySelector(".mesh-nav-items");
+    const more = menu.querySelector(".mesh-more");
+    const button = more.querySelector(".mesh-more-button");
+    const panel = more.querySelector(".mesh-more-menu");
+    const links = [...list.querySelectorAll("a")];
+    const groups = [...new Set(links.map(link => link.dataset.group))];
+    const rank = group => {
+        const index = OVERFLOW_ORDER.indexOf(group);
+        return index === -1 ? OVERFLOW_ORDER.length : index;
+    };
     const setOpen = open => {
         panel.hidden = !open;
         button.setAttribute("aria-expanded", String(open));
-    };
-    const rank = group => {
-        const index = MENU_OVERFLOW_ORDER.indexOf(group);
-        return index === -1 ? MENU_OVERFLOW_ORDER.length : index;
     };
     const overflowing = () => list.scrollWidth > list.clientWidth + 1;
 
     function layout() {
         setOpen(false);
-        panel.replaceChildren();
         more.hidden = true;
         button.classList.remove("active");
-        if (MOBILE_MENU_QUERY.matches) {
-            const children = [];
-            let current = null;
-            for (const entry of entries) {
-                if (entry.section !== current) {
-                    current = entry.section;
-                    const heading = document.createElement("span");
-                    heading.className = "mesh-nav-section";
-                    heading.textContent = MeshI18n.t(MENU_SECTION_LABELS[current]);
-                    children.push(heading);
-                }
-                children.push(entry.el);
-            }
-            list.replaceChildren(...children);
-            return;
-        }
-        list.replaceChildren(...entries.map(entry => entry.el));
-        if (!overflowing()) return;
-
+        // Everything back in its place, in the order the page has it.
+        list.replaceChildren(...originalOrder);
+        panel.replaceChildren();
+        if (MOBILE.matches || !overflowing()) return;
         more.hidden = false;
-        const moved = new Set();
+        const moved = [];
         for (const group of [...groups].sort((a, b) => rank(a) - rank(b))) {
             if (!overflowing()) break;
-            for (const entry of entries) {
-                if (entry.group !== group) continue;
-                entry.el.remove();
-                moved.add(entry);
-            }
+            links.filter(link => link.dataset.group === group).forEach(link => moved.push(link));
+            moved.forEach(link => link.remove());
         }
-        const hidden = entries.filter(entry => moved.has(entry));
-        const panelItems = [];
-        hidden.forEach((entry, index) => {
-            if (index > 0 && entry.group === "links" && hidden[index - 1].group !== "links") {
+        const ordered = links.filter(link => moved.includes(link));
+        const items = [];
+        ordered.forEach((link, index) => {
+            if (index > 0 && link.dataset.group === "links" && ordered[index - 1].dataset.group !== "links") {
                 const separator = document.createElement("div");
                 separator.className = "mesh-more-separator";
                 separator.setAttribute("role", "separator");
-                panelItems.push(separator);
+                items.push(separator);
             }
-            panelItems.push(entry.el);
+            items.push(link);
         });
-        panel.replaceChildren(...panelItems);
-        button.classList.toggle("active", hidden.some(entry => entry.el.classList.contains("active")));
+        panel.replaceChildren(...items);
+        button.classList.toggle("active", ordered.some(link => link.classList.contains("active")));
     }
+    const originalOrder = [...list.children];
 
     button.addEventListener("click", () => setOpen(panel.hidden));
     more.addEventListener("keydown", event => {
-        if (event.key === "Escape" && !panel.hidden) {
-            setOpen(false);
-            button.focus();
-        }
+        if (event.key === "Escape" && !panel.hidden) { setOpen(false); button.focus(); }
     });
-    more.addEventListener("focusout", event => {
-        if (!more.contains(event.relatedTarget)) setOpen(false);
-    });
-    document.addEventListener("click", event => {
-        if (!more.contains(event.target)) setOpen(false);
-    });
+    more.addEventListener("focusout", event => { if (!more.contains(event.relatedTarget)) setOpen(false); });
+    document.addEventListener("click", event => { if (!more.contains(event.target)) setOpen(false); });
 
     let frame = 0;
-    const schedule = () => {
-        cancelAnimationFrame(frame);
-        frame = requestAnimationFrame(layout);
-    };
-    new ResizeObserver(schedule).observe(menu.closest(".mesh-header-inner") || menu);
-    MOBILE_MENU_QUERY.addEventListener("change", schedule);
+    const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(layout); };
+    new ResizeObserver(schedule).observe(menu.closest(".mesh-header-inner"));
+    MOBILE.addEventListener("change", schedule);
     document.fonts?.ready.then(schedule);
     layout();
-}
 
-// --- Data tables: sticky header when the table fits, sideways scroll when it does not ---
-function watchTableWidth(wrap) {
+    // On a phone, the panel under the header.
+    const toggle = document.querySelector(".mesh-menu-toggle");
+    const setPanel = open => {
+        toggle.setAttribute("aria-expanded", String(open));
+        menu.classList.toggle("is-open", open);
+        toggle.querySelector(".when-closed").toggleAttribute("hidden", open);
+        toggle.querySelector(".when-open").toggleAttribute("hidden", !open);
+    };
+    toggle.addEventListener("click", () => {
+        const open = toggle.getAttribute("aria-expanded") !== "true";
+        setPanel(open);
+        if (open) menu.querySelector("a")?.focus();
+    });
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && menu.classList.contains("is-open")) { setPanel(false); toggle.focus(); }
+    });
+    document.addEventListener("click", event => {
+        if (menu.classList.contains("is-open") && !menu.contains(event.target) && !toggle.contains(event.target)) setPanel(false);
+    });
+    MOBILE.addEventListener("change", () => setPanel(false));
+})();
+
+// Data headings: when the actions drop under the title for want of room, the
+// heading is .is-stacked and they take the whole line, a select growing into
+// it. Whether they fit is measured with the class off, at every resize.
+document.querySelectorAll(".mesh-data-page .data-heading").forEach(heading => {
+    const title = heading.querySelector(".data-title");
+    const actions = heading.querySelector(".data-actions");
+    if (!title || !actions) return;
+    const update = () => {
+        heading.classList.remove("is-stacked");
+        const stacked = actions.getBoundingClientRect().top >= title.getBoundingClientRect().bottom - 1;
+        heading.classList.toggle("is-stacked", stacked);
+    };
+    new ResizeObserver(update).observe(heading);
+    update();
+});
+
+// Card tables turn into cards under their own data-cards-below width and, in a
+// data table's wrap, whenever as a table they would not fit it: the width they
+// needed is kept, to be a table again once there is room for it. Other data
+// tables scroll sideways (.is-wide) when they do not fit, and their heading row
+// follows the page while they do. Changing mode, the heading row does not slide
+// (.is-switching) from where it was.
+document.querySelectorAll("table.card-table").forEach(table => {
+    const query = window.matchMedia(`(max-width:${Number(table.dataset.cardsBelow) || 700}px)`);
+    const wrap = table.parentElement.closest(".data-table-wrap");
+    let needed = 0;
+    const apply = () => {
+        let cards = query.matches;
+        if (!cards && wrap) {
+            if (table.classList.contains("is-cards")) cards = wrap.clientWidth < needed;
+            else if (table.scrollWidth > wrap.clientWidth + 1) { needed = table.scrollWidth; cards = true; }
+        }
+        table.classList.toggle("is-cards", cards);
+    };
+    query.addEventListener("change", apply);
+    table.meshCardsApply = apply;
+    apply();
+});
+document.querySelectorAll(".data-table-wrap").forEach(wrap => {
+    let switching = 0;
     const update = () => {
         const table = wrap.querySelector("table");
-        if (table) wrap.classList.toggle("is-wide", table.scrollWidth > wrap.clientWidth + 1);
+        if (!table) return;
+        const before = wrap.className + table.className;
+        table.meshCardsApply?.();
+        const wide = !table.classList.contains("is-cards") && table.scrollWidth > wrap.clientWidth + 1;
+        wrap.classList.toggle("is-wide", wide);
+        if (wrap.className + table.className !== before) {
+            wrap.classList.add("is-switching");
+            cancelAnimationFrame(switching);
+            switching = requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.remove("is-switching")));
+        }
     };
     const observer = new ResizeObserver(update);
     observer.observe(wrap);
     const table = wrap.querySelector("table");
     if (table) observer.observe(table);
     update();
-}
-// Rows with a right-aligned actions block (compact headings, chat toolbar): mark the row
-// .is-wrapped when the actions dropped below its first item, so they align left there.
-function watchHeadingWrap(row, leadSelector = ".data-title", actionsSelector = ".data-actions") {
-    const lead = row.querySelector(leadSelector);
-    const actions = row.querySelector(actionsSelector);
-    if (!lead || !actions) return;
-    const update = () => {
-        row.classList.remove("is-wrapped");
-        row.classList.toggle("is-wrapped", actions.offsetTop > lead.offsetTop + lead.offsetHeight / 2);
-    };
-    new ResizeObserver(update).observe(row);
-    update();
-}
-
-// Card tables: each one switches to cards below its own data-cards-below width.
-function watchCardTable(table) {
-    const query = window.matchMedia(`(max-width:${Number(table.dataset.cardsBelow) || 700}px)`);
-    const apply = () => table.classList.toggle("is-cards", query.matches);
-    query.addEventListener("change", apply);
-    apply();
-}
-document.addEventListener("DOMContentLoaded", () => {
-    document.querySelectorAll("table.card-table").forEach(watchCardTable);
-    document.querySelectorAll(".data-heading.is-compact").forEach(heading => watchHeadingWrap(heading));
-    document.querySelectorAll(".chat-toolbar").forEach(toolbar => watchHeadingWrap(toolbar, ".chat-channel-control", ".chat-actions"));
-    document.querySelectorAll(".data-table-wrap").forEach(watchTableWidth);
 });
 
-// --- Header: hide while scrolling down, show again when scrolling up ---
+// The header hides while scrolling down and comes back on the way up.
 (() => {
     const header = document.querySelector(".mesh-header");
     const root = document.documentElement;
@@ -775,58 +413,19 @@ document.addEventListener("DOMContentLoaded", () => {
     };
     const update = () => {
         const y = window.scrollY;
-        // Keep it visible near the top, with a menu open or with keyboard focus inside.
+        // Visible near the top, with a menu open, or with keyboard focus inside.
         const busy = header.querySelector('[aria-expanded="true"]') || header.contains(document.activeElement);
-        if (busy || y <= header.offsetHeight) {
-            setHidden(false);
-            lastY = y;
-            return;
-        }
+        if (busy || y <= header.offsetHeight) { setHidden(false); lastY = y; return; }
         if (Math.abs(y - lastY) < 6) return;
         setHidden(y > lastY);
         lastY = y;
     };
     let frame = 0;
-    window.addEventListener("scroll", () => {
-        cancelAnimationFrame(frame);
-        frame = requestAnimationFrame(update);
-    }, {passive: true});
+    window.addEventListener("scroll", () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(update); }, {passive: true});
     window.addEventListener("resize", update);
     header.addEventListener("focusin", () => setHidden(false));
     setHidden(false);
 })();
-
-// --- Mobile menu panel ---
-(() => {
-    const toggle = document.querySelector(".mesh-menu-toggle");
-    const menu = document.getElementById("site-menu");
-    const icon = toggle.querySelector(".ti");
-    const setOpen = open => {
-        toggle.setAttribute("aria-expanded", String(open));
-        menu.classList.toggle("is-open", open);
-        icon.classList.toggle("ti-menu-2", !open);
-        icon.classList.toggle("ti-x", open);
-    };
-    toggle.addEventListener("click", () => {
-        const open = toggle.getAttribute("aria-expanded") !== "true";
-        setOpen(open);
-        if (open) menu.querySelector("a")?.focus();
-    });
-    document.addEventListener("keydown", event => {
-        if (event.key === "Escape" && menu.classList.contains("is-open")) {
-            setOpen(false);
-            toggle.focus();
-        }
-    });
-    document.addEventListener("click", event => {
-        if (menu.classList.contains("is-open") && !menu.contains(event.target) && !toggle.contains(event.target)) {
-            setOpen(false);
-        }
-    });
-    MOBILE_MENU_QUERY.addEventListener("change", () => setOpen(false));
-})();
-document.addEventListener("DOMContentLoaded", initializePage);
 </script>
-
 </body>
 </html>

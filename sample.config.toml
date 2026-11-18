@@ -24,8 +24,6 @@ port = 8081
 [site]
 # Optional domain metadata exposed by /api/config; does not configure binding or TLS.
 domain = ""
-# Select a language catalog: en, es, or ru.
-language = "en"
 # Site title to show in the browser title bar and headers.
 title = "My Mesh"
 # Short tagline for this installation, shown in the page footer and used as the
@@ -37,14 +35,14 @@ message = "Real time data from our mesh."
 announcement = ""
 
 # Show or hide navigation links; page and API routes remain available.
+map = true
+everything = true
 nodes = true
 chat = true
-everything = true
 graphs = true
+top = true
 stats = true
 net = true
-map = true
-top = true
 api = true
 # The Meshview Planet to link from the menu and the about dialog; none unless
 # set.
@@ -66,6 +64,10 @@ map_tile_name = ""
 # automatic polling; initial data still loads.
 map_interval = 3
 firehose_interval = 3
+
+# The map's kiosk mode (/map?kiosk) for a kiosk proper: without its full screen
+# button, so that nothing on the screen leaves it.
+map_kiosk_lock = false
 
 # Weekly net: the tag that makes a text message a check-in, wherever it is in
 # it. The page lists them a week at a time, the latest from each node, as they

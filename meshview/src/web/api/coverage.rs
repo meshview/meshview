@@ -21,7 +21,8 @@ const DEFAULT_MAX_DBM: f64 = -80.0;
 /// The parameters, in the order they are checked: name, default, lowest and
 /// highest accepted.
 const LIMITS: [(&str, f64, f64, f64); 8] = [
-    ("freq_mhz", 907.0, 1.0, 10000.0),
+    // Its default is the region's, from the MQTT topics: see the handler.
+    ("freq_mhz", coverage::DEFAULT_FREQ_MHZ, 1.0, 10000.0),
     ("tx_dbm", 20.0, -50.0, 60.0),
     ("tx_height_m", 5.0, 0.0, 1000.0),
     ("rx_height_m", 1.5, 0.0, 1000.0),
@@ -118,7 +119,7 @@ pub enum Coverage {
     params(
         ("node_id" = i64, Path, description = "The node's number, in decimal or 0x hex. It needs a position."),
         ("mode" = Option<String>, Query, description = "`perimeter` (the default), or anything else for every point."),
-        ("freq_mhz" = Option<f64>, Query, description = "Frequency, 1 to 10000 MHz. Default 907."),
+        ("freq_mhz" = Option<f64>, Query, description = "Frequency, 1 to 10000 MHz. Default: that of the region in the MQTT topics, as 868 for EU_868, or 907."),
         ("tx_dbm" = Option<f64>, Query, description = "Transmitted power, -50 to 60 dBm. Default 20."),
         ("tx_height_m" = Option<f64>, Query, description = "Height of the node's antenna, 0 to 1000 m. Default 5."),
         ("rx_height_m" = Option<f64>, Query, description = "Height of a receiving antenna, 0 to 1000 m. Default 1.5."),
@@ -142,9 +143,11 @@ pub async fn coverage(
     let node_id =
         parse_db_int_any_base(&node_id).ok_or_else(|| ApiError::bad_request("Invalid node_id"))?;
 
+    let region_freq = coverage::topics_frequency_mhz(&state.config.mqtt.topics);
     let mut values = [0.0; LIMITS.len()];
     for (value, (name, default, low, high)) in values.iter_mut().zip(LIMITS) {
         *value = match params.get(name) {
+            None if name == "freq_mhz" => region_freq,
             None => default,
             Some(raw) => {
                 let parsed = python_float_parse(raw)

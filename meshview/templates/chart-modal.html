@@ -1,9 +1,11 @@
-<!-- An expanded chart; chart-kit.js fills it. -->
-<div id="chartModal">
-    <div>
-        <div style="text-align:right;">
-            <button onclick="closeModal()" aria-label="{{ "Close" | tr }}" style="background:none;border:none;color:var(--mesh-muted);"><span class="ti ti-x" aria-hidden="true"></span></button>
+<!-- An expanded chart, with its card's title and selects; chart-kit.js fills it. -->
+<div id="chartModal" class="chart-modal" role="dialog" aria-modal="true" aria-labelledby="chart-modal-title">
+    <div class="chart-modal-box">
+        <div class="chart-modal-head">
+            <h2 id="chart-modal-title"></h2>
+            <div id="chart-modal-controls" class="chart-modal-controls"></div>
+            <button type="button" class="mesh-dialog-close" onclick="closeModal()" aria-label="{{ "Close" | tr }}" title="{{ "Close" | tr }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
         </div>
-        <div id="modalChart" style="width:100%; height:90%;"></div>
+        <div id="modalChart"></div>
     </div>
 </div>

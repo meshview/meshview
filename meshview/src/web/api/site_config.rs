@@ -12,6 +12,8 @@ use crate::config::Config;
 use crate::state::AppState;
 use axum::Json;
 use axum::extract::State;
+use axum::http::header::{HeaderMap, VARY};
+use axum::response::IntoResponse;
 use serde::Serialize;
 use std::collections::BTreeMap;
 use utoipa::ToSchema;
@@ -73,7 +75,9 @@ pub struct Site {
     /// The installation's domain, as configured; it is only shown.
     #[schema(example = "example.com")]
     pub domain: String,
-    /// The language of the pages: `en`, `es` or `ru`.
+    /// The language of the pages for whoever asks: the one chosen in the
+    /// preferences, else the first their browser asks for that there is one
+    /// for, else English. `en` or `es`.
     #[schema(example = "en")]
     pub language: String,
     /// The site's title, for the title bar and the headers.
@@ -239,7 +243,7 @@ pub fn build(config: &Config) -> SiteConfig {
     SiteConfig {
         site: Site {
             domain: site.domain.clone(),
-            language: site.language.clone(),
+            language: "en".into(),
             title: site.title.clone(),
             message: site.message.clone(),
             announcement: site.announcement.clone(),
@@ -328,8 +332,12 @@ pub fn build(config: &Config) -> SiteConfig {
     tag = "meta",
     responses((status = 200, description = "The configuration", body = SiteConfig))
 )]
-pub async fn config(State(state): State<AppState>) -> Json<SiteConfig> {
-    Json(build(&state.config))
+pub async fn config(State(state): State<AppState>, headers: HeaderMap) -> impl IntoResponse {
+    let mut config = build(&state.config);
+    config.site.language = super::lang::visitor_language(&headers, |code| {
+        super::lang::available().iter().any(|known| known == code)
+    });
+    ([(VARY, super::lang::VARY_LANGUAGE)], Json(config))
 }
 
 #[cfg(test)]

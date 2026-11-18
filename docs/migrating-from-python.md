@@ -201,6 +201,7 @@ lines indented, becomes a TOML multi-line string (`"""..."""`).
 | API addresses | `/api/...` | `/api/v1/...`; the old ones redirect. See [API](api.md). |
 | API reference | `static/api.html` | `/api/docs`, generated from the code; `/api.html` and `/api-chat.html` redirect to it |
 | Web pages | rendered on every request | the same pages, rendered once at start, and their files built into the binary |
+| Language of the pages | `[site] language`, for everyone | each visitor's: the one their browser asks for, or the one they choose in the preferences; `[site] language` is deprecated and ignored |
 | Traceroute graph | `/graph/traceroute/{id}`, an SVG drawn by Graphviz | redirects to the traceroute's page, `/traceroute/{id}`, which draws it |
 | Scripts and styles | sent as they are | compressed for browsers that take it |
 | Channel colours on the map | the presets' in `config.ini`'s `[map_channel_colors]`, without the 2.8 ones and with `LongModerate` for the channel the firmware calls `LongMod` | built in for every preset, `[map_channel_colors]` only for what you change: the Python sample's can be left out |

@@ -39,7 +39,7 @@ function renderNodeExplorer() {
             // Selecting a search result also reveals it if a saved filter hid it.
             nodeLayer.addTo(map);
             nodeLayer.addLayer(marker);
-            map.setView(marker.getLatLng(), Math.max(map.getZoom(), 12));
+            meshCenterOn(marker.getLatLng(), Math.max(map.getZoom(), 12));
             // The node chosen, as a click on its dot alone would: a synthetic
             // click has no point on the map for the picker of overlapping nodes.
             onNodeClick(node);

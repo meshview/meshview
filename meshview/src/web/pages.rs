@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Óscar García Amor <ogarcia@connectical.com>
 
-//! The web pages: the Python version's, served as it served them.
+//! The web pages.
 //!
-//! Its templates take nothing from the request: everything a page shows it
-//! fetches from the API itself. What they do take, the site's language and
-//! texts and the map's tiles, is known once the configuration is read, so every
-//! page is rendered once, at start, and answered from memory after that. The
-//! one exception is the node page's link preview: the apps that show one do not
-//! run the page's script, so the node's name and details go into the page as it
-//! is answered, in the places left for them at start.
+//! Their templates take almost nothing from the request: everything a page
+//! shows it fetches from the API itself. What they do take, the site's sections,
+//! texts and map tiles, is known once the configuration is read, so every page
+//! is rendered at start, once in each language, and answered from memory after
+//! that: in the language the visitor chose, kept in a cookie, else the site's.
+//! The one exception is the node page's link preview: the apps that show one do
+//! not run the page's script, so the node's name and details go into the page as
+//! it is answered, in the places left for them at start.
 //!
 //! The templates are Tera 2 ones, under `templates/`, and the files they use
 //! under `assets/static/`; their strings are translated in the `ui` section of
@@ -22,7 +23,7 @@ use crate::db::Node;
 use crate::state::AppState;
 use anyhow::{Context as _, anyhow};
 use axum::Router;
-use axum::extract::{Path, Request, State as AxumState};
+use axum::extract::{Path, Query, Request, State as AxumState};
 use axum::http::StatusCode;
 use axum::http::header::{
     CACHE_CONTROL, CONTENT_TYPE, ETAG, HeaderMap, HeaderValue, IF_NONE_MATCH, LOCATION,
@@ -83,8 +84,6 @@ const ROUTES: [(&str, &str); 16] = [
     ("/map", "map.html"),
     ("/map.html", "map.html"),
     ("/net", "net.html"),
-    ("/reliability", "reliability.html"),
-    ("/radio", "radio.html"),
     ("/nodelist", "nodelist.html"),
     ("/firehose", "firehose.html"),
     ("/chat", "chat.html"),
@@ -93,6 +92,8 @@ const ROUTES: [(&str, &str); 16] = [
     ("/stats", "stats.html"),
     ("/packet/{id}", "packet.html"),
     ("/traceroute/{id}", "traceroute.html"),
+    ("/reliability/{id}", "reliability.html"),
+    ("/radio/{id}", "radio.html"),
 ];
 
 /// The Python version's API pages, which the reference replaces.
@@ -149,15 +150,10 @@ fn preview_image(domain: &str, preview: Preview) -> String {
     }
 }
 
-/// The templates, with what they need from the site: its language, the
-/// translation of each string, its tagline and the map's tiles.
-fn tera(config: &Config) -> anyhow::Result<Tera> {
-    let language = config.site.language.trim();
-    let code = if lang::is_language_code(language) {
-        language
-    } else {
-        "en"
-    };
+/// The templates, with what they need from the site, in a language: the
+/// translation of each string, the site's sections and texts, and the map's
+/// tiles.
+fn tera(config: &Config, code: &str) -> anyhow::Result<Tera> {
     let ui = lang::merged(code)
         .get("ui")
         .cloned()
@@ -195,13 +191,20 @@ fn tera(config: &Config) -> anyhow::Result<Tera> {
 
     let globals = tera.global_context();
     globals.insert("ui_translations", &ui);
-    globals.insert("ui_language", &config.site.language);
+    globals.insert("ui_language", code);
+    globals.insert("site", &site);
+    let languages: Vec<_> = lang::available()
+        .into_iter()
+        .map(|code| json!({"code": code, "name": lang::native_name(&code)}))
+        .collect();
+    globals.insert("languages", &languages);
+    globals.insert("page", "");
     globals.insert("site_description", config.site.message.trim());
     globals.insert("site_title", config.site.title.trim());
     // What a link to a page shows where it is pasted: the site, by default.
     let site_name = Some(config.site.title.trim())
         .filter(|title| !title.is_empty())
-        .unwrap_or("Meshview");
+        .unwrap_or("Meshview Rust");
     globals.insert("preview_site", site_name);
     globals.insert("preview_title", site_name);
     globals.insert("preview_description", config.site.message.trim());
@@ -213,6 +216,11 @@ fn tera(config: &Config) -> anyhow::Result<Tera> {
     globals.insert("preview_small", &false);
     globals.insert("map_tiles", &map_tiles);
     globals.insert("planet_url", &config.site.planet_link());
+    globals.insert("map_kiosk_lock", &config.site.map_kiosk_lock);
+    globals.insert(
+        "coverage_freq_mhz",
+        &crate::coverage::topics_frequency_mhz(&config.mqtt.topics).to_string(),
+    );
     let build = super::api::version::current();
     globals.insert("build_version", build.version);
     // Nothing to show when it was built from outside a Git checkout.
@@ -341,17 +349,108 @@ async fn node_page(state: &AppState, page: &NodePage, id: &str) -> String {
     }
 }
 
-fn render(config: &Config) -> anyhow::Result<Rendered> {
-    let tera = tera(config)?;
+/// The texts the pages' own scripts used to translate once loaded, those marked
+/// `data-translate-lang="key"`, written in the page's language already, so that
+/// they never show in English first. Each key is looked up in the catalog
+/// sections the page asks the API for (`section=name` in its script). The
+/// element's leading text is what is translated; what it holds after that (a
+/// sort mark) stays.
+fn translate_marked(html: &str, catalog: &serde_json::Value) -> String {
+    const SECTION: &str = "section=";
+    const MARK: &str = "data-translate-lang=\"";
+    let mut sections = Vec::new();
+    let mut rest = html;
+    while let Some(at) = rest.find(SECTION) {
+        rest = &rest[at + SECTION.len()..];
+        let name: String = rest
+            .chars()
+            .take_while(|c| c.is_ascii_lowercase() || *c == '_')
+            .collect();
+        if !name.is_empty() && !sections.contains(&name) {
+            sections.push(name);
+        }
+    }
+    let lookup = |key: &str| {
+        sections
+            .iter()
+            .find_map(|section| catalog.get(section)?.get(key)?.as_str())
+    };
+
+    let mut out = String::with_capacity(html.len());
+    let mut rest = html;
+    while let Some(at) = rest.find(MARK) {
+        let after = &rest[at + MARK.len()..];
+        let (Some(key_end), Some(tag_end)) = (after.find('"'), after.find('>')) else {
+            break;
+        };
+        let key = &after[..key_end];
+        let content = &after[tag_end + 1..];
+        let text_end = content.find('<').unwrap_or(content.len());
+        let head = at + MARK.len() + tag_end + 1;
+        let escape = |text: &str| {
+            text.replace('&', "&amp;")
+                .replace('<', "&lt;")
+                .replace('>', "&gt;")
+                .replace('"', "&quot;")
+        };
+        // Marks in a script are its own, for what it writes later.
+        let before = &html[..html.len() - rest.len() + at];
+        if before.rfind("<script") > before.rfind("</script>") {
+            out.push_str(&rest[..head]);
+            rest = content;
+            continue;
+        }
+        // A field holds no text: what is translated is its placeholder.
+        let tag_start = rest[..at].rfind('<').unwrap_or(0);
+        let tag = &rest[tag_start..head];
+        if tag.starts_with("<input") || tag.starts_with("<textarea") {
+            const PLACEHOLDER: &str = "placeholder=\"";
+            out.push_str(&rest[..tag_start]);
+            match (lookup(key), tag.find(PLACEHOLDER)) {
+                (Some(text), Some(start)) => {
+                    let value = start + PLACEHOLDER.len();
+                    let end = value + tag[value..].find('"').unwrap_or(0);
+                    out.push_str(&tag[..value]);
+                    out.push_str(&escape(text));
+                    out.push_str(&tag[end..]);
+                }
+                _ => out.push_str(tag),
+            }
+            rest = content;
+            continue;
+        }
+        out.push_str(&rest[..head]);
+        let closes = content[text_end..].starts_with("</");
+        match lookup(key) {
+            Some(text) if closes || !content[..text_end].trim().is_empty() => {
+                out.push_str(&escape(text));
+                // Before what else it holds (a sort mark), a space, as the
+                // scripts leave it.
+                if !closes {
+                    out.push(' ');
+                }
+                rest = &content[text_end..];
+            }
+            _ => rest = content,
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+fn render(config: &Config, code: &str) -> anyhow::Result<Rendered> {
+    let tera = tera(config, code)?;
+    let catalog = lang::merged(code);
     let mut pages = HashMap::new();
     for (template, dashboard) in PAGES {
         let mut context = Context::new();
         context.insert("dashboard", &dashboard);
+        context.insert("page", template);
         let html = tera
             .render(template, &context)
             .map_err(|e| anyhow!("{e}"))
             .with_context(|| format!("rendering {template}"))?;
-        pages.insert(template, Arc::from(html));
+        pages.insert(template, Arc::from(translate_marked(&html, &catalog)));
     }
     let mut context = Context::new();
     context.insert("preview_title", TITLE_MARK);
@@ -361,10 +460,12 @@ fn render(config: &Config) -> anyhow::Result<Rendered> {
     );
     context.insert("preview_small", &true);
     context.insert("preview_description", DESCRIPTION_MARK);
+    context.insert("page", "node.html");
     let marked = tera
         .render("node.html", &context)
         .map_err(|e| anyhow!("{e}"))
         .context("rendering node.html for a node's preview")?;
+    let marked = translate_marked(&marked, &catalog);
     let node = NodePage::new(Arc::clone(&pages["node.html"]), &marked)?;
     let mut context = Context::new();
     context.insert("error_message", "Page not found");
@@ -442,24 +543,96 @@ fn static_file(path: &str, headers: &HeaderMap, not_found_page: &Arc<str>) -> Re
         .into_response()
 }
 
+/// The pages in every language, and the one a request gets: the visitor's,
+/// as [`lang::visitor_language`] tells it.
+struct Localized {
+    by_language: HashMap<String, Rendered>,
+}
+
+impl Localized {
+    fn new(config: &Config) -> anyhow::Result<Self> {
+        let by_language = lang::available()
+            .into_iter()
+            .map(|code| Ok((code.clone(), render(config, &code)?)))
+            .collect::<anyhow::Result<_>>()?;
+        Ok(Self { by_language })
+    }
+
+    fn pick(&self, headers: &HeaderMap) -> &Rendered {
+        let code = lang::visitor_language(headers, |code| self.by_language.contains_key(code));
+        &self.by_language[&code]
+    }
+}
+
+/// A page in the visitor's language is one of several at its address: caches
+/// are told what it depends on.
+async fn vary_by_language(mut response: Response) -> Response {
+    let html = response
+        .headers()
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.starts_with("text/html"));
+    if html {
+        response
+            .headers_mut()
+            .append(axum::http::header::VARY, lang::VARY_LANGUAGE);
+    }
+    response
+}
+
 /// The routes of the pages and their files.
 pub fn router(config: &Config) -> anyhow::Result<Router<AppState>> {
-    let rendered = Arc::new(render(config)?);
+    let localized = Arc::new(Localized::new(config)?);
     let mut router = Router::new();
 
     for (route, template) in ROUTES {
-        let page = Arc::clone(&rendered.pages[template]);
-        router = router.route(route, get(move || async move { Html(page.to_string()) }));
+        let pages = Arc::clone(&localized);
+        router = router.route(
+            route,
+            get(move |headers: HeaderMap| async move {
+                Html(pages.pick(&headers).pages[template].to_string())
+            }),
+        );
     }
-    let pages = Arc::clone(&rendered);
+    let pages = Arc::clone(&localized);
     router = router.route(
         "/node/{id}",
         get(
-            move |AxumState(state): AxumState<AppState>, Path(id): Path<String>| async move {
-                Html(node_page(&state, &pages.node, &id).await)
+            move |AxumState(state): AxumState<AppState>,
+                  Path(id): Path<String>,
+                  headers: HeaderMap| async move {
+                Html(node_page(&state, &pages.pick(&headers).node, &id).await)
             },
         ),
     );
+
+    // Old addresses, the Python version's and those it changed, kept so that
+    // links do not break: /reliability?node_id=, /radio?node_id=, /packet_list/,
+    // /graph/traceroute/ and the old API pages. Deprecated: they are to go in the
+    // version after 1.0.0, with a note in its release.
+    //
+    // A node's reliability and radio are at /reliability/<id> and /radio/<id>; the
+    // old addresses, with the node as ?node_id=, lead there, and without one the
+    // pages ask for a node.
+    for (route, template) in [
+        ("/reliability", "reliability.html"),
+        ("/radio", "radio.html"),
+    ] {
+        let pages = Arc::clone(&localized);
+        router = router.route(
+            route,
+            get(
+                move |Query(query): Query<HashMap<String, String>>, headers: HeaderMap| async move {
+                    match query.get("node_id").map(|id| id.trim()) {
+                        Some(id) if !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()) => {
+                            redirect(StatusCode::FOUND, format!("{route}/{id}"))
+                        }
+                        _ => Html(pages.pick(&headers).pages[template].to_string()).into_response(),
+                    }
+                },
+            ),
+        );
+    }
 
     // An old address of the node page.
     router =
@@ -483,36 +656,23 @@ pub fn router(config: &Config) -> anyhow::Result<Router<AppState>> {
         );
     }
 
-    let missing = Arc::clone(&rendered.not_found);
+    let pages = Arc::clone(&localized);
     router = router.route(
         "/static/{*path}",
         get(
             move |Path(path): Path<String>, request: Request| async move {
-                static_file(&path, request.headers(), &missing)
+                let headers = request.headers();
+                static_file(&path, headers, &pages.pick(headers).not_found)
             },
         ),
     );
 
-    // The pages among the static files, `/kiosk` or `/kiosk.html`, as the
-    // Python version served any of them.
-    let missing = Arc::clone(&rendered.not_found);
-    router = router.route(
-        "/{page}",
-        get(move |Path(page): Path<String>| async move {
-            let name = if page.ends_with(".html") {
-                page
-            } else {
-                format!("{page}.html")
-            };
-            match Static::get(&name).filter(|_| !name.contains('/')) {
-                Some(file) => Html(file.data.into_owned()).into_response(),
-                None => not_found(&missing),
-            }
-        }),
-    );
-
-    let missing = Arc::clone(&rendered.not_found);
-    Ok(router.fallback(move || async move { not_found(&missing) }))
+    let pages = Arc::clone(&localized);
+    Ok(router
+        .fallback(
+            move |headers: HeaderMap| async move { not_found(&pages.pick(&headers).not_found) },
+        )
+        .layer(axum::middleware::map_response(vary_by_language)))
 }
 
 #[cfg(test)]
@@ -581,7 +741,7 @@ mod tests {
             needed.extend(translated_strings(&text).into_iter().map(str::to_string));
         }
         assert!(needed.len() > 100);
-        for code in ["en", "es", "ru"] {
+        for code in ["en", "es"] {
             let ui = lang::merged(code)["ui"].clone();
             let missing: Vec<_> = needed
                 .iter()
@@ -596,9 +756,7 @@ mod tests {
 
     #[test]
     fn the_coverage_help_is_in_the_node_page_in_its_language() {
-        let mut config = Config::default();
-        config.site.language = "es".into();
-        let rendered = render(&config).unwrap();
+        let rendered = render(&Config::default(), "es").unwrap();
         let node = &rendered.pages["node.html"];
         assert!(node.contains("<h4>Cómo funciona</h4>"));
         assert!(!node.contains("/docs/COVERAGE"));
@@ -638,7 +796,7 @@ mod tests {
         let mut config = Config::default();
         config.site.title = "Galicia Mesh".into();
         config.site.message = "Live data".into();
-        let rendered = render(&config).unwrap();
+        let rendered = render(&config, "en").unwrap();
         let plain = &rendered.node.plain;
         assert!(plain.contains(r#"<meta property="og:title" content="Galicia Mesh">"#));
         assert!(plain.contains(r#"<meta property="og:description" content="Live data">"#));
@@ -663,10 +821,9 @@ mod tests {
 
     #[test]
     fn every_page_renders_in_every_language() {
-        for language in ["en", "es", "ru", "xx"] {
-            let mut config = Config::default();
-            config.site.language = language.into();
-            let rendered = render(&config).unwrap_or_else(|e| panic!("{language}: {e:#}"));
+        for language in ["en", "es", "xx"] {
+            let rendered = render(&Config::default(), language)
+                .unwrap_or_else(|e| panic!("{language}: {e:#}"));
             assert_eq!(rendered.pages.len(), PAGES.len());
         }
     }

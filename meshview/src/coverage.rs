@@ -26,6 +26,49 @@ const N_0: f64 = 301.0;
 const EARTH_RADIUS_KM: f64 = 6371.0;
 const BEARING_STEP_DEG: usize = 5;
 
+/// The frequency predictions are made at when nothing says which: the
+/// Python version's, in the band of the Americas.
+pub const DEFAULT_FREQ_MHZ: f64 = 907.0;
+
+/// Roughly the frequency, in MHz, a Meshtastic region's nodes transmit on: the
+/// middle of its band, or of the part of it the presets use.
+pub fn region_frequency_mhz(region: &str) -> Option<f64> {
+    Some(match region {
+        "US" => 907.0,
+        "EU_868" | "EU_N_868" | "UA_868" | "PH_868" => 868.0,
+        "RU" => 869.0,
+        "IN" | "NZ_865" | "NP_865" => 866.0,
+        "KZ_863" => 865.0,
+        "EU_433" | "ANZ_433" | "UA_433" | "MY_433" | "PH_433" | "KZ_433" => 433.0,
+        "CN" => 490.0,
+        "JP" | "KR" | "MY_919" => 921.0,
+        "TW" | "TH" => 922.0,
+        "SG_923" => 923.0,
+        "ANZ" => 918.0,
+        "PH_915" => 915.0,
+        "BR_902" => 904.0,
+        "LORA_24" => 2440.0,
+        _ => return None,
+    })
+}
+
+/// The frequency of the region the MQTT topics read from (`msh/EU_868/#` is
+/// EU_868's), or [`DEFAULT_FREQ_MHZ`] when a topic names none known or the
+/// topics name regions on different frequencies.
+pub fn topics_frequency_mhz(topics: &[String]) -> f64 {
+    let mut found: Option<f64> = None;
+    for topic in topics {
+        let Some(freq) = topic.split('/').nth(1).and_then(region_frequency_mhz) else {
+            return DEFAULT_FREQ_MHZ;
+        };
+        if found.is_some_and(|known| known != freq) {
+            return DEFAULT_FREQ_MHZ;
+        }
+        found = Some(freq);
+    }
+    found.unwrap_or(DEFAULT_FREQ_MHZ)
+}
+
 /// What a prediction is asked for with.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Radio {
@@ -130,6 +173,25 @@ pub fn perimeter(radio: &Radio, threshold_dbm: f64) -> Vec<(f64, f64)> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_topics_tell_the_frequency_of_their_region() {
+        let topics = |list: &[&str]| list.iter().map(|t| t.to_string()).collect::<Vec<_>>();
+        assert_eq!(topics_frequency_mhz(&topics(&["msh/EU_868/#"])), 868.0);
+        // Two regions on one frequency are that frequency.
+        assert_eq!(
+            topics_frequency_mhz(&topics(&["msh/EU_868/#", "msh/EU_N_868/#"])),
+            868.0
+        );
+        assert_eq!(topics_frequency_mhz(&topics(&["msh/US/2/e/#"])), 907.0);
+        // Unknown, mixed or none: the default.
+        assert_eq!(topics_frequency_mhz(&topics(&["msh/#"])), DEFAULT_FREQ_MHZ);
+        assert_eq!(
+            topics_frequency_mhz(&topics(&["msh/EU_868/#", "msh/US/#"])),
+            DEFAULT_FREQ_MHZ
+        );
+        assert_eq!(topics_frequency_mhz(&[]), DEFAULT_FREQ_MHZ);
+    }
+
     use super::*;
 
     fn radio() -> Radio {

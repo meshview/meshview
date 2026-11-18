@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% block theme %}light{% endblock %}
 {% block body_class %}mesh-data-page mesh-nodelist-page{% endblock %}
 
 {% block css %}
@@ -18,7 +17,8 @@
 #node-list .is-cards :is(.c-hw,.c-fw,.c-role,.c-lat,.c-lon,.c-alt,.c-channel,.c-mqtt) { display:none; }
 #node-list .is-cards tbody tr { grid-template-columns:auto minmax(0,1fr) auto; grid-template-areas:"short long fav" "meta meta meta" "net net seen" "loc loc loc"; }
 #node-list .is-cards .c-short { grid-area:short; }
-#node-list .is-cards .node-short { display:inline-block; padding:2px 7px; border-radius:5px; background:var(--mesh-soft); color:var(--mesh-primary); font-size:12px; font-weight:600; }
+.node-unknown { color:var(--mesh-muted); }
+#node-list :is(.c-lat,.c-lon,.c-alt) { white-space:nowrap; }
 #node-list .is-cards .c-long { grid-area:long; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #node-list .is-cards .c-fav { grid-area:fav; justify-self:end; }
 #node-list .is-cards .c-meta { grid-area:meta; font-size:12px; color:var(--mesh-muted); }
@@ -28,10 +28,10 @@
 .node-badge { display:inline-block; margin-left:4px; padding:1px 8px; border-radius:10px; background:var(--mesh-soft); color:var(--mesh-primary); font-size:11px; font-weight:600; }
 /* The sort control only shows in card mode, where there are no column headers. */
 /* Segmented sort control: direction toggle + field select, showing the current order. */
-.sort-control { display:none; align-items:stretch; height:38px; border:1px solid var(--mesh-border); border-radius:6px; background:var(--mesh-surface); overflow:hidden; order:5; }
+.sort-control { display:none; align-items:stretch; height:var(--mesh-control); border:1px solid var(--mesh-border-strong); border-radius:var(--mesh-radius-sm); background:var(--mesh-surface); overflow:hidden; order:5; }
 .mesh-nodelist-page:has(#node-list .is-cards) .sort-control { display:inline-flex; }
 .sort-control:focus-within { outline:2px solid var(--mesh-primary); outline-offset:1px; }
-.mesh-data-page .mesh-content .sort-direction { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; width:34px; height:auto; padding:0; border:0; border-right:1px solid var(--mesh-border); border-radius:0; background:var(--mesh-soft); color:var(--mesh-primary); font-size:18px; }
+.mesh-data-page .mesh-content .sort-direction { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; width:36px; height:auto; padding:0; border:0; border-right:1px solid var(--mesh-border); border-radius:0; background:var(--mesh-surface-2); color:var(--mesh-primary); font-size:18px; }
 .mesh-data-page .mesh-content .sort-direction:focus-visible { outline:0; }
 .mesh-data-page .sort-control .sort-select { flex:1 1 auto; min-width:0; height:auto; padding:0 20px 0 7px; font-size:13px; background-position:right 4px center; border:0; border-radius:0; background-color:transparent; text-overflow:ellipsis; }
 .mesh-data-page .sort-control .sort-select:focus-visible { outline:0; }
@@ -39,21 +39,29 @@
 /* Card mode above phones: search and sort on the first row (sort at the right end), the
    filters and "clear" on a second row of their own. */
 @media(min-width:701px) {
-    .mesh-nodelist-page:has(#node-list .is-cards) .search-box { flex:1 1 260px; order:0; }
+    .mesh-nodelist-page:has(#node-list .is-cards) .search-field { flex:1 1 260px; order:0; }
     .mesh-nodelist-page:has(#node-list .is-cards) .sort-control { flex:0 0 230px; order:1; }
     .mesh-nodelist-page:has(#node-list .is-cards) .filter-panel { display:flex; flex:1 1 100%; flex-wrap:wrap; align-items:center; gap:8px; order:2; }
     .mesh-nodelist-page:has(#node-list .is-cards) .filter-panel > select { flex:1 1 150px; }
     .mesh-nodelist-page:has(#node-list .is-cards) .filter-panel .days-active { margin-left:4px; }
 }
 #node-list th { cursor:pointer; }
-.filter-container { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:12px; }
+.filter-container { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:14px; }
 .filter-panel { display:contents; }
-.mesh-data-page .mesh-content .filters-toggle { display:none; align-items:center; gap:6px; height:38px; padding:0 12px; font-size:13px; }
+.mesh-data-page .mesh-content .filters-toggle { display:none; }
 .filters-toggle .ti { font-size:17px; }
 .filters-count { display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px; padding:0 6px; border-radius:10px; background:var(--mesh-primary); color:var(--mesh-surface); font-size:11px; font-weight:700; }
 .filters-count[hidden] { display:none; }
 @media(max-width:700px) {
-    .search-box { flex:1 1 100%!important; min-width:0; }
+    .search-field { flex:1 1 100%!important; min-width:0; }
+    /* Typing, the search gives its magnifier's room to the text. */
+    .search-field:focus-within svg { display:none; }
+    .search-field:focus-within input { padding-left:10px; }
+    /* Favourites and export share the line the map's icon leaves; export and
+       the map go together to the next line when there is no room for all. */
+    .mesh-nodelist-page .favorites-btn { flex:1 1 0; }
+    .mesh-nodelist-page .data-actions-pair { display:flex; flex:1 1 0; gap:8px; }
+    .mesh-nodelist-page .data-actions-pair .export-btn { flex:1 1 auto; }
     /* Filters and sort share the row under the search box, half each. */
     .mesh-data-page .mesh-content .filters-toggle { display:inline-flex; flex:0 0 calc(50% - 4px); min-width:0; justify-content:center; order:1; }
     .mesh-nodelist-page:has(#node-list .is-cards) .sort-control { flex:0 0 calc(50% - 4px); min-width:0; order:2; }
@@ -63,16 +71,22 @@
     .filter-container .filter-panel > select { flex:1 1 calc(50% - 4px); min-width:0; }
     .filter-panel .days-active { margin-left:0; }
 }
-.days-active { white-space:nowrap; display:inline-flex; align-items:center; gap:6px; margin:0 0 0 4px; font-size:12px; color:var(--mesh-muted); }
-.mesh-data-page .mesh-content .clear-btn { flex-shrink:0; border-color:transparent; background:transparent; }
-.mesh-data-page .mesh-content .clear-btn:hover { background:var(--mesh-soft); }
-.search-box { flex:0 1 260px; }
-.node-status { opacity:0; padding:3px 8px; border-radius:20px; background:var(--mesh-soft); color:var(--mesh-primary); margin-left:10px; font-size:11px; }
-.node-status.active { opacity:1; }
+.days-active { white-space:nowrap; display:inline-flex; align-items:center; gap:8px; margin:0 0 0 4px; font-size:13px; color:var(--mesh-muted); }
+.days-active select { width:auto; }
+.clear-btn { flex-shrink:0; }
+/* The search, with its magnifier inside. */
+.search-field { position:relative; display:flex; align-items:center; flex:0 1 280px; }
+.search-field svg { position:absolute; left:11px; width:17px; height:17px; color:var(--mesh-muted); pointer-events:none; }
+.search-field input { width:100%; padding-left:36px; }
+/* Loading shows in the count; what is being done is told to screen readers. */
+.node-status { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.data-actions-pair { display:contents; }
 .mesh-data-page .mesh-content .favorite-star { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--mesh-muted); font-size:18px; cursor:pointer; }
 .mesh-data-page .mesh-content .favorite-star:hover { background:var(--mesh-soft); }
 .mesh-data-page .mesh-content .favorite-star.active { color:#b7791f; }
-.mesh-data-page .favorites-btn.active { background:#fff3d6; border-color:#eacb80; color:#8b6200; }
+/* Favourites on: amber, in either theme. */
+.favorites-btn.active { background:color-mix(in srgb, #f5b301 16%, var(--mesh-surface)); border-color:color-mix(in srgb, #f5b301 55%, var(--mesh-surface)); }
+.favorites-btn.active .ti { color:#d99a00; }
 .node-load-more { display:flex; align-items:center; justify-content:center; gap:10px; padding:24px 0 8px; color:var(--mesh-muted); font-size:13px; }
 .node-load-more[hidden] { display:none; }
 .node-spinner { width:22px; height:22px; border:3px solid var(--mesh-border); border-top-color:var(--mesh-primary); border-radius:50%; animation:node-spin .8s linear infinite; }
@@ -81,7 +95,7 @@
 .node-page-range { margin:10px 0 0; text-align:center; color:var(--mesh-muted); font-size:12px; }
 .node-page-range:empty { display:none; }
 .sort-icon { font-size:10px; }
-@media(max-width:768px) { .filter-container select { flex:1 1 130px; } .search-box { flex:1 1 100%; } }
+@media(max-width:768px) { .filter-container select { flex:1 1 130px; } .search-field { flex:1 1 100%; } }
 </style>
 {% endblock %}
 
@@ -93,26 +107,32 @@
         <span id="node-status" class="node-status" aria-live="polite"></span>
     </div>
     <div class="data-actions">
-        <button type="button" class="favorites-btn" id="favorites-btn" aria-pressed="false">
+        <button type="button" class="favorites-btn mesh-button" id="favorites-btn" aria-pressed="false">
             <span class="ti ti-star" aria-hidden="true"></span> <span id="favorites-label" data-translate-lang="show_favorites">Show Favorites</span>
         </button>
-        <button class="export-btn" id="export-btn" data-translate-lang="export_csv">
+        <span class="data-actions-pair">
+        <button type="button" class="export-btn mesh-button" id="export-btn" data-translate-lang="export_csv">
             Export CSV
         </button>
-        <a class="mesh-secondary-button" href="/map">{{ "View map ↗" | tr }}</a>
+        <a class="mesh-button is-icon-mobile" href="/map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l6 -3l6 3l6 -3v13l-6 3l-6 -3l-6 3v-13"/><path d="M9 4v13"/><path d="M15 7v13"/></svg><span class="mesh-button-label">{{ "View map" | tr }}</span><span class="mesh-go" aria-hidden="true">↗</span></a>
+        </span>
     </div>
 </header>
 <div class="filter-container">
-    <input
-        type="text"
-        id="search-box"
-        class="search-box"
-        aria-label="{{ "Search nodes" | tr }}"
-        data-translate-lang="search_placeholder"
-        placeholder="Search by name or ID or HEX ID..."
-    />
+    <label class="search-field">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0M21 21l-6 -6"/></svg>
+        <input
+            type="search"
+            id="search-box"
+            class="mesh-input"
+            aria-label="{{ "Search nodes" | tr }}"
+            data-translate-lang="search_placeholder"
+            placeholder="Search by name or ID or HEX ID..."
+            autocomplete="off"
+        />
+    </label>
 
-    <button type="button" id="filters-toggle" class="filters-toggle" aria-expanded="false" aria-controls="filter-panel">
+    <button type="button" id="filters-toggle" class="filters-toggle mesh-button" aria-expanded="false" aria-controls="filter-panel">
         <span class="ti ti-adjustments-horizontal" aria-hidden="true"></span>
         <span>{{ "Filters" | tr }}</span>
         <span id="filters-count" class="filters-count" hidden></span>
@@ -127,19 +147,19 @@
 
     <!-- On phones the rest folds behind the Filters button; elsewhere it lays out inline. -->
     <div id="filter-panel" class="filter-panel">
-    <select id="role-filter" aria-label="{{ "Filter by role" | tr }}">
+    <select id="role-filter" class="mesh-select" aria-label="{{ "Filter by role" | tr }}">
         <option value="" data-translate-lang="all_roles">All Roles</option>
     </select>
 
-    <select id="channel-filter" aria-label="{{ "Filter by channel" | tr }}">
+    <select id="channel-filter" class="mesh-select" aria-label="{{ "Filter by channel" | tr }}">
         <option value="" data-translate-lang="all_channels">All Channels</option>
     </select>
 
-    <select id="hw-filter" aria-label="{{ "Filter by hardware" | tr }}">
+    <select id="hw-filter" class="mesh-select" aria-label="{{ "Filter by hardware" | tr }}">
         <option value="" data-translate-lang="all_hw">All HW Models</option>
     </select>
 
-    <select id="firmware-filter" aria-label="{{ "Filter by firmware" | tr }}">
+    <select id="firmware-filter" class="mesh-select" aria-label="{{ "Filter by firmware" | tr }}">
         <option value="" data-translate-lang="all_firmware">All Firmware</option>
     </select>
 
@@ -147,7 +167,7 @@
     <div class="filter-footer">
     <label class="days-active" for="days-active-filter">
         <span>{{ "Active in the last" | tr }}</span>
-        <select id="days-active-filter">
+        <select id="days-active-filter" class="mesh-select">
             {% for day in range(start=1, end=15) %}
             <option value="{{ day }}" {% if day == 3 %}selected{% endif %}>{{ day }}</option>
             {% endfor %}
@@ -155,7 +175,7 @@
         <span>{{ "days" | tr }}</span>
     </label>
 
-    <button class="clear-btn" id="clear-btn" data-translate-lang="clear_filters">
+    <button type="button" class="clear-btn mesh-button is-ghost" id="clear-btn" data-translate-lang="clear_filters">
         Clear Filters
     </button>
     </div>
@@ -219,7 +239,8 @@ function applyTranslationsNodelist() {
 async function loadTranslationsNodelist() {
     try {
         const cfg = await window._siteConfigPromise;
-        const lang = cfg?.site?.language || "en";
+        // The visitor's language, the page's, else the site's.
+        const lang = window.meshLanguage || cfg?.site?.language || "en";
         const res = await fetch(`/api/v1/lang?lang=${lang}&section=nodelist`);
         nodelistTranslations = await res.json();
         applyTranslationsNodelist();
@@ -595,6 +616,9 @@ document.addEventListener("DOMContentLoaded", async function() {
     function nodeRow(node) {
         const fav = isFavorite(node.node_id);
         const na = MeshI18n.t("N/A");
+        // What a node has not told, in grey, so that what it has stands out.
+        const unknown = `<span class="node-unknown">${escapeHtml(na)}</span>`;
+        const shown = value => value != null && value !== "" ? escapeHtml(String(value)) : unknown;
         const lat = node.last_lat ? (node.last_lat / 1e7).toFixed(7) : null;
         const lon = node.last_long ? (node.last_long / 1e7).toFixed(7) : null;
         const alt = node.last_altitude != null ? String(node.last_altitude) : null;
@@ -609,13 +633,13 @@ document.addEventListener("DOMContentLoaded", async function() {
         row.innerHTML = `
             <td class="c-short"><span class="node-short">${escapeHtml(node.short_name || na)}</span></td>
             <td class="c-long"><a href="/node/${node.node_id}">${escapeHtml(node.long_name || na)}</a></td>
-            <td class="c-hw">${escapeHtml(node.hw_model || na)}</td>
-            <td class="c-fw">${escapeHtml(node.firmware || na)}</td>
-            <td class="c-role">${escapeHtml(node.role || na)}</td>
-            <td class="c-lat">${lat || na}</td>
-            <td class="c-lon">${lon || na}</td>
-            <td class="c-alt">${alt != null ? escapeHtml(alt) : na}</td>
-            <td class="c-channel">${escapeHtml(node.channel || na)}</td>
+            <td class="c-hw">${shown(node.hw_model)}</td>
+            <td class="c-fw">${shown(node.firmware)}</td>
+            <td class="c-role">${shown(node.role)}</td>
+            <td class="c-lat">${shown(lat)}</td>
+            <td class="c-lon">${shown(lon)}</td>
+            <td class="c-alt">${shown(alt)}</td>
+            <td class="c-channel">${shown(node.channel)}</td>
             <td class="c-mqtt">${node.is_mqtt_gateway ? (nodelistTranslations.yes || MeshI18n.t("Yes")) : (nodelistTranslations.no || MeshI18n.t("No"))}</td>
             <td class="c-seen">${timeAgoFromMs(node.last_seen_ms)}</td>
             <td class="c-fav" style="text-align:center;">${favoriteStar(node.node_id, fav)}</td>
@@ -710,8 +734,7 @@ document.addEventListener("DOMContentLoaded", async function() {
             statusShownAt = Date.now();
             console.log("[nodelist] status:", message);
             statusSpan.textContent = message;
-            statusSpan.setAttribute("aria-busy", "true");
-            statusSpan.classList.add("active");
+            countSpan.setAttribute("aria-busy", "true");
             isBusy = true;
             return;
         }
@@ -723,8 +746,7 @@ document.addEventListener("DOMContentLoaded", async function() {
                 statusHideTimer = null;
                 console.log("[nodelist] status: cleared");
                 statusSpan.textContent = "";
-                statusSpan.removeAttribute("aria-busy");
-                statusSpan.classList.remove("active");
+                countSpan.removeAttribute("aria-busy");
                 isBusy = false;
             }, remaining);
             return;
@@ -732,8 +754,7 @@ document.addEventListener("DOMContentLoaded", async function() {
 
         console.log("[nodelist] status: cleared");
         statusSpan.textContent = "";
-        statusSpan.removeAttribute("aria-busy");
-        statusSpan.classList.remove("active");
+        countSpan.removeAttribute("aria-busy");
         isBusy = false;
     }
 });

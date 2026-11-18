@@ -139,8 +139,8 @@ so changing a word of it makes the paragraph missing and its old translation
 stale: translate it anew rather than only renaming the key.
 
 A new language is a new `assets/api-lang/<code>.json`, with every piece; the
-reference is then served in it when it is `[site] language`. Scalar has its
-own words in a few languages, `es` and `ru` among them; in one it does not
+reference is then served in it to visitors who read in it. Scalar has its
+own words in a few languages, `es` among them; in one it does not
 have, they are English.
 
 ## The web pages

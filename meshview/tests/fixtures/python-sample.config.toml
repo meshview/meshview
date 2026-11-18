@@ -25,8 +25,6 @@ port = 8081
 [site]
 # Optional domain metadata exposed by /api/config; does not configure binding or TLS.
 domain = ""
-# Select a language catalog: en, es, or ru.
-language = "en"
 # Site title to show in the browser title bar and headers.
 title = "Bay Area Mesh"
 # Short tagline for this installation, shown in the page footer and used as the

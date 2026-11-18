@@ -1,29 +1,13 @@
 {% extends "base.html" %}
-{% block theme %}light{% endblock %}
+{% block leaflet %}{% include "leaflet.html" %}{% endblock %}
 {% block body_class %}mesh-data-page mesh-radio-page{% endblock %}
 
 {% block css %}
 {% include "data-page-styles.html" %}
 {% include "chart-styles.html" %}
 <style>
-.radio-description { margin-bottom:20px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; padding:14px 18px; font-size:13px; color:var(--mesh-muted); }
-.radio-description summary { cursor:pointer; color:var(--mesh-text); font-weight:500; }
-.radio-description p { margin:12px 0 0; line-height:1.7; }
-/* The node and the period, as the reliability page's controls. */
-.radio-controls { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:10px 12px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; padding:14px 16px; margin-bottom:20px; }
-.radio-controls[hidden] { display:none; }
-.radio-field { display:flex; flex-direction:column; gap:4px; min-width:0; }
-.radio-label { margin:0; font-size:12px; color:var(--mesh-muted); }
-.radio-node { display:flex; flex-wrap:wrap; align-items:baseline; align-content:center; column-gap:6px; min-height:38px; margin:0; font-size:15px; font-weight:600; overflow-wrap:break-word; }
-/* Phones: the node on its own row, the period under it. */
-@media(max-width:600px) {
-    .radio-controls { grid-template-columns:minmax(0,1fr); }
-    .radio-node { min-height:0; }
-}
-.radio-node a { color:var(--mesh-primary); text-decoration:none; }
-.radio-node a:hover { text-decoration:underline; }
-.radio-hex { color:var(--mesh-muted); font-size:13px; font-weight:400; white-space:nowrap; }
-.mesh-data-page .radio-controls select { width:100%; min-width:160px; height:38px; padding:0 10px; font-size:14px; }
+/* No node asked for: a note where the page would be, and nothing else. */
+.radio-page:has(#radio-missing:not([hidden])) :is(.data-actions,.radio-description) { display:none; }
 /* The links map: a line from the node to each one it is linked with, its
    style the kind of link and its colour the mean SNR. */
 .radio-map { width:100%; height:440px; background:var(--mesh-stripe); }
@@ -53,11 +37,11 @@
 .relay-candidates { white-space:normal; }
 .relay-candidates > a + a::before { content:" · "; color:var(--mesh-muted); }
 .relay-direct { color:var(--mesh-muted); font-size:12px; }
-.relay-none { color:var(--mesh-muted); font-style:italic; }
+.relay-none { color:var(--mesh-muted); }
 .relay-hints { color:var(--mesh-muted); font-size:12px; white-space:normal; opacity:.85; }
 .relay-hints a { color:inherit; text-decoration:underline dotted; }
 .relay-shared { color:#9a5b00; font-size:12px; }
-[data-bs-theme="dark"] .relay-shared { color:#f1d38a; }
+[data-theme="dark"] .relay-shared { color:#f1d38a; }
 #relays_container .chart-empty[hidden] { display:none; }
 #relays_container .signal-table-wrap { padding-top:12px; }
 /* With no chart, the signal shown only matters on a phone, where each row
@@ -77,19 +61,19 @@
 
 {% block body %}
 <section class="radio-page">
-    <header class="data-heading is-compact"><div class="data-title"><h1>{{ "Radio" | tr }}</h1></div><div class="data-actions"><a class="mesh-secondary-button" id="radio-node-link" href="/nodelist">{{ "Back to Node" | tr }}</a></div></header>
+    <header class="data-heading is-compact"><div class="data-title"><h1>{{ "Radio" | tr }}</h1></div><div class="data-actions"><a class="mesh-button" id="radio-node-link" href="/nodelist"><span class="mesh-back" aria-hidden="true">←</span>{{ "Back to Node" | tr }}</a></div></header>
 
-    <details class="radio-description"><summary>{{ "What this page shows" | tr }}</summary><p>{{ "Who this node hears and who hears it over the air. Direct receptions are the packets heard straight from the node that sent them, with no hops between. Relays are the nodes a packet was heard from after it had taken a hop at least: the firmware tells only the last byte of their id, so the nodes each one may be are those heard directly whose id ends in that byte, and a byte two of them share cannot be told apart. Neighbors are those the node itself reports hearing." | tr }}</p></details>
+    <details class="radio-description page-explain"><summary><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6l-6 6"/></svg>{{ "What this page shows" | tr }}</summary><p>{{ "Who this node hears and who hears it over the air. Direct receptions are the packets heard straight from the node that sent them, with no hops between. Relays are the nodes a packet was heard from after it had taken a hop at least: the firmware tells only the last byte of their id, so the nodes each one may be are those heard directly whose id ends in that byte, and a byte two of them share cannot be told apart. Neighbors are those the node itself reports hearing." | tr }}</p></details>
 
     <!-- The node shown and the period of every section. -->
-    <div class="radio-controls" id="radio-controls">
-        <div class="radio-field radio-field-node">
-            <span class="radio-label">{{ "Node" | tr }}</span>
-            <p class="radio-node" id="radio-node"><span class="is-loading">{{ "Loading..." | tr }}</span></p>
+    <div class="subject-bar radio-controls" id="radio-controls">
+        <div class="subject-field subject-node">
+            <span class="subject-label">{{ "Node" | tr }}</span>
+            <p class="subject-value" id="radio-node"><span class="is-loading">{{ "Loading..." | tr }}</span></p>
         </div>
-        <div class="radio-field">
-            <label for="radio-period" class="radio-label">{{ "Period" | tr }}</label>
-            <select class="chart-period radio-period" id="radio-period" data-chart="radio">
+        <div class="subject-field">
+            <label for="radio-period" class="subject-label">{{ "Period" | tr }}</label>
+            <select class="mesh-select chart-period radio-period" id="radio-period" data-chart="radio">
                 <option value="1">{{ "Last 24 hours" | tr }}</option>
                 <option value="7" selected>{{ "Last 7 days" | tr }}</option>
                 <option value="30">{{ "Last 30 days" | tr }}</option>
@@ -119,7 +103,7 @@
         <p class="radio-map-note" id="radio-map-note" hidden></p>
     </div>
 
-    <p class="radio-missing chart-empty" id="radio-missing" hidden>{{ "Choose a node from the node list to see its radio links." | tr }}</p>
+    <p class="page-missing" id="radio-missing" hidden>{{ "Choose a node from the node list to see its radio links." | tr }}</p>
 
     <!-- Direct receptions: packets heard at no hops, and their signal. -->
     <div id="direct_container" class="chart-container">
@@ -164,7 +148,7 @@
                 </thead>
                 <tbody id="direct_table"></tbody>
             </table>
-            <p class="chart-hint chart-hint-mouse"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Click a node to show or hide it, double-click it to show only it, and click a point to open its packet. Drag across the chart to zoom in, scroll to move along it and double-click it to see it all." | tr }}</p>
+            <p class="chart-hint chart-hint-mouse"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Click a node to show or hide it, double-click it to show only it, and click a point to open its packet. Expand the chart to zoom in." | tr }}</p>
             <p class="chart-hint chart-hint-touch"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Tap a node to show or hide it, tap it twice to show only it, and tap a point to open its packet. Expand the chart to zoom in." | tr }}</p>
         </div>
     </div>
@@ -210,7 +194,7 @@
         <p class="chart-loading is-loading">{{ "Loading..." | tr }}</p>
         <p class="chart-empty" hidden>{{ "No neighbors reported in this period." | tr }}</p>
         <div id="chart_neighbors" class="chart-canvas" data-solo="true" style="height:380px;"></div>
-        <p class="chart-hint chart-hint-mouse"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Click a neighbor in the legend to show or hide it, and double-click it to show only it. Drag across the chart to zoom in, scroll to move along it and double-click it to see it all." | tr }}</p>
+        <p class="chart-hint chart-hint-mouse"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Click a neighbor in the legend to show or hide it, and double-click it to show only it. Expand the chart to zoom in." | tr }}</p>
         <p class="chart-hint chart-hint-touch"><span class="ti ti-info-circle" aria-hidden="true"></span> {{ "Tap a neighbor in the legend to show or hide it, and tap it twice to show only it. Expand the chart to zoom in." | tr }}</p>
     </div>
 </section>
@@ -220,7 +204,8 @@
 <script src="/static/vendor/echarts-6.1.0/dist/echarts.min.js"></script>
 <script src="/static/chart-kit.js"></script>
 <script>
-const radioNodeId = Number(new URLSearchParams(window.location.search).get("node_id")) || null;
+// The node is in the address, /radio/<id>; without one there is nothing to show.
+const radioNodeId = Number(window.location.pathname.match(/^\/radio\/(\d+)/)?.[1]) || null;
 
 /* ======================================================
     NODES, by id, for their names
@@ -263,7 +248,7 @@ async function showRadioNode() {
     const heading = document.getElementById("radio-node");
     const short = node?.short_name && node.short_name !== name ? ` (${node.short_name})` : "";
     const hex = document.createElement("span");
-    hex.className = "radio-hex";
+    hex.className = "subject-id";
     hex.textContent = hexId(radioNodeId);
     heading.replaceChildren(nodeAnchor(radioNodeId, name + short), hex);
     document.getElementById("radio-node-link").href = `/node/${radioNodeId}`;
@@ -361,7 +346,6 @@ function renderDirect() {
                     + `RSSI: ${escapeHtml(r.rssi)} dBm · SNR: ${escapeHtml(r.snr ?? MeshI18n.t("N/A"))} dB`;
             }
         },
-        ...spanZoomOption(),
         // #dce4ef is a border colour the theme turns dark at night.
         xAxis: { type: "time", axisLabel: { color: "#64748b", hideOverlap: true },
             axisLine: { lineStyle: { color: "#dce4ef" } } },
@@ -386,7 +370,6 @@ function renderDirect() {
     chart.on("click", point => {
         if (point.data?.packet_id) window.location.href = `/packet/${point.data.packet_id}`;
     });
-    enableSpanZoom(chart);
 
     container.querySelector(".signal-table").dataset.metric = metric;
     const body = document.getElementById("direct_table");
@@ -768,7 +751,6 @@ async function loadNeighborTimeSeries() {
         },
         xAxis: { type: "time", axisLabel: { color: "#64748b", hideOverlap: true } },
         yAxis: { type: "value", name: "SNR", axisLabel: { color: "#64748b" } },
-        ...spanZoomOption(),
         series: kept.map(([, entry]) => ({
             name: entry.name,
             type: "line",
@@ -886,9 +868,6 @@ function radioLinks() {
 
 // A node's popup, laid out as the other maps' node popups, with its links.
 function linkPopup(nodeId, node, kinds, distanceKm) {
-    const name = nodeLabel(node, nodeId);
-    const shortName = node?.short_name && node.short_name !== name
-        ? ` <span class="node-popup-short">(${escapeHtml(node.short_name)})</span>` : "";
     const facts = Object.values(kinds).map(info => {
         const parts = [];
         if (info.packets != null) parts.push(MeshI18n.t("{n} packets", {n: info.packets}));
@@ -901,14 +880,7 @@ function linkPopup(nodeId, node, kinds, distanceKm) {
     if (distanceKm != null) {
         facts.push([MeshI18n.t("Distance"), `${distanceKm.toFixed(1)} km / ${(distanceKm * 0.621371).toFixed(1)} mi`]);
     }
-    return `
-        <div class="node-popup">
-            <div class="node-popup-title"><a href="/node/${encodeURIComponent(nodeId)}">${escapeHtml(name)}</a>${shortName}</div>
-            <p class="node-popup-meta">${escapeHtml(MeshI18n.t("Node {id}", {id: nodeId}) + ` (${hexId(nodeId)})`)}</p>
-            <dl class="node-popup-facts">${facts.map(([label, value]) =>
-                `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}</dl>
-        </div>
-    `;
+    return meshNodePopup({id: nodeId, node, facts});
 }
 
 // The points the map opens on: a node far beyond the others, as one whose

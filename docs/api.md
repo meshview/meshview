@@ -9,9 +9,10 @@ cannot disagree with it.
 | `/api/docs` | The reference, as a page to read and try calls from. |
 | `/api/openapi.json` | The OpenAPI document behind it, for clients and code generators. |
 
-Both are in the site's language, `[site] language`, when there is a translation
-of the reference for it (`es` and `ru`), and in English otherwise.
-`/api/openapi.json?lang=en` (or `es`, `ru`) asks for another; a language there
+Both are in the visitor's language, as the pages are: the one chosen in the
+preferences, else the first the browser asks for that there is a translation
+of the reference for (`es`), else English.
+`/api/openapi.json?lang=en` (or `es`) asks for one; a language there
 is no translation for gets English.
 
 This page is only about what is different for someone coming from the Python

@@ -1,367 +1,400 @@
 {% extends "base.html" %}
-{% block theme %}light{% endblock %}
+{% block leaflet %}{% include "leaflet.html" %}{% endblock %}
+
 {% block body_class %}{{ "mesh-dashboard" if dashboard else "mesh-map-only" }}{% endblock %}
 
 {% block css %}
 <script>
-if (new URLSearchParams(location.search).get('kiosk') === '1') {
+// ?kiosk, with or without a value: the map alone, filling the screen.
+if (new URLSearchParams(location.search).has('kiosk')) {
     document.documentElement.classList.add('mesh-kiosk');
+    {% if map_kiosk_lock %}document.documentElement.classList.add('mesh-kiosk-locked');{% endif %}
 }
 </script>
 <style>
-    .legend { background:var(--mesh-surface);padding:8px;line-height:1.5;border-radius:5px;box-shadow:0 0 10px rgba(0,0,0,0.3);font-size:14px;color:var(--mesh-text); }
-    .legend i { width:12px;height:12px;display:inline-block;margin-right:6px;border-radius:50%; }
+/* ---- Home and map ---------------------------------------------------------
+   On wide screens the map fills everything between the header and the footer,
+   and the rest floats over it: on Home the figures along the top, the node list
+   on the left and the live traffic along the bottom, each of the two folding
+   away. On phones it all stacks: figures, map, filters, nodes, traffic. */
 
-
-
-    .blinking-tooltip {
-        background: var(--mesh-surface);
-        color:var(--mesh-text);
-        border: 1px solid #111;
-        border-radius: 4px;
-        padding: 3px 6px;
-        font-size: 12px;
-        font-weight: 400;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.25);
-    }
-    .blinking-tooltip.text-packet {
-        animation: textPulse 1.1s ease-in-out 6;
-        border-color: #ff8c00;
-    }
-    .mesh-map-panel { --packet-reach-color:#1f2937; }
-    [data-bs-theme="dark"] .mesh-map-panel { --packet-reach-color:#38bdf8; }
-    .packet-seen-trace { stroke:var(--packet-reach-color); }
-    .packet-seen-trace.packet-seen-outline { stroke:#fff; }
-    .packet-seen-landing {
-        stroke:var(--packet-reach-color);
-        fill:var(--packet-reach-color);
-        filter:drop-shadow(0 0 1px #fff) drop-shadow(0 0 2px var(--packet-reach-color));
-    }
-    .packet-seen-trace {
-        stroke-dasharray: 0.01px var(--packet-trace-gap, 999px);
-        stroke-linecap: round;
-        animation: packetTrace var(--packet-trace-duration, 3.25s) linear 1 forwards;
-    }
-    .packet-seen-landing {
-        transform-box: fill-box;
-        transform-origin: center;
-        animation: packetSeenLanding 1.4s ease-out 1 forwards;
-    }
-    @keyframes packetTrace {
-        from { stroke-dashoffset: 0; }
-        to { stroke-dashoffset: calc(-1 * var(--packet-trace-distance, 1000px)); }
-    }
-    @keyframes packetSeenLanding {
-        from {
-            stroke-opacity: 1;
-            fill-opacity: 0.4;
-            transform: scale(0.4);
-        }
-        40% {
-            stroke-opacity: 0.85;
-            fill-opacity: 0.18;
-            transform: scale(1);
-        }
-        to {
-            stroke-opacity: 0;
-            fill-opacity: 0;
-            transform: scale(1.8);
-        }
-    }
-    @keyframes textPulse {
-        0% { box-shadow: 0 2px 8px rgba(0,0,0,0.25); }
-        50% { box-shadow: 0 4px 14px rgba(255,140,0,0.45); }
-        100% { box-shadow: 0 2px 8px rgba(0,0,0,0.25); }
-    }
-
-    #map-wrapper {
-        position: relative;
-        width: 100%;
-        height: calc(100vh - 270px);
-    }
-    #map {
-        width: 100%;
-        height: 100%;
-    }
-    #unmapped-packets {
-        position: absolute;
-        bottom: 30px;
-        right: 15px;
-        z-index: 600;
-        width: 220px;
-        padding: 6px 8px;
-        background: rgba(255, 255, 255, 0.95);
-        border: 1px solid #ddd;
-        border-radius: 6px;
-        font-size: 12px;
-        text-align: left;
-        box-shadow: 0 0 10px rgba(0,0,0,0.2);
-        pointer-events: auto;
-    }
-    #unmapped-packets h3 {
-        margin: 0 0 6px;
-        font-size: 12px;
-        font-weight: 600;
-        color: #000;
-    }
-    #unmapped-list {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        max-height: 120px;
-        overflow-y: auto;
-    }
-    #unmapped-list li {
-        display: flex;
-        gap: 6px;
-        padding: 3px 0;
-        border-bottom: 1px dotted #e0e0e0;
-    }
-    #unmapped-list li:last-child { border-bottom: none; }
-    .map-overlay > summary { display:flex; align-items:center; gap:6px; list-style:none; cursor:pointer; }
-    .map-overlay > summary::-webkit-details-marker { display:none; }
-    .map-overlay > summary::after { content:""; flex-shrink:0; width:12px; height:12px; margin-left:auto; background:currentColor; opacity:.6; -webkit-mask:url(/static/vendor/tabler-icons-3.51.0/icons/outline/chevron-right.svg) center / contain no-repeat; mask:url(/static/vendor/tabler-icons-3.51.0/icons/outline/chevron-right.svg) center / contain no-repeat; transition:transform .15s ease; }
-    .map-overlay[open] > summary::after { transform:rotate(90deg); }
-    #unmapped-packets > summary { margin-bottom:6px; }
-    #unmapped-packets > summary h3 { margin:0; }
-    #map-legend > summary { display:none; }
-    /* Zoom and legend side by side in the top-left corner. */
-    .mesh-map-panel .leaflet-top.leaflet-left { display:flex; align-items:flex-start; }
-    .mesh-map-panel #map-legend { margin-left:8px; font-size:11px; box-shadow:0 2px 8px #0001; border:1px solid var(--mesh-border); }
-    /* Wider screens: as tall as the zoom buttons beside it, its two lines centred. */
-    @media(min-width:701px) { .mesh-map-panel #map-legend { box-sizing:border-box; min-height:64px; padding-top:0; padding-bottom:0; display:flex; flex-direction:column; justify-content:center; } }
-    .map-overlay-count { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--mesh-primary); color:var(--mesh-surface); font-size:11px; font-weight:700; }
-    .map-overlay-count[hidden] { display:none; }
-    @media(max-width:700px) {
-        .mesh-map-panel .map-overlay:not([open]) { width:auto; padding:5px 10px; }
-        .mesh-map-panel .map-overlay:not([open]) > summary { margin:0; }
-        #map-legend > summary { display:flex; font-weight:600; font-size:12px; }
-        #map-legend[open] > summary { margin-bottom:6px; }
-    }
-    .unmapped-node { font-weight: 400; color: #000; }
-    .unmapped-empty { color: #666; font-style: italic; }
-
-/* Give the standalone map more vertical space. */
-/* Map page: the content fills the window under the header and the map takes every pixel the
-   filter row leaves, whatever its height. */
-.mesh-map-only .mesh-content { display:flex; flex-direction:column; height:calc(100dvh - 48px); min-height:480px; box-sizing:border-box; }
-.mesh-map-only .mesh-explorer { display:flex; flex:1; min-height:0; }
-.mesh-map-only .mesh-map-panel { display:flex; flex:1; flex-direction:column; min-width:0; min-height:0; }
-.mesh-map-only .mesh-map-panel #map-wrapper { display:flex; flex:1; flex-direction:column; height:auto; min-height:300px; }
-.mesh-map-only .mesh-map-panel #map { flex:1; height:auto; min-height:0; }
-@media(max-width:700px) { .mesh-map-only .mesh-content { height:calc(100dvh - 52px); } }
-/* Fit and share as a map control, with labels on wider screens. */
-.mesh-map-tools { display:flex; flex-direction:column; overflow:hidden; background:var(--mesh-surface); }
-/* Same frame as the layers control and the legend (thin border, soft shadow), not Leaflet's thick bar border. */
-.mesh-map-panel .mesh-map-tools.leaflet-bar { border:1px solid var(--mesh-border); border-radius:5px; box-shadow:0 2px 8px #0001; background-clip:padding-box; }
-.mesh-map-tools button { display:flex; align-items:center; justify-content:center; width:44px; min-height:38px; padding:0; border:0; border-bottom:1px solid var(--mesh-border); background:var(--mesh-surface); color:var(--mesh-text); font:500 11px/1 inherit; white-space:nowrap; cursor:pointer; }
-.mesh-map-tools button:last-child { border-bottom:0; }
-.mesh-map-tools button:hover { background:var(--mesh-soft); }
-.mesh-map-tools button:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:-2px; }
-.mesh-map-tools .ti { font-size:16px; color:var(--mesh-primary); }
-.mesh-map-tools button.is-copied .ti { color:#198754; }
-/* Icon buttons like the folded layer picker; the label stays for screen readers and the tooltip. */
-.mesh-map-tool-label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
-/* Reset sits at the end of the filter row. */
-.map-filter-reset { display:inline-flex; align-items:center; gap:6px; margin-left:auto; padding:6px 10px; border:0; border-radius:6px; background:transparent; color:var(--mesh-primary); font-size:12px; font-weight:500; white-space:nowrap; cursor:pointer; }
-.map-filter-reset:hover { background:var(--mesh-soft); }
-.map-filter-reset:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:2px; }
-/* Let the map determine the desktop row height; scroll longer node panels. */
-@media(min-width:1001px) {
-    .mesh-explorer .mesh-node-panel { contain:size; }
-    .mesh-explorer .mesh-node-browser:not([hidden]) { height:100%; display:flex; flex-direction:column; }
-    .mesh-explorer .mesh-node-browser-body { flex:1; min-height:0; display:flex; flex-direction:column; }
-    .mesh-explorer .mesh-node-list { flex:1; min-height:0; max-height:none; }
-    .mesh-explorer .mesh-node-inspector { max-height:100%; }
+/* Map pieces drawn by the scripts. */
+.blinking-tooltip { background:var(--mesh-surface); color:var(--mesh-text); border:1px solid var(--mesh-border-strong); border-radius:6px; padding:3px 7px; font-size:12px; box-shadow:0 2px 8px rgba(16,25,37,.18); }
+.blinking-tooltip.text-packet { animation:textPulse 1.1s ease-in-out 6; border-color:#ff8c00; }
+@keyframes textPulse { 50% { box-shadow:0 4px 14px rgba(255,140,0,.45); } }
+.mesh-map-panel { --packet-reach-color:#1f2937; }
+[data-theme="dark"] .mesh-map-panel { --packet-reach-color:#38bdf8; }
+.packet-seen-trace { stroke:var(--packet-reach-color); stroke-dasharray:0.01px var(--packet-trace-gap, 999px); stroke-linecap:round; animation:packetTrace var(--packet-trace-duration, 3.25s) linear 1 forwards; }
+.packet-seen-trace.packet-seen-outline { stroke:#fff; }
+.packet-seen-landing { stroke:var(--packet-reach-color); fill:var(--packet-reach-color); filter:drop-shadow(0 0 1px #fff) drop-shadow(0 0 2px var(--packet-reach-color)); transform-box:fill-box; transform-origin:center; animation:packetSeenLanding 1.4s ease-out 1 forwards; }
+@keyframes packetTrace { from { stroke-dashoffset:0; } to { stroke-dashoffset:calc(-1 * var(--packet-trace-distance, 1000px)); } }
+@keyframes packetSeenLanding {
+    from { stroke-opacity:1; fill-opacity:.4; transform:scale(.4); }
+    40% { stroke-opacity:.85; fill-opacity:.18; transform:scale(1); }
+    to { stroke-opacity:0; fill-opacity:0; transform:scale(1.8); }
 }
-/* Kiosk shares the live map and fills the viewport without dashboard chrome. */
-html.mesh-kiosk, .mesh-kiosk body { width:100%; height:100%; margin:0; overflow:hidden; }
-.mesh-kiosk .mesh-header,.mesh-kiosk .mesh-announcement,.mesh-kiosk .mesh-footer,
-.mesh-kiosk .mesh-page-heading,.mesh-kiosk .mesh-map-panel > .mesh-panel-title,
-.mesh-kiosk .mesh-map-panel > div:has(> #share-button) { display:none; }
-.mesh-kiosk .mesh-map-only .mesh-content { width:100%; height:100%; padding:0; max-width:none; }
-.mesh-kiosk .mesh-explorer,.mesh-kiosk .mesh-map-panel { width:100%; height:100%; border:0; border-radius:0; }
-.mesh-kiosk .mesh-map-only .mesh-map-panel #map-wrapper { height:100dvh; min-height:0; }
-/* In kiosk mode the filters fold into a button above the map's scale, as the layers do into theirs: it unfolds into them in its place. */
-.map-filter-toggle { display:none; }
-.mesh-kiosk .map-filter-toggle { display:inline-flex; align-items:center; gap:6px; position:absolute; bottom:48px; left:10px; z-index:700; padding:6px 10px; font:inherit; font-size:12px; font-weight:600; color:var(--mesh-text); background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:6px; box-shadow:0 2px 8px #0001; cursor:pointer; }
-.mesh-kiosk .map-filter-toggle[aria-expanded="true"] { display:none; }
-.mesh-kiosk .map-filter-toggle:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:2px; }
-.mesh-kiosk .mesh-map-panel #filter-container:not(.is-open) { display:none; }
-.mesh-kiosk .mesh-map-panel #filter-container { position:absolute; bottom:48px; left:10px; z-index:700; max-width:calc(100% - 240px); max-height:25dvh; overflow:auto; padding:8px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:6px; }
-.mesh-kiosk #map-load-status:not(:empty) { position:absolute; top:10px; left:50px; z-index:800; background:var(--mesh-surface); padding:8px; border-radius:5px; }
-@media(max-width:700px) { .mesh-kiosk .mesh-map-panel #filter-container { max-width:calc(100% - 20px); bottom:48px; } .mesh-kiosk #unmapped-packets { display:none; } }
-/* Compact live-map node card. */
-.mesh-map-only .mesh-content { max-width:none; }
-/* The node panel opens at the top right over the map controls; close it to use them. */
-.mesh-map-only .mesh-node-panel { position:absolute; right:10px; top:10px; width:280px; max-width:calc(100% - 20px); max-height:calc(100% - 20px); overflow:auto; z-index:1001; contain:none; padding:14px; box-shadow:0 4px 20px #0003; }
-.mesh-map-only .mesh-node-panel[hidden] { display:none; }
-.mesh-map-only .mesh-panel-close { float:right; margin-left:8px; }
-.mesh-map-only .mesh-inspector-name { font-size:15px; margin:8px 0 4px; }
-.mesh-map-only .mesh-inspector-meta { margin-bottom:10px; }
-.mesh-map-only .mesh-inspector-facts { grid-template-columns:70px minmax(0,1fr); gap:5px; margin:0; }
-.mesh-map-only .mesh-inspector-short-name { font-size:14px; font-weight:650; }
-/* Map-side inspection and shared live packet stream. */
-.mesh-node-browser[hidden],.mesh-node-inspector[hidden],.mesh-node-browser-body[hidden] { display:none; }
-/* Node list heading: plain title beside the map, a fold toggle once stacked under it. */
-.mesh-panel-toggle { display:inline-flex; align-items:center; gap:6px; padding:0; border:0; background:none; color:inherit; font:inherit; text-align:left; }
-.mesh-panel-toggle .ti { display:none; color:var(--mesh-muted); transition:transform .15s ease; }
-.mesh-panel-toggle:disabled { cursor:default; opacity:1; }
-.mesh-panel-toggle:not(:disabled) { cursor:pointer; }
-.mesh-panel-toggle:not(:disabled) .ti { display:inline-block; }
-.mesh-panel-toggle[aria-expanded="true"] .ti { transform:rotate(90deg); }
-.mesh-panel-toggle:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:3px; border-radius:4px; }
-.mesh-node-panel:has(.mesh-node-browser-body[hidden]) .mesh-panel-title { border-bottom:0; }
-/* Node list search: magnifier and result count inside the field. Beside the map it is the
-   list's heading (same height as the inspector's); stacked, the fold toggle stays above it. */
-.mesh-search-row { position:relative; display:flex; align-items:center; box-sizing:border-box; min-height:64px; padding:12px 16px; border-bottom:1px solid var(--mesh-border); }
-.mesh-search-row .ti-search { position:absolute; left:27px; color:var(--mesh-muted); pointer-events:none; }
-.mesh-search-row .mesh-search { width:100%; margin:0; padding:9px 64px 9px 34px; }
-.mesh-search-row .mesh-count { position:absolute; right:26px; pointer-events:none; }
-@media(min-width:1001px) { .mesh-explorer .mesh-node-browser > .mesh-panel-title { display:none; } }
-@media(max-width:1000px) { .mesh-search-row .mesh-count { display:none; } .mesh-search-row .mesh-search { padding-right:10px; } }
-.mesh-node-inspector { max-height:690px; overflow:auto; }
-/* Inspector heading: stays at the top while the inspector's own scroll moves, hides while
-   scrolling down and comes back on scroll up, like the page header. Phones show the whole
-   inspector in the page, so there it simply scrolls away. */
-#mesh-node-inspector > .mesh-panel-title { position:sticky; top:0; z-index:5; background:var(--mesh-surface); transition:transform .2s ease; }
-#mesh-node-inspector > .mesh-panel-title.is-hidden { transform:translateY(-100%); }
-@media(max-width:700px) { #mesh-node-inspector > .mesh-panel-title { position:static; } }
-.mesh-inspector-back,.mesh-traffic-control { padding:6px 10px; background:var(--mesh-soft); color:var(--mesh-primary); border:1px solid var(--mesh-border); border-radius:5px; font-size:12px; }
-.mesh-inspector-body { padding:16px; }
-.mesh-inspector-name { font-size:17px; font-weight:650; overflow-wrap:anywhere; margin:0 0 5px; }
-/* Node name with the refresh icon on its right. */
-.mesh-inspector-title { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
-.mesh-inspector-title .mesh-traffic-icon { flex-shrink:0; }
-.mesh-inspector-meta { color:var(--mesh-muted); font-size:11px; margin:0 0 16px; overflow-wrap:anywhere; }
-.mesh-inspector-facts { display:grid; grid-template-columns:90px minmax(0,1fr); gap:8px; font-size:12px; }
-.mesh-inspector-facts dt { color:var(--mesh-muted); font-weight:500; }
-.mesh-inspector-facts dd { margin:0; overflow-wrap:anywhere; }
-.mesh-inspector-section { margin:18px 0 10px; font-size:12px; font-weight:650; padding-top:14px; border-top:1px solid var(--mesh-border); }
-.mesh-inspector-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
-.mesh-inspector-actions a { font-size:12px; }
-/* Rows bleed into the body padding so the hover tint does not stop at the letters. */
-.mesh-inspector-packet { display:block; width:auto; margin:0 -8px; text-align:left; padding:10px 8px; border:0; border-bottom:1px solid var(--mesh-border); background:var(--mesh-surface); color:var(--mesh-text); font-size:12px; text-decoration:none; }
-.mesh-inspector-packet:last-child { border-bottom:0; }
-a.mesh-inspector-packet:hover { background:var(--mesh-hover); }
-.mesh-inspector-packet-top { display:flex; align-items:center; gap:8px; min-width:0; }
-.mesh-inspector-packet-peer { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--mesh-muted); }
-.mesh-inspector-packet-time { flex-shrink:0; color:var(--mesh-muted); font-variant-numeric:tabular-nums; }
-.mesh-inspector-packet small { display:block; color:var(--mesh-text); margin-top:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.mesh-inspector-note { color:var(--mesh-muted); font-size:12px; margin:8px 0; }
-.mesh-inspector-telemetry { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-/* Values sit at the bottom so a row's numbers line up even when a label wraps. */
-.mesh-inspector-telemetry > div { display:flex; flex-direction:column; justify-content:space-between; padding:10px; background:var(--mesh-soft); border-radius:6px; }
-.mesh-inspector-telemetry strong { display:block; margin-top:2px; font-size:18px; line-height:1.25; color:var(--mesh-primary); }
-/* Icon and label on top, value below, like the home metric cards on phones. */
-.mesh-inspector-telemetry div > span { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--mesh-muted); }
-.mesh-inspector-telemetry .ti { width:14px; height:14px; vertical-align:0; color:var(--mesh-primary); }
-.mesh-traffic { margin-top:20px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; overflow:hidden; }
-.mesh-traffic-tools { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-left:auto; }
-.mesh-traffic-actions { display:flex; gap:8px; align-items:center; }
-.mesh-traffic-icon { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; padding:0; }
-.mesh-traffic-icon .ti { width:16px; height:16px; vertical-align:0; }
-.mesh-traffic-list { max-height:360px; overflow:auto; }
- .mesh-traffic-table { width:100%; min-width:780px; border-collapse:collapse; font-size:13px; color:var(--mesh-text); }
-/* Same rows as the traffic page: 40px header and rows, plain underlined links, muted italic broadcast. */
-.mesh-traffic-table th { position:sticky; top:0; z-index:1; height:40px; padding:0 14px; background:var(--mesh-brand); color:white; font-weight:600; font-size:12px; white-space:nowrap; text-align:left; vertical-align:middle; }
-.mesh-traffic-table td { padding:6px 14px; border-bottom:1px solid var(--mesh-border); text-align:left; vertical-align:middle; }
-.mesh-traffic-row { background:var(--mesh-surface); }
-.mesh-traffic-row:hover { background:var(--mesh-hover); }
-.mesh-traffic-table a { color:inherit; text-decoration:underline; }
-.mesh-traffic-table .to-mqtt { color:var(--mesh-muted); font-size:12px; font-style:italic; }
-.mesh-traffic-time { white-space:nowrap; }
-.mesh-traffic-type { display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 9px; border-radius:11px; background:var(--mesh-soft); color:var(--mesh-text); font-size:12px; font-weight:500; line-height:1; white-space:nowrap; vertical-align:middle; }
-.mesh-traffic-type::before { content:""; flex-shrink:0; width:8px; height:8px; border-radius:50%; background:var(--port-color,#6c757d); box-shadow:inset 0 0 0 1px rgba(0,0,0,.18); }
-.mesh-traffic-payload[hidden] { display:none; }
-.mesh-traffic-payload td { background:var(--mesh-soft); }
-.mesh-traffic-payload pre { margin:0; max-height:180px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.7 ui-monospace,monospace; }
-#map-traffic-channel { border:1px solid var(--mesh-border); border-radius:5px; color:var(--mesh-text); background:var(--mesh-surface); font-size:12px; padding:6px 8px; max-width:180px; }
-:is(.mesh-traffic-toggle,.mesh-traffic-table a,#map-traffic-channel,.mesh-inspector-packet,.mesh-inspector-back,.mesh-traffic-control):focus-visible { outline:2px solid var(--mesh-primary); outline-offset:2px; }
-.mesh-traffic-note { padding:8px 18px; border-top:1px solid var(--mesh-border); color:var(--mesh-muted); font-size:11px; margin:0; }
-/* Phones: title and buttons share the first row, channel and status the second. */
-@media(max-width:700px) { .mesh-node-inspector { max-height:none; } .mesh-traffic .mesh-panel-title { flex-wrap:wrap; row-gap:10px; } .mesh-traffic .mesh-panel-title h2 { flex:1; } .mesh-traffic-tools { order:3; width:100%; margin-left:0; } }
-/* Picker for nodes that overlap where the map was clicked: a Leaflet popup in
-   a pane of its own above the map controls (see nodePickerPane). */
+
+/* Floating cards: on the map, and the map's own controls, framed alike. */
+.mesh-float { background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); box-shadow:0 2px 12px rgba(16,25,37,.10); }
+.mesh-map-panel .leaflet-bar,.mesh-map-panel .leaflet-control-layers { border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); box-shadow:0 2px 12px rgba(16,25,37,.10); background-clip:padding-box; overflow:hidden; }
+.mesh-map-panel .leaflet-bar a { width:36px; height:36px; line-height:36px; border-bottom-color:var(--mesh-border); color:var(--mesh-text); }
+.mesh-map-panel .leaflet-control-layers-toggle { width:40px; height:40px; }
+.mesh-map-panel .leaflet-control-layers-expanded { padding:10px 12px; font-size:13px; }
+
+/* Map tools (fit, share): icon buttons under the layer picker. */
+.mesh-map-tools { display:flex; flex-direction:column; background:var(--mesh-surface); }
+.mesh-map-tools button { display:flex; align-items:center; justify-content:center; width:40px; height:40px; padding:0; border:0; border-bottom:1px solid var(--mesh-border); background:var(--mesh-surface); color:var(--mesh-primary); }
+.mesh-map-tools button:last-child { border-bottom:0; }
+.mesh-map-tools button:hover { background:var(--mesh-surface-2); }
+.mesh-map-tools .ti { font-size:17px; }
+.mesh-map-tools button.is-copied .ti { color:var(--mesh-live); }
+.mesh-map-tool-label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+/* Full screen: the way in, or, in kiosk mode, the way out. */
+.mesh-map-tools svg { width:17px; height:17px; }
+#kiosk-button[aria-pressed="true"] .kiosk-enter, #kiosk-button:not([aria-pressed="true"]) .kiosk-exit { display:none; }
+
+/* Legend, beside the zoom; unmapped packets in a corner. */
+.legend-utilization { display:flex; flex-wrap:wrap; align-items:center; gap:2px 10px; margin-top:6px; }
+.legend-utilization i { display:inline-block; width:9px; height:9px; margin-right:4px; border-radius:50%; vertical-align:-1px; }
+.map-overlay > summary { display:flex; align-items:center; gap:6px; list-style:none; cursor:pointer; }
+.map-overlay > summary::-webkit-details-marker { display:none; }
+.map-overlay > summary::after { content:""; flex-shrink:0; width:12px; height:12px; margin-left:auto; background:currentColor; opacity:.6; -webkit-mask:url(/static/vendor/tabler-icons-3.51.0/icons/outline/chevron-right.svg) center / contain no-repeat; mask:url(/static/vendor/tabler-icons-3.51.0/icons/outline/chevron-right.svg) center / contain no-repeat; transition:transform .15s ease; }
+.map-overlay[open] > summary::after { transform:rotate(90deg); }
+/* Unmapped packets beside the zoom, in the corner the legend left free. */
+#unmapped-packets { position:absolute; left:58px; top:10px; z-index:800; width:240px; padding:10px 12px; font-size:12px; }
+/* Open, at least as tall as the zoom beside it (two 36px buttons and their borders). */
+#unmapped-packets[open] { min-height:75px; }
+/* Folded, only as wide as its title. */
+#unmapped-packets:not([open]) { width:auto; }
+/* With nothing in it, the note sits in the middle of the room under the title. */
+#unmapped-packets[open] #unmapped-list:has(> .unmapped-empty:only-child) { display:flex; align-items:center; min-height:30px; }
+#unmapped-list:has(> .unmapped-empty:only-child) > li { border-bottom:0; padding:0; }
+#unmapped-packets[open] > summary { margin-bottom:6px; }
+#unmapped-packets h3 { margin:0; font-size:12.5px; font-weight:650; }
+#unmapped-list { list-style:none; margin:0; padding:0; max-height:120px; overflow-y:auto; }
+#unmapped-list li { display:flex; gap:6px; padding:3px 0; border-bottom:1px solid var(--mesh-border-soft); }
+#unmapped-list li:last-child { border-bottom:0; }
+.unmapped-empty { color:var(--mesh-muted); }
+.map-overlay-count { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--mesh-primary); color:var(--mesh-on-primary); font-size:11px; font-weight:700; }
+#map-load-status:empty { display:none; }
+#map-load-status { position:absolute; top:12px; left:50%; z-index:900; transform:translateX(-50%); margin:0; padding:8px 12px; color:var(--mesh-danger); }
+
+/* Home's legend, among the filters after a thin divider. */
+.map-filter-divider { align-self:stretch; flex-shrink:0; width:1px; margin:-8px 6px; background:var(--mesh-border); }
+.map-legend-inline { display:inline-flex; flex-direction:column; align-items:flex-start; flex-shrink:0; align-self:center; gap:5px; padding:0; font-size:12px; line-height:1.4; color:var(--mesh-nav-text); }
+/* The pills keep to their side, wrapping among themselves. */
+.map-filter-pills { display:flex; align-items:center; flex-wrap:wrap; gap:6px; flex:1 1 auto; min-width:0; }
+.map-legend-item { display:inline-flex; align-items:center; gap:7px; white-space:nowrap; }
+.map-legend-line { display:inline-block; width:16px; height:3px; border-radius:2px; }
+.map-legend-inline .legend-utilization { margin:0; }
+@media(max-width:1199px) { .map-filter-divider { display:none; } .map-legend-inline { width:100%; flex-direction:row; flex-wrap:wrap; gap:4px 16px; padding:2px 4px 4px; } .map-filter-pills { flex-basis:100%; } }
+
+/* Filters: pills, the checkbox and its text never apart. */
+#filter-container { display:flex; align-items:center; flex-wrap:wrap; gap:6px; padding:8px; }
+@media(min-width:1200px) { #filter-container { flex-wrap:nowrap; } }
+/* The legend and the filters fold away into the button before them, on wide screens. */
+.map-legend-toggle { display:none; }
+@media(min-width:1200px) {
+    .map-legend-toggle { display:flex; align-items:center; justify-content:center; flex-shrink:0; align-self:stretch; width:22px; margin:-8px 0 -8px -8px; padding:0; border:0; border-radius:var(--mesh-radius) 0 0 var(--mesh-radius); background:transparent; color:var(--mesh-muted); }
+    .map-legend-toggle:hover { background:var(--mesh-surface-2); color:var(--mesh-text); }
+    .map-legend-toggle svg { width:16px; height:16px; transition:transform .2s ease; }
+    #filter-container.is-folded .map-legend-toggle svg { transform:rotate(180deg); }
+    /* Folded, only the button shows, for more map. The legend and the pills stay,
+       with no width and unseen, so the panel keeps the height they give it. */
+    #filter-container.is-folded { gap:0; }
+    #filter-container.is-folded .map-filter-divider { display:none; }
+    #filter-container.is-folded :is(.map-legend-inline,.map-filter-pills) { flex:0 0 0; width:0; overflow:hidden; visibility:hidden; }
+    #filter-container.is-folded .map-filter-pills { flex-wrap:nowrap; }
+    #filter-container.is-folded .map-legend-toggle { width:32px; margin:-8px; border-radius:var(--mesh-radius); }
+}
+.map-filter-group { display:contents; }
+.map-filter-group:empty { display:none; }
+.map-filter { display:inline-flex; align-items:center; gap:7px; height:32px; margin:0; padding:0 12px 0 10px; border:1px solid var(--mesh-border-strong); border-radius:16px; background:var(--mesh-surface); font-size:13px; font-weight:500; white-space:nowrap; cursor:pointer; user-select:none; }
+.map-filter:has(input:checked) { background:var(--mesh-soft); border-color:var(--mesh-hover); }
+.map-filter:hover { border-color:var(--mesh-muted); }
+.map-filter input { margin:0; }
+.map-filter:has(input:focus-visible) { outline:2px solid var(--mesh-primary); outline-offset:2px; }
+.map-filter-dot { flex-shrink:0; width:9px; height:9px; border-radius:3px; background:var(--chip-color,#6c757d); box-shadow:inset 0 0 0 1px rgba(0,0,0,.18); }
+button.map-filter-dot { position:relative; width:12px; height:12px; padding:0; border:0; }
+button.map-filter-dot::before { content:""; position:absolute; inset:-7px; }
+button.map-filter-dot:hover,button.map-filter-dot[aria-expanded="true"] { box-shadow:inset 0 0 0 1px rgba(0,0,0,.18), 0 0 0 2px var(--mesh-surface), 0 0 0 3px var(--mesh-muted); }
+.map-filter-reset { display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 10px; border:0; border-radius:var(--mesh-radius-sm); background:transparent; color:var(--mesh-primary); font-size:13px; font-weight:600; white-space:nowrap; }
+.map-filter-reset:hover { background:var(--mesh-soft); }
+/* The map's attribution: in the footer on wide screens, small in the map's
+   corner (meshview.css) on narrow ones. */
+.mesh-footer-attribution { display:none; }
+.mesh-footer-attribution a { color:inherit; }
+.mesh-footer-attribution a:hover { color:var(--mesh-primary); text-decoration:none; }
+@media(pointer:coarse) { .map-filter,.map-filter-reset { height:34px; border-radius:17px; } }
+
+/* Channel colour picker, on the map page. */
+.map-color-popover { position:fixed; z-index:2000; padding:10px; font-size:12px; }
+.map-color-swatches { display:grid; grid-template-columns:repeat(6,26px); gap:7px; }
+.map-color-swatch { width:26px; height:26px; padding:0; border:0; border-radius:50%; background:var(--swatch); box-shadow:inset 0 0 0 1px rgba(0,0,0,.18); transition:transform .1s ease; }
+.map-color-swatch:hover { transform:scale(1.12); }
+.map-color-swatch[aria-pressed="true"] { box-shadow:inset 0 0 0 1px rgba(0,0,0,.18), 0 0 0 2px var(--mesh-surface), 0 0 0 4px var(--mesh-text); }
+.map-color-actions { position:relative; display:flex; flex-direction:column; gap:2px; margin-top:10px; padding-top:8px; border-top:1px solid var(--mesh-border); }
+.map-color-actions button { display:flex; align-items:center; gap:8px; padding:6px 8px; border:0; border-radius:6px; background:none; text-align:left; }
+.map-color-actions button:hover { background:var(--mesh-soft); }
+.map-color-actions .ti { font-size:15px; color:var(--mesh-primary); }
+.map-color-input { position:absolute; left:8px; bottom:0; width:1px; height:1px; padding:0; border:0; opacity:0; pointer-events:none; }
+.leaflet-control-layers .map-layer-suboption { display:flex; align-items:center; gap:3px; margin:0 0 0 18px; }
+.map-layer-suboption input { margin:0; }
+
+/* Picker for overlapping nodes: a popup in a pane above the controls. */
 .leaflet-pane.node-picker-pane { z-index:1100; }
-.mesh-node-picker .leaflet-popup-content-wrapper { padding:4px; border-radius:9px; box-shadow:0 8px 24px rgba(16,25,37,.22); }
+.mesh-node-picker .leaflet-popup-content-wrapper { padding:4px; border-radius:var(--mesh-radius); box-shadow:var(--mesh-shadow); }
 .mesh-node-picker .leaflet-popup-content { margin:0; width:260px !important; max-width:calc(100vw - 64px); }
 .node-picker-head { display:flex; align-items:center; gap:8px; padding:2px 2px 2px 8px; }
 .mesh-node-picker .node-picker-title { flex:1; margin:0; color:var(--mesh-muted); font-size:12px; font-weight:500; }
-.node-picker-zoom { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--mesh-muted); cursor:pointer; }
+.node-picker-zoom { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--mesh-muted); }
 .node-picker-zoom:hover { background:var(--mesh-hover); color:var(--mesh-text); }
-.node-picker-zoom:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:-2px; }
 .node-picker-list { display:flex; flex-direction:column; gap:1px; overflow-y:auto; margin:0; padding:0; list-style:none; }
-.node-picker-item { display:grid; grid-template-columns:10px minmax(0,1fr) auto; align-items:center; gap:9px; width:100%; min-height:40px; padding:6px 8px; border:0; border-radius:6px; background:transparent; color:var(--mesh-text); font-size:13px; line-height:1.3; text-align:left; cursor:pointer; }
-.node-picker-item:hover, .node-picker-item:focus-visible { background:var(--mesh-hover); }
-.node-picker-item:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:-2px; }
-/* On the map page a channel's dot is a button for its color: larger, with a
-   touch area beyond it, so as not to tick the channel by mistake. */
-button.map-filter-dot { position:relative; width:12px; height:12px; padding:0; border:0; cursor:pointer; }
-button.map-filter-dot::before { content:""; position:absolute; inset:-7px; }
-button.map-filter-dot:hover,button.map-filter-dot[aria-expanded="true"] { box-shadow:inset 0 0 0 1px rgba(0,0,0,.18), 0 0 0 2px var(--mesh-surface), 0 0 0 3px var(--mesh-muted); }
-button.map-filter-dot:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:3px; }
-.map-color-popover { position:fixed; z-index:2000; padding:10px; background:var(--mesh-surface); color:var(--mesh-text); border:1px solid var(--mesh-border); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,.18); font-size:12px; }
-.map-color-swatches { display:grid; grid-template-columns:repeat(6,26px); gap:7px; }
-.map-color-swatch { width:26px; height:26px; padding:0; border:0; border-radius:50%; background:var(--swatch); box-shadow:inset 0 0 0 1px rgba(0,0,0,.18); cursor:pointer; transition:transform .1s ease; }
-.map-color-swatch:hover { transform:scale(1.12); }
-.map-color-swatch[aria-pressed="true"] { box-shadow:inset 0 0 0 1px rgba(0,0,0,.18), 0 0 0 2px var(--mesh-surface), 0 0 0 4px var(--mesh-text); }
-.map-color-swatch:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:4px; }
-.map-color-actions { position:relative; display:flex; flex-direction:column; gap:2px; margin-top:10px; padding-top:8px; border-top:1px solid var(--mesh-border); }
-.map-color-actions button { display:flex; align-items:center; gap:8px; padding:6px 8px; border:0; border-radius:6px; background:none; color:var(--mesh-text); font:inherit; text-align:left; cursor:pointer; }
-.map-color-actions button:hover { background:var(--mesh-soft); }
-.map-color-actions button:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:-2px; }
-.map-color-actions .ti { font-size:15px; color:var(--mesh-primary); }
-.map-color-input { position:absolute; left:8px; bottom:0; width:1px; height:1px; padding:0; border:0; opacity:0; pointer-events:none; }
-@media (prefers-reduced-motion: reduce) { .map-color-swatch { transition:none; } }
-/* The utilization colours, in one line under the links in the legend. */
-.legend-utilization { display:flex; flex-wrap:wrap; align-items:center; gap:2px 10px; margin-top:6px; }
-.legend-utilization[hidden] { display:none; }
-.legend-utilization i { width:9px; height:9px; margin-right:4px; vertical-align:-1px; }
-/* An option of the layer above it in the layer picker. */
-.leaflet-control-layers .map-layer-suboption { display:flex; align-items:center; gap:3px; margin:0 0 0 18px; color:var(--mesh-muted); }
-.leaflet-control-layers .map-layer-suboption[hidden] { display:none; }
-.map-layer-suboption input { margin:0; }
+.node-picker-item { display:grid; grid-template-columns:10px minmax(0,1fr) auto; align-items:center; gap:9px; width:100%; min-height:40px; padding:6px 8px; border:0; border-radius:6px; background:transparent; font-size:13px; line-height:1.3; text-align:left; }
+.node-picker-item:hover,.node-picker-item:focus-visible { background:var(--mesh-hover); }
 .node-picker-dot { width:10px; height:10px; border-radius:50%; background:var(--node-color); box-shadow:0 0 0 1px #fff, 0 0 0 2px rgba(0,0,0,.18); }
 .node-picker-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .node-picker-name strong { font-weight:600; margin-right:6px; }
-.node-picker-name span, .node-picker-seen { color:var(--mesh-muted); font-size:12px; }
-.node-picker-seen { white-space:nowrap; }
+.node-picker-name span,.node-picker-seen { color:var(--mesh-muted); font-size:12px; white-space:nowrap; }
+
+
+/* ---- Node list and inspector ---- */
+.mesh-node-panel { display:flex; flex-direction:column; overflow:hidden; min-width:0; }
+.mesh-node-browser { display:flex; flex-direction:column; min-height:0; flex:1; }
+.mesh-node-browser-body { display:flex; flex-direction:column; flex:1; min-height:0; }
+.mesh-panel-title { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:52px; padding:8px 14px; border-bottom:1px solid var(--mesh-border); }
+.mesh-panel-title h2 { margin:0; font-size:15px; }
+.mesh-count { padding:2px 9px; border-radius:999px; background:var(--mesh-soft); color:var(--mesh-primary); font-size:12.5px; font-weight:600; }
+.mesh-panel-toggle { display:inline-flex; align-items:center; gap:8px; padding:0; border:0; background:none; font:inherit; text-align:left; }
+.mesh-panel-toggle svg { width:18px; height:18px; color:var(--mesh-muted); transition:transform .2s ease; }
+.mesh-panel-toggle[aria-expanded="false"] svg { transform:rotate(-90deg); }
+.mesh-node-panel:has(.mesh-node-browser-body[hidden]) .mesh-panel-title { border-bottom:0; }
+.mesh-search-row { position:relative; display:flex; align-items:center; padding:12px 14px; border-bottom:1px solid var(--mesh-border); }
+.mesh-search-row svg { position:absolute; left:26px; width:17px; height:17px; color:var(--mesh-muted); pointer-events:none; }
+.mesh-search { width:100%; height:var(--mesh-control); padding:0 64px 0 36px; border:1px solid var(--mesh-border-strong); border-radius:var(--mesh-radius-sm); background:var(--mesh-surface); font-size:13.5px; }
+.mesh-search-row .mesh-count { position:absolute; right:22px; pointer-events:none; }
+/* Beside the map the list needs no heading: the search, with its count, is it.
+   Under the map it keeps its heading, to fold it away. */
+@media(min-width:1200px) { .mesh-node-browser > .mesh-panel-title { display:none; } }
+@media(max-width:1199px) { .mesh-search-row .mesh-count { display:none; } .mesh-search { padding-right:12px; } }
+.mesh-node-list { flex:1; min-height:0; overflow:auto; }
+.mesh-node-row { display:flex; align-items:center; gap:12px; width:100%; min-height:56px; padding:8px 14px; border:0; border-bottom:1px solid var(--mesh-border-soft); background:transparent; text-align:left; }
+.mesh-node-row:hover,.mesh-node-row:focus-visible { background:var(--mesh-surface-2); }
+.mesh-node-dot { flex-shrink:0; width:8px; height:8px; border-radius:50%; background:var(--mesh-live); }
+.mesh-node-dot.offline { background:var(--mesh-border-strong); }
+.mesh-node-copy { flex:1; min-width:0; }
+.mesh-node-copy strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; font-weight:600; }
+.mesh-node-copy small { display:block; margin-top:2px; font-size:12px; color:var(--mesh-muted); }
+.mesh-node-role { flex-shrink:0; font-size:11.5px; color:var(--mesh-muted); }
+.mesh-empty { margin:0; padding:20px 16px; color:var(--mesh-muted); font-size:13px; }
+.mesh-node-inspector { overflow:auto; }
+#mesh-node-inspector > .mesh-panel-title { position:sticky; top:0; z-index:5; background:var(--mesh-surface); transition:transform .2s ease; }
+#mesh-node-inspector > .mesh-panel-title.is-hidden { transform:translateY(-100%); }
+.mesh-inspector-back,.mesh-traffic-control { display:inline-flex; align-items:center; justify-content:center; gap:6px; height:32px; padding:0 12px; border:1px solid var(--mesh-border-strong); border-radius:var(--mesh-radius-sm); background:var(--mesh-surface); font-size:13px; white-space:nowrap; }
+.mesh-inspector-back:hover,.mesh-traffic-control:hover { background:var(--mesh-surface-2); }
+.mesh-traffic-icon { width:32px; padding:0; }
+.mesh-traffic-icon .ti { font-size:16px; }
+/* The last packet's own padding is the bottom margin: no more under it. */
+.mesh-inspector-body { padding:14px 16px 6px; }
+.mesh-inspector-title { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.mesh-inspector-name { margin:0 0 4px; font-size:17px; overflow-wrap:anywhere; }
+.mesh-inspector-meta { margin:0 0 14px; font-size:12px; color:var(--mesh-muted); overflow-wrap:anywhere; }
+.mesh-inspector-facts { display:grid; grid-template-columns:90px minmax(0,1fr); gap:8px; margin:0; font-size:12.5px; }
+.mesh-inspector-facts dt { color:var(--mesh-muted); font-weight:500; }
+.mesh-inspector-facts dd { margin:0; overflow-wrap:anywhere; }
+.mesh-inspector-section { margin:18px 0 10px; padding-top:14px; border-top:1px solid var(--mesh-border); font-size:11.5px; font-weight:650; letter-spacing:.05em; text-transform:uppercase; color:var(--mesh-muted); }
+.mesh-inspector-actions { display:flex; flex-wrap:wrap; gap:12px; margin-top:14px; font-size:13px; font-weight:600; }
+.mesh-inspector-packet { display:block; margin:0 -8px; padding:9px 8px; border-bottom:1px solid var(--mesh-border-soft); border-radius:6px; color:var(--mesh-text); font-size:12.5px; text-decoration:none; }
+.mesh-inspector-packet:last-child { border-bottom:0; }
+a.mesh-inspector-packet:hover { background:var(--mesh-surface-2); color:var(--mesh-text); text-decoration:none; }
+.mesh-inspector-packet-top { display:flex; align-items:center; gap:8px; min-width:0; }
+.mesh-inspector-packet-peer { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--mesh-muted); }
+.mesh-inspector-packet-time { flex-shrink:0; color:var(--mesh-muted); }
+.mesh-inspector-packet small { display:block; margin-top:5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mesh-inspector-note { margin:8px 0; font-size:12.5px; color:var(--mesh-muted); }
+.mesh-inspector-telemetry { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.mesh-inspector-telemetry > div { display:flex; flex-direction:column; justify-content:space-between; padding:10px; border-radius:var(--mesh-radius-sm); background:var(--mesh-surface-2); border:1px solid var(--mesh-border-soft); }
+.mesh-inspector-telemetry strong { margin-top:2px; font-size:18px; line-height:1.25; }
+.mesh-inspector-telemetry div > span { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--mesh-muted); }
+.mesh-inspector-telemetry .ti { width:14px; height:14px; color:var(--mesh-primary); }
+
+/* ---- Live traffic ---- */
+.mesh-traffic { display:flex; flex-direction:column; overflow:hidden; }
+.mesh-traffic .mesh-panel-title { flex-wrap:wrap; justify-content:flex-start; row-gap:8px; }
+/* Title, then status and channel, then the buttons; on phones the title and the
+   buttons share the first line, and status and channel take the second. */
+.mesh-traffic-tools { display:flex; align-items:center; flex-wrap:wrap; gap:10px; flex:1; min-width:0; }
+.mesh-traffic-tools select { margin-left:auto; }
+.mesh-traffic-actions { display:flex; align-items:center; gap:8px; }
+#map-traffic-channel { height:32px; max-width:200px; padding:0 8px; border:1px solid var(--mesh-border-strong); border-radius:var(--mesh-radius-sm); background:var(--mesh-surface); font-size:13px; }
+.mesh-traffic-list { flex:1; min-height:0; overflow:auto; }
+.mesh-traffic-list:has(> .card-table.is-cards) { padding:12px; background:var(--mesh-surface-2); }
+.mesh-traffic-table { width:100%; min-width:760px; font-size:13px; }
+.mesh-traffic-table th { position:sticky; top:0; z-index:1; height:32px; padding:0 14px; background:var(--mesh-surface-2); border-bottom:1px solid var(--mesh-border); color:var(--mesh-muted); font-size:11.5px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; white-space:nowrap; text-align:left; }
+.mesh-traffic-table td { height:38px; padding:4px 14px; border-bottom:1px solid var(--mesh-border-soft); vertical-align:middle; }
+.mesh-traffic-row:hover { background:var(--mesh-surface-2); }
+.mesh-traffic-table a { color:var(--mesh-text); font-weight:500; }
+.mesh-traffic-table .c-id a { color:var(--mesh-primary); font-weight:400; }
+.mesh-traffic-table .to-mqtt { color:var(--mesh-muted); }
+.mesh-traffic-time { white-space:nowrap; color:var(--mesh-muted); }
+.mesh-traffic-table .c-id { white-space:nowrap; }
+.mesh-traffic-payload td { background:var(--mesh-surface-2); }
+.mesh-traffic-payload pre { margin:0; max-height:180px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.7 var(--mesh-mono); }
+.mesh-traffic-fold { display:inline-flex; align-items:center; gap:8px; padding:0; border:0; background:none; font:inherit; font-size:15px; font-weight:650; }
+.mesh-traffic-fold svg { width:18px; height:18px; color:var(--mesh-muted); transition:transform .2s ease; }
+.mesh-traffic.is-folded .mesh-traffic-fold svg { transform:rotate(-90deg); }
+.mesh-traffic.is-folded :is(.mesh-traffic-list,.mesh-traffic-note) { display:none; }
+.mesh-traffic.is-folded .mesh-panel-title { border-bottom:0; }
+.mesh-traffic-note { margin:0; padding:8px 14px; border-top:1px solid var(--mesh-border-soft); font-size:12px; color:var(--mesh-muted); }
+
+/* ---- Wide screens: the map under everything ---- */
+@media(min-width:1200px) {
+    body:is(.mesh-dashboard,.mesh-map-only) { height:100dvh; overflow:hidden; }
+    :is(.mesh-dashboard,.mesh-map-only) .mesh-content { position:relative; flex:1 1 auto; min-height:0; max-width:none; padding:0; }
+    :is(.mesh-dashboard,.mesh-map-only) :is(.mesh-explorer,.mesh-map-panel) { position:absolute; inset:0; }
+    #map-wrapper,#map { height:100%; }
+
+    .mesh-dashboard { --side:352px; --top:118px; --bottom:296px; }
+    .mesh-dashboard:has(.mesh-traffic.is-folded) { --bottom:84px; }
+    .mesh-dashboard .mesh-metrics { position:absolute; z-index:1000; top:16px; left:var(--side); right:16px; }
+    .mesh-dashboard .mesh-node-panel { position:absolute; z-index:1000; top:16px; left:16px; bottom:16px; width:320px; }
+    .mesh-dashboard .mesh-node-panel:has(.mesh-node-browser-body[hidden]) { bottom:auto; }
+    .mesh-dashboard .mesh-traffic { position:absolute; z-index:1000; left:var(--side); right:16px; bottom:16px; height:264px; }
+    .mesh-dashboard .mesh-traffic.is-folded { height:auto; }
+    .mesh-dashboard .mesh-map-panel .leaflet-top { top:calc(var(--top) - 10px); }
+    .mesh-dashboard .mesh-map-panel .leaflet-left { left:calc(var(--side) - 10px); }
+    /* The attribution goes to the footer, which these pages always show. */
+    .mesh-map-panel .leaflet-control-attribution { display:none; }
+    .mesh-footer-attribution { display:inline; }
+    .mesh-dashboard #filter-container { position:absolute; z-index:1000; left:var(--side); bottom:var(--bottom); max-width:calc(100% - var(--side) - 16px); }
+
+    .mesh-map-only #filter-container { position:absolute; z-index:1000; left:16px; bottom:16px; max-width:calc(100% - 220px); }
+}
+
+/* ---- Phones and narrow windows: stacked ---- */
+@media(max-width:1199px) {
+    .mesh-dashboard .mesh-content { display:flex; flex-direction:column; gap:12px; }
+    .mesh-explorer { display:flex; flex-direction:column; gap:12px; }
+    .mesh-map-panel { order:-1; overflow:hidden; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); }
+    #map-wrapper { position:relative; height:60dvh; min-height:320px; }
+    #map { height:100%; }
+    .mesh-map-only #map-wrapper { height:calc(100dvh - 52px - 120px); }
+    .mesh-node-list { max-height:360px; }
+    #filter-container { border:0; border-top:1px solid var(--mesh-border); border-radius:0; box-shadow:none; }
+    .mesh-traffic-list { max-height:70vh; }
+    .mesh-traffic .mesh-panel-title h2 { flex:1; }
+    #unmapped-packets { top:auto; left:12px; bottom:12px; }
+    .mesh-traffic-tools { order:3; flex-basis:100%; }
+    /* The channel first and the status at the end, so that "live" does not show twice, one above the other. */
+    .mesh-traffic-tools select { order:-1; margin-left:0; }
+    .mesh-traffic-tools .live-status { margin-left:auto; }
+    .mesh-traffic-fold:disabled { color:inherit; cursor:default; }
+    .mesh-traffic-fold:disabled svg { display:none; }
+    .map-filter { height:30px; padding:0 10px 0 8px; font-size:12.5px; }
+}
+
+/* ---- The map page below wide screens: as on them, and as the mesh graphs,
+   the map under the header with the cards floating over it; the footer in
+   view, or, on phones, under the map. ---- */
+@media(max-width:1199px) {
+    body.mesh-map-only { height:100dvh; overflow:hidden; }
+    .mesh-map-only .mesh-content { position:relative; flex:1 1 auto; min-height:0; max-width:none; padding:0; }
+    .mesh-map-only .mesh-map-panel { position:absolute; inset:0; border:0; border-radius:0; }
+    .mesh-map-only #map-wrapper { height:100%; min-height:0; }
+    .mesh-map-only #unmapped-packets { top:10px; left:58px; bottom:auto; }
+    /* The filters: the fold down their left, the legend over the pills. */
+    .mesh-map-only #filter-container { position:absolute; z-index:1000; left:12px; bottom:12px; display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:6px 10px; max-width:calc(100% - 220px); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); box-shadow:0 2px 12px rgba(16,25,37,.10); }
+    .mesh-map-only .map-legend-inline,.mesh-map-only .map-filter-pills { grid-column:2; }
+    .mesh-map-only .map-legend-inline { padding:2px 0 0; }
+    .mesh-map-only .map-legend-toggle { display:flex; align-items:center; justify-content:center; grid-row:1 / span 2; align-self:stretch; width:22px; margin:-8px 0 -8px -8px; padding:0; border:0; border-radius:var(--mesh-radius) 0 0 var(--mesh-radius); background:transparent; color:var(--mesh-muted); }
+    .mesh-map-only .map-legend-toggle:hover { background:var(--mesh-surface-2); color:var(--mesh-text); }
+    .mesh-map-only .map-legend-toggle svg { width:16px; height:16px; transition:transform .2s ease; }
+    .mesh-map-only #filter-container.is-folded { display:flex; }
+    .mesh-map-only #filter-container.is-folded :is(.map-legend-inline,.map-filter-pills) { display:none; }
+    .mesh-map-only #filter-container.is-folded .map-legend-toggle { width:32px; height:32px; margin:-8px; border-radius:var(--mesh-radius); }
+    .mesh-map-only #filter-container.is-folded .map-legend-toggle svg { transform:rotate(180deg); }
+}
+/* With the footer in view, the attribution goes there, as on wide screens. */
+@media(min-width:701px) and (max-width:1199px) {
+    .mesh-map-only .mesh-map-panel .leaflet-control-attribution { display:none; }
+    body.mesh-map-only .mesh-footer-attribution { display:inline; }
+}
+@media(max-width:700px) {
+    body.mesh-map-only { height:auto; overflow:visible; }
+    .mesh-map-only .mesh-content { flex:none; height:calc(100dvh - 52px); min-height:420px; }
+    .mesh-map-only #filter-container { left:10px; bottom:10px; max-width:calc(100% - 20px); }
+}
+
+/* The footer cannot hold the attribution on one line: it stays in the map. */
+body.mesh-attribution-in-map .mesh-footer-attribution { display:none; }
+body.mesh-attribution-in-map .mesh-map-panel .leaflet-control-attribution { display:block; }
+
+/* ---- The map page's node card ---- */
+.mesh-map-only .mesh-node-panel { position:absolute; z-index:1001; top:12px; right:12px; width:290px; max-width:calc(100% - 24px); max-height:calc(100% - 24px); overflow:auto; padding:14px; }
+.mesh-map-only .mesh-node-panel { display:block; }
+.mesh-map-only .mesh-panel-close { position:absolute; top:8px; right:8px; }
+.mesh-map-only .mesh-inspector-short-name { display:inline-block; margin-right:36px; }
+.mesh-map-only .mesh-inspector-name { margin:8px 0 4px; font-size:15px; }
+.mesh-map-only .mesh-inspector-facts { grid-template-columns:72px minmax(0,1fr); gap:5px; }
+.mesh-map-only .mesh-inspector-short-name { font-size:14px; font-weight:650; }
+
+/* ---- Kiosk: the map alone, filling the screen ---- */
+html.mesh-kiosk,.mesh-kiosk body { width:100%; height:100%; overflow:hidden; }
+.mesh-kiosk :is(.mesh-header,.mesh-announcement,.mesh-footer) { display:none; }
+.mesh-kiosk .mesh-content { position:fixed; inset:0; padding:0; max-width:none; }
+.mesh-kiosk :is(.mesh-explorer,.mesh-map-panel) { position:absolute; inset:0; }
+.mesh-kiosk #map-wrapper { height:100%; }
+.mesh-kiosk #share-button { display:none; }
+/* Without the footer, the map credits its tiles itself again. */
+.mesh-kiosk .mesh-map-panel .leaflet-control-attribution { display:block; }
+/* The filters float over the map, as on the map page, at any width, and the
+   unmapped packets stay beside the zoom, above them. */
+.mesh-kiosk #unmapped-packets { top:10px; left:58px; bottom:auto; }
+.mesh-kiosk #filter-container { position:absolute; z-index:1000; left:16px; bottom:16px; max-width:calc(100% - 220px); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); box-shadow:0 2px 12px rgba(16,25,37,.10); }
+/* A kiosk proper (map_kiosk_lock) has no way out of its full screen. */
+.mesh-kiosk-locked.mesh-kiosk #kiosk-button { display:none; }
 </style>
 {% endblock %}
 
 {% block body %}
 {% if dashboard %}
-<section class="mesh-page-heading is-compact">
-    <h1>{{ "Mesh overview" | tr }}</h1>
-    <a class="mesh-secondary-button" href="/stats">{{ "View statistics ↗" | tr }}</a>
+<h1 class="visually-hidden">{{ "Mesh overview" | tr }}</h1>
+<section class="mesh-metrics mesh-float" aria-label="{{ "Network summary" | tr }}">
+    <div class="mesh-metric"><div class="mesh-metric-in"><span class="mesh-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 4v8M16 4.5v7M12 5v16M8 5.5v5M4 6v4M20 8h-16"/></svg></span><strong id="metric-nodes">—</strong><span class="mesh-metric-name">{{ "Recent nodes" | tr }}</span><small>{{ "Seen in the last 3 days" | tr }}</small></div></div>
+    <div class="mesh-metric"><div class="mesh-metric-in"><span class="mesh-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8l4 -16l3 8h4"/></svg></span><strong id="metric-active">—</strong><span class="mesh-metric-name">{{ "Active nodes" | tr }}</span><small>{{ "Seen in the last 24 hours" | tr }}</small></div></div>
+    <div class="mesh-metric"><div class="mesh-metric-in"><span class="mesh-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2zM17 17v.01M13 17v.01M15 13v-2M11.75 8.75a4 4 0 0 1 6.5 0M8.5 6.5a8 8 0 0 1 13 0"/></svg></span><strong id="metric-gateways">—</strong><span class="mesh-metric-name">{{ "MQTT gateways" | tr }}</span><small>{{ "Among recent nodes" | tr }}</small></div></div>
+    <div class="mesh-metric"><div class="mesh-metric-in"><span class="mesh-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5v9l-8 4.5l-8 -4.5v-9l8 -4.5M12 12l8 -4.5M12 12v9M12 12l-8 -4.5"/></svg></span><strong id="metric-packets">—</strong><span class="mesh-metric-name">{{ "Total packets" | tr }}</span><small id="metric-status" role="status" aria-busy="true">{{ "Loading network totals…" | tr }}</small></div></div>
 </section>
-<section class="mesh-metrics" aria-label="{{ "Network summary" | tr }}">
-    <div class="mesh-metric"><span class="mesh-metric-icon" aria-hidden="true"><span class="ti ti-antenna"></span></span><span>{{ "Recent nodes" | tr }}</span><strong id="metric-nodes">—</strong><small>{{ "Seen in the last 3 days" | tr }}</small></div>
-    <div class="mesh-metric"><span class="mesh-metric-icon" aria-hidden="true"><span class="ti ti-activity"></span></span><span>{{ "Active nodes" | tr }}</span><strong id="metric-active">—</strong><small>{{ "Seen in the last 24 hours" | tr }}</small></div>
-    <div class="mesh-metric"><span class="mesh-metric-icon" aria-hidden="true"><span class="ti ti-router"></span></span><span>{{ "MQTT gateways" | tr }}</span><strong id="metric-gateways">—</strong><small>{{ "Among recent nodes" | tr }}</small></div>
-    <div class="mesh-metric"><span class="mesh-metric-icon" aria-hidden="true"><span class="ti ti-package"></span></span><span>{{ "Total packets" | tr }}</span><strong id="metric-packets">—</strong><small id="metric-status" role="status" aria-busy="true">{{ "Loading network totals…" | tr }}</small></div>
-</section>
+<script>
+// Over the map, the figures' height, which grows when a caption wraps, decides
+// where the map's controls and the room for fitting it start.
+(() => {
+    const strip = document.querySelector(".mesh-metrics");
+    const set = () => document.body.style.setProperty("--top", `${strip.offsetHeight + 28}px`);
+    new ResizeObserver(set).observe(strip);
+    set();
+})();
+</script>
 {% else %}
 <h1 class="visually-hidden">{{ "Network map" | tr }}</h1>
 {% endif %}
 <div class="mesh-explorer">
 {% if dashboard %}
-<aside id="mesh-node-panel" class="mesh-node-panel" aria-label="{{ "Node explorer" | tr }}"{% if not dashboard %} hidden{% endif %}>
+<aside id="mesh-node-panel" class="mesh-node-panel mesh-float" aria-label="{{ "Node explorer" | tr }}">
     <div id="mesh-node-browser" class="mesh-node-browser">
-    <div class="mesh-panel-title">
-        <h2><button id="node-panel-toggle" class="mesh-panel-toggle" type="button" aria-expanded="true" aria-controls="mesh-node-browser-body" disabled>{{ "Network nodes" | tr }}<span class="ti ti-chevron-right" aria-hidden="true"></span></button></h2>
-        <span class="mesh-count node-result-count">—</span>
-    </div>
-    <div id="mesh-node-browser-body" class="mesh-node-browser-body">
-    <div class="mesh-search-row">
-        <label class="visually-hidden" for="node-search">{{ "Search nodes" | tr }}</label>
-        <span class="ti ti-search" aria-hidden="true"></span>
-        <input id="node-search" class="mesh-search" type="search" placeholder="{{ "Name or node ID…" | tr }}" autocomplete="off">
-        <span class="mesh-count node-result-count" aria-hidden="true">—</span>
-    </div>
-    <div id="mesh-node-list" class="mesh-node-list" aria-live="polite"><p class="mesh-empty is-loading">{{ "Loading nodes…" | tr }}</p></div>
-    </div>
+        <div class="mesh-panel-title">
+            <h2><button id="node-panel-toggle" class="mesh-panel-toggle" type="button" aria-expanded="true" aria-controls="mesh-node-browser-body"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6l6 -6"/></svg>{{ "Network nodes" | tr }}</button></h2>
+            <span class="mesh-count node-result-count">—</span>
+        </div>
+        <div id="mesh-node-browser-body" class="mesh-node-browser-body">
+            <div class="mesh-search-row">
+                <label class="visually-hidden" for="node-search">{{ "Search nodes" | tr }}</label>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0M21 21l-6 -6"/></svg>
+                <input id="node-search" class="mesh-search" type="search" placeholder="{{ "Name or node ID…" | tr }}" autocomplete="off">
+                <span class="mesh-count node-result-count" aria-hidden="true">—</span>
+            </div>
+            <div id="mesh-node-list" class="mesh-node-list" aria-live="polite"><p class="mesh-empty is-loading">{{ "Loading nodes…" | tr }}</p></div>
+        </div>
     </div>
     <section id="mesh-node-inspector" class="mesh-node-inspector" aria-label="{{ "Selected node" | tr }}" hidden>
         <div class="mesh-panel-title"><h2>{{ "Node inspector" | tr }}</h2><button id="inspector-back" class="mesh-inspector-back" type="button">{{ "← Nodes" | tr }}</button></div>
@@ -369,7 +402,7 @@ button.map-filter-dot:focus-visible { outline:2px solid var(--mesh-primary); out
             <div class="mesh-inspector-title"><h3 id="inspector-name" class="mesh-inspector-name"></h3><button id="inspector-refresh" class="mesh-traffic-control mesh-traffic-icon" type="button" title="{{ "Refresh data" | tr }}" aria-label="{{ "Refresh data" | tr }}"><span class="ti ti-refresh" aria-hidden="true"></span></button></div>
             <p id="inspector-node-meta" class="mesh-inspector-meta"></p>
             <dl id="inspector-facts" class="mesh-inspector-facts"></dl>
-            <div class="mesh-inspector-actions"><a id="inspector-node-link" href="/nodelist">{{ "Full node details ↗" | tr }}</a><a id="inspector-reliability-link" href="/reliability">{{ "Reliability ↗" | tr }}</a></div>
+            <div class="mesh-inspector-actions"><a id="inspector-node-link" href="/nodelist">{{ "Full node details" | tr }}<span class="mesh-go" aria-hidden="true">↗</span></a><a id="inspector-reliability-link" href="/reliability">{{ "Reliability" | tr }}<span class="mesh-go" aria-hidden="true">↗</span></a></div>
             <h3 class="mesh-inspector-section">{{ "Latest device telemetry" | tr }}</h3>
             <div id="inspector-telemetry" aria-live="polite"></div>
             <h3 class="mesh-inspector-section">{{ "Recent packets · sent & received" | tr }}</h3>
@@ -380,117 +413,143 @@ button.map-filter-dot:focus-visible { outline:2px solid var(--mesh-primary); out
 {% endif %}
 
 <section class="mesh-map-panel" aria-label="{{ "Network map" | tr }}">
-<!-- Fit (and share, on the map page) live in a map control under the layer picker (moved in by script). -->
-<div id="map-tools" class="mesh-map-tools leaflet-bar">
-    <button type="button" id="fit-network" title="{{ "Fit network" | tr }}"><span class="ti ti-focus-centered" aria-hidden="true"></span><span class="mesh-map-tool-label">{{ "Fit network" | tr }}</span></button>
-    {% if not dashboard %}
-    <button type="button" id="share-button" onclick="shareCurrentView()" title="{{ "Share this view" | tr }}"><span id="share-icon" class="ti ti-link" aria-hidden="true"></span><span id="share-label" class="mesh-map-tool-label" data-translate-lang="share_view">Share This View</span></button>
-    {% endif %}
-</div>
-<p id="map-load-status" role="status" style="margin:0; color:#b23d2f;"></p>
+    <!-- Fit (and share, on the map page) live in a map control under the layer picker (moved in by script). -->
+    <div id="map-tools" class="mesh-map-tools leaflet-bar">
+        <button type="button" id="fit-network" title="{{ "Fit network" | tr }}"><span class="ti ti-focus-centered" aria-hidden="true"></span><span class="mesh-map-tool-label">{{ "Fit network" | tr }}</span></button>
+        {% if not dashboard %}
+        <button type="button" id="kiosk-button" title="{{ "Full screen" | tr }}" data-title-exit="{{ "Exit full screen" | tr }}"><svg class="kiosk-enter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4h4v4"/><path d="M14 10l6 -6"/><path d="M8 20h-4v-4"/><path d="M4 20l6 -6"/><path d="M16 20h4v-4"/><path d="M14 14l6 6"/><path d="M8 4h-4v4"/><path d="M4 4l6 6"/></svg><svg class="kiosk-exit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9h4v-4"/><path d="M3 3l6 6"/><path d="M5 15h4v4"/><path d="M3 21l6 -6"/><path d="M19 9h-4v-4"/><path d="M15 9l6 -6"/><path d="M19 15h-4v4"/><path d="M15 15l6 6"/></svg><span class="mesh-map-tool-label">{{ "Full screen" | tr }}</span></button>
+        <button type="button" id="share-button" onclick="shareCurrentView()" title="{{ "Share this view" | tr }}"><span id="share-icon" class="ti ti-link" aria-hidden="true"></span><span id="share-label" class="mesh-map-tool-label" data-translate-lang="share_view">Share This View</span></button>
+        {% endif %}
+    </div>
+    <p id="map-load-status" class="mesh-float" role="status"></p>
 
-<div id="map-wrapper">
-    <div id="map"></div>
-    {% if not dashboard %}
-    <aside id="mesh-node-panel" class="mesh-node-panel" aria-label="{{ "Selected node" | tr }}" hidden>
-        <button id="map-panel-close" class="mesh-inspector-back mesh-panel-close" type="button" aria-label="{{ "Close node inspector" | tr }}">{{ "Close" | tr }}</button>
-        <a id="inspector-node-link" class="mesh-inspector-short-name" href="/nodelist" title="{{ "View full node details" | tr }}"></a>
-        <h3 id="inspector-name" class="mesh-inspector-name"></h3>
-        <p id="inspector-node-meta" class="mesh-inspector-meta"></p>
-        <dl id="inspector-facts" class="mesh-inspector-facts"></dl>
-    </aside>
-    {% endif %}
+    <div id="map-wrapper">
+        <div id="map"></div>
+        {% if not dashboard %}
+        <aside id="mesh-node-panel" class="mesh-node-panel mesh-float" aria-label="{{ "Selected node" | tr }}" hidden>
+            <button id="map-panel-close" class="mesh-dialog-close mesh-panel-close" type="button" aria-label="{{ "Close node inspector" | tr }}" title="{{ "Close" | tr }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+            <a id="inspector-node-link" class="mesh-inspector-short-name" href="/nodelist" title="{{ "View full node details" | tr }}"></a>
+            <h3 id="inspector-name" class="mesh-inspector-name"></h3>
+            <p id="inspector-node-meta" class="mesh-inspector-meta"></p>
+            <dl id="inspector-facts" class="mesh-inspector-facts"></dl>
+        </aside>
+        {% endif %}
 
-    <!-- Map overlays fold to a small pill on phones (opened by script on wider screens). -->
-    <details id="unmapped-packets" class="map-overlay" open>
-        <summary><h3 data-translate-lang="unmapped_packets_title">Unmapped Packets</h3><span id="unmapped-count" class="map-overlay-count" hidden></span></summary>
-        <ul id="unmapped-list">
-            <li class="unmapped-empty" data-translate-lang="unmapped_packets_empty">
-                No recent unmapped packets.
-            </li>
-        </ul>
-    </details>
-<details id="map-legend" open class="legend map-overlay">
-    <summary>{{ "Legend" | tr }}</summary>
-    <div>
-        <i style="background:orange; width:15px; height:3px; border-radius:0;"></i>
-        <span data-translate-lang="legend_traceroute">Traceroute Path (arrowed)</span>
+        <!-- Map overlays fold to a small pill on phones (opened by script on wider screens).
+             Unmapped packets are the map page's: Home's map is a preview. -->
+        {% if not dashboard %}
+        <details id="unmapped-packets" class="map-overlay mesh-float" open>
+            <summary><h3 data-translate-lang="unmapped_packets_title">Unmapped Packets</h3><span id="unmapped-count" class="map-overlay-count" hidden></span></summary>
+            <ul id="unmapped-list">
+                <li class="unmapped-empty" data-translate-lang="unmapped_packets_empty">No recent unmapped packets.</li>
+            </ul>
+        </details>
+        {% endif %}
     </div>
 
-    <div style="margin-top:6px;">
-        <i style="background:gray; width:15px; height:3px; border-radius:0;"></i>
-        <span data-translate-lang="legend_neighbor">Neighbor Link</span>
+    <div id="filter-container" class="mesh-float">
+        <button type="button" id="map-legend-toggle" class="map-legend-toggle" aria-controls="filter-container" aria-expanded="true" title="{{ "Hide the filters" | tr }}" aria-label="{{ "Hide the filters" | tr }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6l6 6"/></svg></button>
+        <div id="map-legend" class="map-legend-inline" role="group" aria-label="{{ "Legend" | tr }}">
+            <span class="map-legend-item"><i class="map-legend-line" style="background:orange"></i><span data-translate-lang="legend_traceroute">Traceroute</span></span>
+            <span class="map-legend-item"><i class="map-legend-line" style="background:gray"></i><span data-translate-lang="legend_neighbor">Neighbor</span></span>
+            <span id="legend-utilization" class="legend-utilization" hidden>
+                <span>{{ "Channel Utilization" | tr }}</span>
+                <span><i style="background:#2e9e4f;"></i>&lt;25%</span>
+                <span><i style="background:#e0a800;"></i>25–40%</span>
+                <span><i style="background:#d63333;"></i>&gt;40%</span>
+            </span>
+        </div>
+        <span class="map-filter-divider" aria-hidden="true"></span>
+        <div class="map-filter-pills">
+        <div class="map-filter-group">
+            <label class="map-filter"><input type="checkbox" class="filter-checkbox" id="filter-routers-only"> <span data-translate-lang="show_routers_only">Show Routers Only</span></label>
+            <label class="map-filter"><input type="checkbox" class="filter-checkbox" id="filter-mqtt-only"> <span data-translate-lang="show_mqtt_only">Show MQTT Gateways Only</span></label>
+        </div>
+        <div id="map-channel-filters" class="map-filter-group" role="group" aria-label="{{ "Channels" | tr }}"></div>
+        {% if not dashboard %}
+        <button id="reset-filters-button" class="map-filter-reset" type="button" onclick="resetFiltersToDefaults()"><span data-translate-lang="reset_filters">Reset Filters To Defaults</span></button>
+        {% endif %}
+        </div>
     </div>
-
-    <div id="legend-utilization" class="legend-utilization" hidden>
-        <span>{{ "Channel Utilization" | tr }}</span>
-        <span><i style="background:#2e9e4f;"></i>&lt;25%</span>
-        <span><i style="background:#e0a800;"></i>25–40%</span>
-        <span><i style="background:#d63333;"></i>&gt;40%</span>
-    </div>
-</details>
-
-
-</div>
-
-<button id="filter-toggle" class="map-filter-toggle" type="button" aria-controls="filter-container" aria-expanded="false"><span class="ti ti-adjustments-horizontal" aria-hidden="true"></span> <span>{{ "Filters" | tr }}</span></button>
-<div id="filter-container">
-    <div class="map-filter-group">
-        <label class="map-filter"><input type="checkbox" class="filter-checkbox" id="filter-routers-only"> <span data-translate-lang="show_routers_only">Show Routers Only</span></label>
-        <label class="map-filter"><input type="checkbox" class="filter-checkbox" id="filter-mqtt-only"> <span data-translate-lang="show_mqtt_only">Show MQTT Gateways Only</span></label>
-    </div>
-    <div id="map-channel-filters" class="map-filter-group" role="group" aria-label="{{ "Channels" | tr }}"></div>
-    {% if not dashboard %}
-    <button id="reset-filters-button" class="map-filter-reset" type="button" onclick="resetFiltersToDefaults()">
-        <span class="ti ti-refresh" aria-hidden="true"></span> <span data-translate-lang="reset_filters">Reset Filters To Defaults</span>
-    </button>
-    {% endif %}
-</div>
-<script>
-// The kiosk's filter button unfolds into the filters, as the layers button does;
-// clicking anywhere else or pressing Escape folds them again.
-(() => {
-    const toggle = document.getElementById("filter-toggle");
-    const filters = document.getElementById("filter-container");
-    const isOpen = () => filters.classList.contains("is-open");
-    const show = open => {
-        filters.classList.toggle("is-open", open);
-        toggle.setAttribute("aria-expanded", String(open));
-    };
-    toggle.addEventListener("click", () => {
-        show(true);
-        filters.querySelector("input, button")?.focus({ preventScroll: true });
-    });
-    document.addEventListener("pointerdown", event => {
-        if (isOpen() && !filters.contains(event.target)) show(false);
-    });
-    document.addEventListener("keydown", event => {
-        if (event.key === "Escape" && isOpen()) {
-            show(false);
-            toggle.focus({ preventScroll: true });
+    <script>
+    // The legend and the filters fold away, and stay so in this browser, on Home
+    // and the map alike.
+    (() => {
+        const KEY = "meshview-map-filters-folded";
+        const filters = document.getElementById("filter-container");
+        const toggle = document.getElementById("map-legend-toggle");
+        const set = folded => {
+            filters.classList.toggle("is-folded", folded);
+            toggle.setAttribute("aria-expanded", String(!folded));
+            const label = MeshI18n.t(folded ? "Show the filters" : "Hide the filters");
+            toggle.title = label;
+            toggle.setAttribute("aria-label", label);
+        };
+        // The map page on a phone always starts folded, and what is done there
+        // is not kept: unfolded, the filters cover much of so small a map.
+        const phone = () => document.body.classList.contains("mesh-map-only")
+            && window.matchMedia("(max-width:700px)").matches;
+        let folded = phone();
+        if (!folded) {
+            try { folded = localStorage.getItem(KEY) === "1"; } catch {}
         }
-    });
-})();
-</script>
-
-
-
+        set(folded);
+        toggle.addEventListener("click", () => {
+            folded = !folded;
+            set(folded);
+            if (phone()) return;
+            try { folded ? localStorage.setItem(KEY, "1") : localStorage.removeItem(KEY); } catch {}
+        });
+    })();
+    </script>
 </section>
 </div>
 {% if dashboard %}
-<section class="mesh-traffic" aria-label="{{ "Live network traffic" | tr }}">
-    <div class="mesh-panel-title"><h2>{{ "Live traffic" | tr }}</h2><div class="mesh-traffic-tools"><label for="map-traffic-channel" class="visually-hidden">{{ "Channel" | tr }}</label><select id="map-traffic-channel"><option value="">{{ "All channels" | tr }}</option></select><span id="map-traffic-status" class="live-status" role="status" data-state="loading">{{ "Loading packets…" | tr }}</span></div><div class="mesh-traffic-actions"><button id="map-traffic-pause" class="mesh-traffic-control" type="button" aria-pressed="false" title="{{ "Pause the traffic list; map animations continue" | tr }}">{{ "Pause feed" | tr }}</button><button id="map-traffic-refresh" class="mesh-traffic-control mesh-traffic-icon" type="button" title="{{ "Refresh" | tr }}" aria-label="{{ "Refresh" | tr }}"><span class="ti ti-refresh" aria-hidden="true"></span></button></div></div>
+<section id="mesh-traffic" class="mesh-traffic mesh-float" aria-label="{{ "Live network traffic" | tr }}">
+    <div class="mesh-panel-title">
+        <h2><button id="map-traffic-fold" class="mesh-traffic-fold" type="button" aria-expanded="true" aria-controls="map-traffic-list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6l6 -6"/></svg>{{ "Live traffic" | tr }}</button></h2>
+        <div class="mesh-traffic-tools">
+            <span id="map-traffic-status" class="live-status" role="status" data-state="loading">{{ "Loading packets…" | tr }}</span>
+            <label for="map-traffic-channel" class="visually-hidden">{{ "Channel" | tr }}</label>
+            <select id="map-traffic-channel"><option value="">{{ "All channels" | tr }}</option></select>
+        </div>
+        <div class="mesh-traffic-actions">
+            <button id="map-traffic-pause" class="mesh-traffic-control" type="button" aria-pressed="false" title="{{ "Pause the traffic list; map animations continue" | tr }}">{{ "Pause feed" | tr }}</button>
+            <button id="map-traffic-refresh" class="mesh-traffic-control mesh-traffic-icon" type="button" title="{{ "Refresh" | tr }}" aria-label="{{ "Refresh" | tr }}"><span class="ti ti-refresh" aria-hidden="true"></span></button>
+        </div>
+    </div>
     <div id="map-traffic-list" class="mesh-traffic-list" role="region" aria-label="{{ "Live packet table" | tr }}" tabindex="0">
-        <table class="mesh-traffic-table card-table" data-cards-below="1100"><thead><tr><th>{{ "Time" | tr }}</th><th>{{ "Packet ID" | tr }}</th><th>{{ "From" | tr }}</th><th>{{ "To" | tr }}</th><th>{{ "Channel" | tr }}</th><th>{{ "Port" | tr }}</th></tr></thead><tbody id="map-traffic-body"><tr><td colspan="6" class="mesh-empty">{{ "Loading recent network traffic…" | tr }}</td></tr></tbody></table>
+        <table class="mesh-traffic-table card-table" data-cards-below="1199"><thead><tr><th>{{ "Time" | tr }}</th><th>{{ "Packet ID" | tr }}</th><th>{{ "From" | tr }}</th><th>{{ "To" | tr }}</th><th>{{ "Channel" | tr }}</th><th>{{ "Port" | tr }}</th></tr></thead><tbody id="map-traffic-body"><tr><td colspan="6" class="mesh-empty">{{ "Loading recent network traffic…" | tr }}</td></tr></tbody></table>
     </div>
     <p class="mesh-traffic-note">{{ "Latest 30 packets · expand the arrow to view payloads · follow packet IDs or node names for details." | tr }}</p>
 </section>
-
+<script>
+// The live traffic folds down to its heading over the map, and stays so in this
+// browser; stacked under the map it is always open.
+(() => {
+    const KEY = "meshview-home-traffic-folded";
+    const stacked = matchMedia("(max-width:1199px)");
+    const section = document.getElementById("mesh-traffic");
+    const fold = document.getElementById("map-traffic-fold");
+    let folded = false;
+    try { folded = localStorage.getItem(KEY) === "1"; } catch {}
+    const apply = () => {
+        const shut = folded && !stacked.matches;
+        section.classList.toggle("is-folded", shut);
+        fold.setAttribute("aria-expanded", String(!shut));
+        fold.disabled = stacked.matches;
+        window.map?.invalidateSize?.();
+    };
+    apply();
+    stacked.addEventListener("change", apply);
+    fold.addEventListener("click", () => {
+        folded = !folded;
+        apply();
+        try { folded ? localStorage.setItem(KEY, "1") : localStorage.removeItem(KEY); } catch {}
+    });
+})();
+</script>
 {% endif %}
-<script src="/static/vendor/leaflet-1.9.4/dist/leaflet.js"
-        integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH"
-        crossorigin=""></script>
-
 <script src="/static/vendor/leaflet-polylinedecorator-1.6.0/dist/leaflet.polylineDecorator.js"
         integrity="sha384-FhPn/2P/fJGhQLeNWDn9B/2Gml2bPOrKJwFqJXgR3xOPYxWg5mYQ5XZdhUSugZT0"
         crossorigin></script>
@@ -498,6 +557,7 @@ button.map-filter-dot:focus-visible { outline:2px solid var(--mesh-primary); out
         integrity="sha384-mFKkGiGvT5vo1fEyGCD3hshDdKmW3wzXW/x+fWriYJArD0R3gawT6lMvLboM22c0"
         crossorigin="anonymous"></script>
 <script src="/static/portmaps.js"></script>
+<script src="/static/channel-colors.js"></script>
 
 <script>
 /* ======================================================
@@ -509,7 +569,8 @@ let mapTranslations = {};
 async function loadTranslationsMap() {
     try {
         const cfg = await window._siteConfigPromise;
-        const lang = cfg?.site?.language || "en";
+        // The visitor's language, the page's, else the site's.
+        const lang = window.meshLanguage || cfg?.site?.language || "en";
         const res  = await fetch(`/api/v1/lang?lang=${lang}&section=map`);
         mapTranslations = await res.json();
         applyTranslationsMap();
@@ -538,15 +599,89 @@ function applyTranslationsMap(root = document) {
    ====================================================== */
 
 var map = L.map('map');
+// On Home's wide layout panels float over the map: fitting it to an area, or
+// centring it on a node, uses the part they leave uncovered.
+const floatingPanels = document.body.classList.contains('mesh-dashboard')
+    ? matchMedia('(min-width:1200px)') : null;
+// What the panels cover on each side, in pixels: nothing when they do not float.
+function coveredEdges() {
+    if (!floatingPanels?.matches) return { left: 0, top: 0, right: 0, bottom: 0 };
+    const style = getComputedStyle(document.body);
+    const length = name => parseFloat(style.getPropertyValue(name)) || 0;
+    return { left: length('--side'), top: length('--top'), right: 16, bottom: length('--bottom') };
+}
+for (const name of ['fitBounds', 'flyToBounds']) {
+    const fit = map[name].bind(map);
+    map[name] = (bounds, options = {}) => {
+        const edges = coveredEdges();
+        const pad = L.point(options.padding || [0, 0]);
+        const { padding, ...rest } = options;
+        return fit(bounds, {
+            ...rest,
+            paddingTopLeft: [edges.left + pad.x, edges.top + pad.y],
+            paddingBottomRight: [edges.right + pad.x, edges.bottom + pad.y],
+        });
+    };
+}
+// Centres the map on a point, in the middle of what the panels leave uncovered.
+window.meshCenterOn = (latlng, zoom = map.getZoom()) => {
+    const edges = coveredEdges();
+    const shift = L.point((edges.left - edges.right) / 2, (edges.top - edges.bottom) / 2);
+    const center = map.unproject(map.project(latlng, zoom).subtract(shift), zoom);
+    map.setView(center, zoom);
+};
+// The attribution the tiles need, without Leaflet's own credit, which is not
+// required; on wide screens it shows in the footer, kept in step as layers change.
+map.attributionControl.setPrefix(false);
+(() => {
+    // The footer comes after this script: its place is looked up when needed.
+    const sync = () => {
+        const copy = document.getElementById('footer-attribution');
+        if (!copy) return;
+        copy.innerHTML = map.attributionControl.getContainer().innerHTML;
+        // Links out, like the menu's: a new tab, and the arrow that says so.
+        copy.querySelectorAll('a').forEach(link => {
+            link.target = '_blank';
+            link.rel = 'noopener';
+            const mark = document.createElement('span');
+            mark.className = 'mesh-nav-external';
+            mark.setAttribute('aria-hidden', 'true');
+            mark.textContent = '↗';
+            link.append(mark);
+        });
+    };
+    // Only while the footer holds it on one line: else it stays in the map's
+    // corner, as on phones (.mesh-attribution-in-map). Measured with it there.
+    const fit = () => {
+        const inner = document.querySelector('.mesh-footer-inner');
+        if (!inner) return;
+        document.body.classList.remove('mesh-attribution-in-map');
+        const tops = [...inner.children].filter(child => child.offsetParent)
+            .map(child => child.getBoundingClientRect().top);
+        const shown = getComputedStyle(document.getElementById('footer-attribution')).display !== 'none';
+        document.body.classList.toggle('mesh-attribution-in-map',
+            shown && tops.some(top => Math.abs(top - tops[0]) > 2));
+    };
+    map.on('layeradd layerremove', () => setTimeout(() => { sync(); fit(); }));
+    document.addEventListener('DOMContentLoaded', () => {
+        sync();
+        const inner = document.querySelector('.mesh-footer-inner');
+        if (inner) new ResizeObserver(fit).observe(inner);
+        fit();
+    });
+})();
 var baseLayers = { [escapeHtml(meshMapTiles.name)]: meshTileLayer() };
 const topoLayer = meshTopoLayer();
 if (topoLayer) baseLayers["OpenTopoMap"] = topoLayer;
 Object.values(baseLayers)[0].addTo(map);
-L.control.scale({
-    position: 'bottomleft',
-    metric: true,
-    imperial: true
-}).addTo(map);
+// Home's map is a preview of the map page's: no scale there.
+if (!document.body.classList.contains('mesh-dashboard')) {
+    L.control.scale({
+        position: 'bottomright',
+        metric: true,
+        imperial: true
+    }).addTo(map);
+}
 var nodeLayer = L.layerGroup().addTo(map);
 var edgeLayer = L.layerGroup().addTo(map);
 var packetSeenLayer = L.layerGroup();
@@ -601,8 +736,9 @@ function updateMapLayerTranslations() {
 
 // Data structures
 // The legend sits next to the zoom buttons as a map control.
+// The legend beside the zoom, on the map page; Home has it among the filters.
 const mapLegend = document.getElementById('map-legend');
-if (mapLegend) {
+if (mapLegend?.matches('details')) {
     const MapLegend = L.Control.extend({
         onAdd() {
             L.DomEvent.disableClickPropagation(mapLegend);
@@ -720,11 +856,9 @@ const PACKET_LANDING_DURATION_MS = 1400;
 
 const portMap = window.PORT_LABEL_MAP;
 
-// Generated colors for channels without a configured override.
-const palette = ["#18aa18","#976049","#a5508c","#1898dc","#3a8846","#dc1884",
-                 "#b8813d","#b64f35","#408b18","#4c719e","#be379c","#18aa52"];
-
-const channelColorOverrides = new Map();
+// The palette channels take their colours from, and offer to choose among
+// (channel-colors.js, shared with the chat).
+const palette = MeshChannels.palette;
 
 // The colors a visitor chose for channels on the map page, kept in this
 // browser and followed by every map. Only plain #rrggbb colors are taken from
@@ -754,10 +888,6 @@ function timeAgoFromUs(us){
     return d>0?d+"d":h>0?h+"h":m>0?m+"m":s+"s";
 }
 
-function normalizeChannelName(str){
-    return String(str || MeshI18n.t("Unknown")).toLowerCase().replace(/[\s_-]+/g, "");
-}
-
 {% include "marker-stroke.js" %}
 function hashToColor(str){
     const channel = String(str || MeshI18n.t("Unknown"));
@@ -771,8 +901,7 @@ function hashToColor(str){
 // A channel's color unless the visitor chose another: the one configured for
 // it, or one of the palette's.
 function defaultChannelColor(channel){
-    return channelColorOverrides.get(normalizeChannelName(channel)) ||
-        palette[Math.floor(hashToUnit(channel) * palette.length) % palette.length];
+    return MeshChannels.defaultColor(channel);
 }
 
 function hashToUnit(str){
@@ -940,9 +1069,7 @@ async function waitForConfig() {
     }
     try {
         const cfg = await window._siteConfigPromise;
-        for(const [channel, color] of Object.entries(cfg.site?.map_channel_colors || {})){
-            channelColorOverrides.set(normalizeChannelName(channel), color);
-        }
+        await MeshChannels.ready;
         return cfg.site || {};
     } catch (err) {
         console.error("Error loading site config:", err);
@@ -964,7 +1091,7 @@ async function initMapPolling() {
         // (kept separately for the home page and the map page), then the
         // configured area. Kiosk screens always use the configured area.
         const viewKey = document.body.classList.contains("mesh-dashboard") ? "mapView:home" : "mapView:map";
-        const kiosk = params.get("kiosk") === "1";
+        const kiosk = params.has("kiosk");
         let savedView = null;
         if (!kiosk) {
             try { savedView = JSON.parse(localStorage.getItem(viewKey) || "null"); } catch (_) { /* ignore */ }
@@ -2032,6 +2159,43 @@ function syncUtilizationLegend(){
    ====================================================== */
 
 let shareViewResetTimer = null;
+// Full screen: the page turns into its kiosk mode where it is, the browser
+// fills the screen with it, and leaving the browser's full screen (Esc) leaves
+// both. Loaded as a kiosk (?kiosk), only the browser's full screen comes and
+// goes. Without that (iPhones), kiosk mode alone.
+(() => {
+    const button = document.getElementById("kiosk-button");
+    if (!button) return;
+    const root = document.documentElement;
+    const loadedAsKiosk = root.classList.contains("mesh-kiosk");
+    const enterTitle = button.title, exitTitle = button.dataset.titleExit;
+    const label = button.querySelector(".mesh-map-tool-label");
+    const sync = () => {
+        const on = loadedAsKiosk ? Boolean(document.fullscreenElement) : root.classList.contains("mesh-kiosk");
+        button.title = label.textContent = on ? exitTitle : enterTitle;
+        button.setAttribute("aria-pressed", String(on));
+        setTimeout(() => map.invalidateSize(), 50);
+    };
+    const kiosk = on => {
+        if (!loadedAsKiosk) root.classList.toggle("mesh-kiosk", on);
+        sync();
+    };
+    button.addEventListener("click", () => {
+        const on = loadedAsKiosk ? !document.fullscreenElement : !root.classList.contains("mesh-kiosk");
+        if (on) {
+            kiosk(true);
+            root.requestFullscreen?.().catch(() => {});
+        } else {
+            if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+            kiosk(false);
+        }
+    });
+    document.addEventListener("fullscreenchange", () => {
+        if (!document.fullscreenElement) kiosk(false); else sync();
+    });
+    sync();
+})();
+
 function shareCurrentView() {
     const c = map.getCenter();
     const url = `${window.location.origin}/map?lat=${c.lat.toFixed(6)}&lng=${c.lng.toFixed(6)}&zoom=${map.getZoom()}`;

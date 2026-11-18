@@ -140,18 +140,18 @@ once it is restarted.
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `domain` | string | `""` | The address Meshview is reached at, such as `mesh.example.org` (HTTPS is assumed unless it starts with `http://`). Link previews take their pictures from it, `/static/og.png` and, for a node, `/static/og-node.png`; without it, the same pictures from the project's website. Also exposed by `/api/config`; it does not configure binding or TLS. |
-| `language` | string | `"en"` | Language of the pages and of the API reference: `en`, `es` or `ru`. |
+| `language` | string | | **Deprecated**, ignored with a warning, and removed in the next version: the pages and the API reference come in the language each visitor's browser asks for, `en` or `es`, else English, and a visitor can choose another in the preferences in the header, which keep it in a cookie. |
 | `title` | string | `""` | Site title, in the browser title bar, headers and link previews. |
 | `message` | string | `""` | Tagline, shown in the footer and used as the page description, link previews included. |
 | `announcement` | string | `""` | Banner at the top of every page. Visitors can dismiss it; it shows again when the text changes. |
-| `nodes` | boolean | `true` | Show the Nodes link. Pages and API routes stay available either way. |
+| `map` | boolean | `true` | Show the Map link. Pages and API routes stay available either way. |
+| `everything` | boolean | `true` | Show the Traffic link. |
+| `nodes` | boolean | `true` | Show the Nodes link. |
 | `chat` | boolean | `true` | Show the Chat link. |
-| `everything` | boolean | `true` | Show the Everything link. |
-| `graphs` | boolean | `true` | Show the Graphs link. |
+| `graphs` | boolean | `true` | Show the Mesh Graphs link. |
+| `top` | boolean | `true` | Show the Top Traffic Nodes link. |
 | `stats` | boolean | `true` | Show the Stats link. |
-| `net` | boolean | `true` | Show the Net link. |
-| `map` | boolean | `true` | Show the Map link. |
-| `top` | boolean | `true` | Show the Top link. |
+| `net` | boolean | `true` | Show the Weekly Net link. |
 | `api` | boolean | `true` | Show the API documentation link. |
 | `planet_url` | string | `""` | The address of a Meshview Planet, `http://` or `https://`, for the menu and the about dialog to link to. Empty, there is no link. New in Meshview. |
 | `map_top_left_lat` | number | `75.0` | Map bounds: latitude of the top left corner. |
@@ -164,6 +164,7 @@ once it is restarted.
 | `map_tile_name` | string | `""` | Name of the tile layer in the layer picker. |
 | `map_interval` | whole number | `3` | Seconds between map refreshes. Zero or less disables polling. |
 | `firehose_interval` | whole number | `3` | Seconds between firehose refreshes. Zero or less disables polling. |
+| `map_kiosk_lock` | boolean | `false` | The map's kiosk mode (`/map?kiosk`) without its full screen button, so that nothing on the screen leaves it: for a kiosk proper. New in Meshview. |
 | `weekly_net_message` | string | `""` | Text at the top of the weekly net page: what the net is and how to take part. Empty, the page explains it itself, in the visitor's language. There is no schedule: any check-in in the week counts. |
 | `net_tag` | string | `"#Meshview"` | Tag that makes a text message a check-in, anywhere in it and in any case. The weekly net page lists them a week at a time, the earliest from each node, as they were sent, the tag marked. |
 | `net_week_start` | string | `"monday"` | The day the weekly net's weeks start on, from `monday` to `sunday`: each runs seven days from midnight of that day, in the visitor's local time. New in Meshview. |

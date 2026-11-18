@@ -8,121 +8,131 @@
 
 {% block css %}
 <style>
-/* The page fills the window under the header: the graph takes what the toolbar leaves. */
-.mesh-graph-page .mesh-content { display:flex; flex-direction:column; max-width:none; height:calc(100dvh - 48px); min-height:480px; box-sizing:border-box; }
-@media(max-width:700px) { .mesh-graph-page .mesh-content { height:calc(100dvh - 52px); } }
-.graph-panel { display:flex; flex:1; flex-direction:column; min-height:0; overflow:hidden; border:1px solid var(--mesh-border); border-radius:9px; background:var(--mesh-surface); }
-.graph-stage { position:relative; flex:1; min-height:300px; }
+/* The graph fills the page between the header and the footer, as the map does,
+   with floating cards over it: the channel and the search top left, the fit
+   button top right, the selected node beside it and the legend bottom left. */
+body.mesh-graph-page { height:100dvh; overflow:hidden; }
+.mesh-graph-page .mesh-content { position:relative; flex:1 1 auto; min-height:0; max-width:none; padding:0; }
+.graph-stage { position:absolute; inset:0; overflow:hidden; background:var(--mesh-surface-2); }
 #mynetwork { position:absolute; inset:0; }
+.graph-float { position:absolute; z-index:5; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); box-shadow:0 2px 12px rgba(16,25,37,.10); color:var(--mesh-text); }
 
-/* Overlays: legend top left, fit top right, node card bottom right (only when selected). */
-.graph-overlay { position:absolute; z-index:5; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:8px; box-shadow:0 2px 8px #0001; color:var(--mesh-text); font-size:12px; }
-#legend { top:10px; left:10px; padding:8px 10px; max-width:calc(100% - 80px); }
-#legend > summary { display:none; align-items:center; gap:6px; list-style:none; font-weight:600; cursor:pointer; }
-#legend > summary::-webkit-details-marker { display:none; }
-#legend > summary::after { content:""; width:12px; height:12px; margin-left:auto; background:currentColor; opacity:.6; -webkit-mask:url(/static/vendor/tabler-icons-3.51.0/icons/outline/chevron-right.svg) center / contain no-repeat; mask:url(/static/vendor/tabler-icons-3.51.0/icons/outline/chevron-right.svg) center / contain no-repeat; transition:transform .15s ease; }
-#legend[open] > summary::after { transform:rotate(90deg); }
-.legend-items { display:grid; grid-template-columns:repeat(4,auto); gap:4px 14px; }
-.legend-items > div { display:flex; align-items:center; gap:6px; white-space:nowrap; }
-.legend-items code { font-size:11px; color:inherit; }
-.legend-box { display:inline-block; flex-shrink:0; width:12px; height:12px; border-radius:3px; }
-.legend-box.line { height:3px; border-radius:0; }
-.circle { border-radius:50%; }
-.graph-tools { top:10px; right:10px; overflow:hidden; }
-.graph-tools button { display:flex; align-items:center; gap:8px; min-height:34px; padding:0 12px 0 10px; border:0; background:var(--mesh-surface); color:var(--mesh-text); font:500 12px/1 inherit; white-space:nowrap; cursor:pointer; }
-.graph-tools button:hover { background:var(--mesh-soft); }
-.graph-tools button:focus-visible { outline:2px solid var(--mesh-primary); outline-offset:-2px; }
-.graph-tools .ti { font-size:16px; color:var(--mesh-primary); }
-#node-info { right:10px; bottom:10px; width:260px; max-width:calc(100% - 20px); padding:12px 14px; font-size:13px; }
-#node-info[hidden] { display:none; }
-#node-info h2 { margin:0 28px 6px 0; font-size:15px; font-weight:650; overflow-wrap:anywhere; }
-#node-info dl { display:grid; grid-template-columns:auto minmax(0,1fr); gap:3px 10px; margin:0 0 8px; }
-#node-info dt { font-weight:500; color:var(--mesh-muted); }
-#node-info dd { margin:0; overflow-wrap:anywhere; }
-#node-info-close { position:absolute; top:8px; right:8px; display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--mesh-muted); cursor:pointer; }
-#node-info-close:hover { background:var(--mesh-soft); color:var(--mesh-text); }
-
-/* Toolbar under the graph: channel and search, like the map filters. */
-.graph-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:10px 12px; border-top:1px solid var(--mesh-border); font-size:13px; }
-.graph-toolbar label { margin:0; font-size:12px; color:var(--mesh-muted); }
-.graph-toolbar select, .graph-toolbar input { height:34px; padding:0 10px; border:1px solid var(--mesh-border); border-radius:6px; background:var(--mesh-surface); color:var(--mesh-text); font-size:13px; }
-.graph-search { display:flex; align-items:center; gap:6px; flex:1 1 260px; max-width:420px; }
-.graph-search input { flex:1; min-width:0; }
-.graph-search button { display:inline-flex; align-items:center; gap:6px; height:34px; padding:0 12px; border:1px solid var(--mesh-border); border-radius:6px; background:var(--mesh-soft); color:var(--mesh-primary); font-size:13px; font-weight:500; cursor:pointer; }
-.graph-search button:hover { background:var(--mesh-hover); }
-#graph-search-status { font-size:12px; color:#b42318; }
+/* Channel and search. */
+.graph-find { top:16px; left:16px; display:flex; flex-wrap:wrap; align-items:center; gap:8px; width:min(460px, calc(100% - 96px)); padding:8px; }
+.graph-find .mesh-select { flex:0 1 170px; min-width:0; }
+.graph-find .mesh-input { flex:1 1 160px; min-width:0; }
+.graph-find .mesh-button { flex-shrink:0; }
+#graph-search-status { flex-basis:100%; margin:0 2px; font-size:12px; color:#b42318; }
 #graph-search-status:empty { display:none; }
-[data-bs-theme="dark"] #graph-search-status { color:#ffb4a6; }
-:is(.graph-toolbar select,.graph-toolbar input,.graph-search button):focus-visible { outline:2px solid var(--mesh-primary); outline-offset:2px; }
+[data-theme="dark"] #graph-search-status { color:#ffb4a6; }
 
+/* Fit, as the map's tools. */
+.graph-tools { top:16px; right:16px; display:flex; flex-direction:column; overflow:hidden; }
+.graph-tools button { display:flex; align-items:center; justify-content:center; width:40px; height:40px; padding:0; border:0; background:var(--mesh-surface); color:var(--mesh-primary); }
+.graph-tools button:hover { background:var(--mesh-surface-2); }
+.graph-tools svg { width:18px; height:18px; }
+
+/* The selected node, as the map's card. */
+#node-info { top:16px; right:68px; width:290px; max-width:calc(100% - 84px); max-height:calc(100% - 32px); overflow:auto; padding:14px; }
+#node-info[hidden] { display:none; }
+#node-info .mesh-dialog-close { position:absolute; top:8px; right:8px; }
+.graph-node-short { display:inline-block; margin-right:36px; font-size:14px; font-weight:650; }
+#node-long-name { margin:8px 0 10px; font-size:15px; overflow-wrap:anywhere; }
+#node-info dl { display:grid; grid-template-columns:72px minmax(0,1fr); gap:5px; margin:0; font-size:12.5px; }
+#node-info dt { color:var(--mesh-muted); font-weight:500; }
+#node-info dd { margin:0; overflow-wrap:anywhere; }
+.graph-node-actions { margin-top:14px; font-size:13px; font-weight:600; }
+
+/* Legend: the links, a line between, and the roles; folded to its chevron. */
+#legend { left:16px; bottom:16px; display:flex; align-items:center; gap:14px; max-width:calc(100% - 32px); padding:8px 14px 8px 8px; font-size:12px; line-height:1.4; color:var(--mesh-nav-text); }
+.graph-legend-toggle { display:flex; align-items:center; justify-content:center; flex-shrink:0; align-self:stretch; width:22px; margin:-8px -6px -8px -8px; padding:0; border:0; border-radius:var(--mesh-radius) 0 0 var(--mesh-radius); background:transparent; color:var(--mesh-muted); }
+.graph-legend-toggle:hover { background:var(--mesh-surface-2); color:var(--mesh-text); }
+.graph-legend-toggle svg { width:16px; height:16px; transition:transform .2s ease; }
+.graph-legend-title { display:none; }
+.graph-legend-links { display:flex; flex-direction:column; gap:5px; flex-shrink:0; }
+.graph-legend-divider { align-self:stretch; flex-shrink:0; width:1px; margin:-8px 0; background:var(--mesh-border); }
+.graph-legend-roles { display:grid; grid-template-columns:repeat(4,auto); gap:5px 16px; min-width:0; }
+.graph-legend-item { display:inline-flex; align-items:center; gap:7px; white-space:nowrap; }
+.graph-legend-line { display:inline-block; width:16px; height:3px; border-radius:2px; }
+.graph-legend-dot { display:inline-block; flex-shrink:0; width:10px; height:10px; border-radius:50%; }
+#legend.is-folded { gap:0; padding:8px; }
+#legend.is-folded .graph-legend-divider { display:none; }
+#legend.is-folded :is(.graph-legend-links,.graph-legend-roles) { flex:0 0 0; width:0; overflow:hidden; visibility:hidden; }
+#legend.is-folded .graph-legend-toggle { width:32px; margin:-8px; border-radius:var(--mesh-radius); }
+#legend.is-folded .graph-legend-toggle svg { transform:rotate(180deg); }
+
+/* Phones: the graph under the header, the footer below it; the legend down
+   the top left, folding upwards, and the search across the bottom, with the
+   selected node above it. */
 @media(max-width:700px) {
-    #legend > summary { display:flex; }
-    #legend[open] > summary { margin-bottom:6px; }
-    .legend-items { grid-template-columns:repeat(2,auto); }
-    .graph-tools button { justify-content:center; width:34px; padding:0; }
-    .graph-tool-label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
-    /* Channel and search stay on one line: the channel's label and the search
-       button's word go, which the select and the magnifier say well enough. */
-    .graph-toolbar { flex-wrap:nowrap; }
-    .graph-toolbar select { flex:0 1 auto; min-width:0; max-width:45%; }
-    .graph-search { flex:1 1 0; min-width:0; max-width:none; }
-    .graph-search button { justify-content:center; width:34px; padding:0; flex-shrink:0; }
-    :is(.graph-channel-label,.graph-search-label) { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
-    /* A search that finds nothing says so on a line of its own. */
-    .graph-toolbar:has(#graph-search-status:not(:empty)) { flex-wrap:wrap; }
-    #graph-search-status { flex-basis:100%; }
+    body.mesh-graph-page { height:auto; overflow:visible; }
+    .mesh-graph-page .mesh-content { flex:none; height:calc(100dvh - 52px); min-height:420px; }
+    .graph-find { top:auto; left:10px; right:10px; bottom:10px; width:auto; flex-wrap:nowrap; padding:6px; gap:6px; }
+    .graph-find .mesh-select { flex:0 1 38%; }
+    .graph-find:has(#graph-search-status:not(:empty)) { flex-wrap:wrap; }
+    .graph-tools { top:10px; right:10px; }
+    #node-info { top:auto; right:10px; bottom:68px; left:10px; width:auto; max-width:none; max-height:50%; }
+    .graph-stage:has(#graph-search-status:not(:empty)) #node-info { bottom:92px; }
+    /* The legend as the map's unmapped packets: its title and a chevron. */
+    #legend { top:10px; bottom:auto; left:10px; flex-direction:column; align-items:stretch; gap:6px; max-width:calc(100% - 70px); padding:10px 12px; }
+    .graph-legend-toggle, #legend.is-folded .graph-legend-toggle { justify-content:flex-start; gap:6px; width:auto; height:auto; margin:0; border-radius:0; background:none; color:var(--mesh-text); }
+    .graph-legend-toggle:hover { background:none; }
+    .graph-legend-title { display:inline; font-size:12.5px; font-weight:650; }
+    .graph-legend-toggle svg { width:12px; height:12px; margin-left:auto; opacity:.6; transform:rotate(-90deg); }
+    .graph-legend-divider { width:auto; height:1px; margin:0 -12px; }
+    .graph-legend-roles { grid-template-columns:auto; }
+    #legend.is-folded { padding:10px 12px; }
+    #legend.is-folded :is(.graph-legend-links,.graph-legend-roles) { display:none; }
+    #legend.is-folded .graph-legend-toggle svg { transform:rotate(180deg); }
 }
 </style>
 {% endblock %}
 
 {% block body %}
 <h1 class="visually-hidden">{{ "Mesh Graphs" | tr }}</h1>
-<section class="graph-panel" aria-label="{{ "Mesh Graphs" | tr }}">
-<div class="graph-stage">
+<section class="graph-stage" aria-label="{{ "Mesh Graphs" | tr }}">
     <div id="mynetwork"></div>
 
-    <details id="legend" class="graph-overlay" open>
-        <summary>{{ "Legend" | tr }}</summary>
-        <div class="legend-items">
-            <div><span class="legend-box line" style="background-color:#ff5733"></span>{{ "Traceroute" | tr }}</div>
-            <div><span class="legend-box circle" style="background-color:#ff5733"></span><code>ROUTER</code></div>
-            <div><span class="legend-box circle" style="background-color:#007bff"></span><code>CLIENT</code></div>
-            <div><span class="legend-box circle" style="background-color:#049acd"></span><code>CLIENT_BASE</code></div>
-            <div><span class="legend-box line" style="background-color:#049acd"></span>{{ "Neighbor" | tr }}</div>
-            <div><span class="legend-box circle" style="background-color:#b65224"></span><code>ROUTER_LATE</code></div>
-            <div><span class="legend-box circle" style="background-color:#00c3ff"></span><code>CLIENT_MUTE</code></div>
-            <div><span class="legend-box circle" style="background-color:#ffbf00"></span>{{ "Other" | tr }}</div>
-            <div></div><div></div><div></div>
-            <div><span class="legend-box circle" style="background-color:#6c757d"></span>{{ "Unknown" | tr }}</div>
-        </div>
-    </details>
+    <form class="graph-float graph-find" role="search" onsubmit="event.preventDefault(); searchNode();">
+        <select id="channel-select" class="mesh-select" aria-label="{{ "Channel" | tr }}" onchange="filterByChannel()"></select>
+        <input type="search" id="node-search" class="mesh-input" aria-label="{{ "Search node..." | tr }}" placeholder="{{ "Search node..." | tr }}">
+        <button type="submit" class="mesh-button is-icon-mobile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/><path d="M21 21l-6 -6"/></svg><span class="mesh-button-label">{{ "Search" | tr }}</span></button>
+        <p id="graph-search-status" role="status"></p>
+    </form>
 
-    <div class="graph-overlay graph-tools">
-        <button type="button" id="graph-fit" title="{{ "Fit network" | tr }}"><span class="ti ti-focus-centered" aria-hidden="true"></span><span class="graph-tool-label">{{ "Fit network" | tr }}</span></button>
+    <div class="graph-float graph-tools">
+        <button type="button" id="graph-fit" title="{{ "Center" | tr }}" aria-label="{{ "Center" | tr }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M4 8v-2a2 2 0 0 1 2 -2h2"/><path d="M4 16v2a2 2 0 0 0 2 2h2"/><path d="M16 4h2a2 2 0 0 1 2 2v2"/><path d="M16 20h2a2 2 0 0 0 2 -2v-2"/></svg></button>
     </div>
 
-    <aside id="node-info" class="graph-overlay" aria-live="polite" hidden>
-        <button type="button" id="node-info-close" aria-label="{{ "Close" | tr }}" title="{{ "Close" | tr }}"><span class="ti ti-x" aria-hidden="true"></span></button>
+    <aside id="node-info" class="graph-float" aria-live="polite" hidden>
+        <button type="button" id="node-info-close" class="mesh-dialog-close" aria-label="{{ "Close" | tr }}" title="{{ "Close" | tr }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+        <span id="node-short-name" class="graph-node-short"></span>
         <h2 id="node-long-name"></h2>
         <dl>
-            <dt>{{ "Short Name:" | tr }}</dt><dd id="node-short-name"></dd>
-            <dt>{{ "Role:" | tr }}</dt><dd id="node-role"></dd>
-            <dt>{{ "Hardware Model:" | tr }}</dt><dd id="node-hw-model"></dd>
-            <dt>{{ "Channel:" | tr }}</dt><dd id="node-channel"></dd>
+            <dt>{{ "Role" | tr }}</dt><dd id="node-role"></dd>
+            <dt>{{ "Hardware" | tr }}</dt><dd id="node-hw-model"></dd>
+            <dt>{{ "Channel" | tr }}</dt><dd id="node-channel"></dd>
         </dl>
-        <a id="node-info-link" href="/nodelist">{{ "Full node details ↗" | tr }}</a>
+        <div class="graph-node-actions"><a id="node-info-link" href="/nodelist">{{ "Full node details" | tr }}<span class="mesh-go" aria-hidden="true">↗</span></a></div>
     </aside>
-</div>
 
-<div class="graph-toolbar">
-    <label for="channel-select" class="graph-channel-label">{{ "Channel:" | tr }}</label>
-    <select id="channel-select" onchange="filterByChannel()"></select>
-    <form class="graph-search" role="search" onsubmit="event.preventDefault(); searchNode();">
-        <input type="search" id="node-search" aria-label="{{ "Search node..." | tr }}" placeholder="{{ "Search node..." | tr }}">
-        <button type="submit" title="{{ "Search" | tr }}"><span class="ti ti-search" aria-hidden="true"></span><span class="graph-search-label">{{ "Search" | tr }}</span></button>
-    </form>
-    <span id="graph-search-status" role="status"></span>
-</div>
+    <div id="legend" class="graph-float" role="group" aria-label="{{ "Legend" | tr }}">
+        <button type="button" id="graph-legend-toggle" class="graph-legend-toggle" aria-controls="legend" aria-expanded="true" title="{{ "Legend" | tr }}" aria-label="{{ "Legend" | tr }}"><span class="graph-legend-title" aria-hidden="true">{{ "Legend" | tr }}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6l6 6"/></svg></button>
+        <div class="graph-legend-links">
+            <span class="graph-legend-item"><i class="graph-legend-line" style="background:orange"></i><span>{{ "Traceroute route" | tr }}</span></span>
+            <span class="graph-legend-item"><i class="graph-legend-line" style="background:gray"></i><span>{{ "Neighbor link" | tr }}</span></span>
+        </div>
+        <span class="graph-legend-divider" aria-hidden="true"></span>
+        <div class="graph-legend-roles">
+            <span class="graph-legend-item"><i class="graph-legend-dot" style="background:#ff5733"></i>ROUTER</span>
+            <span class="graph-legend-item"><i class="graph-legend-dot" style="background:#007bff"></i>CLIENT</span>
+            <span class="graph-legend-item"><i class="graph-legend-dot" style="background:#049acd"></i>CLIENT_BASE</span>
+            <span class="graph-legend-item"><i class="graph-legend-dot" style="background:#ffbf00"></i>{{ "Other" | tr }}</span>
+            <span class="graph-legend-item"><i class="graph-legend-dot" style="background:#b65224"></i>ROUTER_LATE</span>
+            <span class="graph-legend-item"><i class="graph-legend-dot" style="background:#00c3ff"></i>CLIENT_MUTE</span>
+            <span class="graph-legend-item"><i class="graph-legend-dot" style="background:#6c757d"></i>{{ "Unknown" | tr }}</span>
+        </div>
+    </div>
 </section>
 
 <script>
@@ -133,7 +143,8 @@ const chart = initMeshChart(document.getElementById("mynetwork"));
 // COLOR + ROLE HELPERS
 // -----------------------------------
 const colors = {
-    edge: { traceroute:"#ff5733", neighbor:"#049acd" },
+    // The map's colours for the same links.
+    edge: { traceroute:"orange", neighbor:"gray" },
     role: {
         ROUTER:"#ff5733",
         ROUTER_LATE:"#b65224",
@@ -248,7 +259,7 @@ async function loadData() {
 // -----------------------------------
 // CHANNEL FILTER
 // -----------------------------------
-// One channel at a time, the first to begin with, or all of them together,
+// One channel at a time, the one with the most nodes to begin with, or all of them together,
 // which shows the links between nodes on different channels as well (bridged
 // over UDP, or on one preset with different primary channels). The choice is
 // kept in this browser.
@@ -256,13 +267,15 @@ const CHANNEL_KEY = "nodegraphChannel";
 function populateChannelDropdown() {
     const sel = document.getElementById("channel-select");
     const chans = [...new Set(nodes.map(n => n.channel).filter(Boolean))].sort();
+    const count = ch => nodes.filter(n => n.channel === ch).length;
+    const busiest = [...chans].sort((a, b) => count(b) - count(a))[0];
 
     sel.append(new Option(MeshI18n.t("All channels"), ""));
     chans.forEach(ch => sel.append(new Option(ch, ch)));
 
     let saved = null;
     try { saved = localStorage.getItem(CHANNEL_KEY); } catch (_) { /* storage unavailable */ }
-    selectedChannel = saved !== null && (saved === "" || chans.includes(saved)) ? saved : (chans[0] ?? "");
+    selectedChannel = saved !== null && (saved === "" || chans.includes(saved)) ? saved : (busiest ?? "");
     sel.value = selectedChannel;
     sel.addEventListener("change", () => {
         try { localStorage.setItem(CHANNEL_KEY, sel.value); } catch (_) { /* storage unavailable */ }
@@ -318,12 +331,14 @@ function updateChart() {
 
         return {
             ...e,
-            lineStyle: { ...e.lineStyle, opacity: connected ? 1 : 0.1 }
+            // With a node picked, its links stand out; with none, all show.
+            lineStyle: { ...e.lineStyle, opacity: lastSelectedNode ? (connected ? 1 : 0.1) : 0.7 }
         };
     });
 
     chart.setOption({
         animation: false,
+        tooltip: { show: HOVER.matches, formatter: graphTip },
         series: [{
             type: "graph",
             layout: "force",
@@ -333,6 +348,25 @@ function updateChart() {
             force: { repulsion: 200, edgeLength: [80, 120] }
         }]
     });
+}
+
+// Hover tooltips only with a pointer that hovers: a tap picks the node.
+const HOVER = window.matchMedia("(hover: hover)");
+function nodeName(id) {
+    const n = nodes.find(n => n.name === id);
+    return n ? (n.long_name || n.short_name || n.name) : id;
+}
+function graphTip(p) {
+    if (p.dataType === "edge") {
+        const kind = p.data.edgeType === "neighbor" ? "Neighbor link" : "Traceroute route";
+        return meshTip({title: `${nodeName(p.data.source)} ↔ ${nodeName(p.data.target)}`,
+            rows: [[MeshI18n.t(kind), "", `<span style="display:inline-block;width:12px;height:3px;margin-right:6px;border-radius:2px;background:${p.data.originalColor}"></span>`]]});
+    }
+    const n = p.data;
+    return meshTip({title: n.long_name || n.short_name || n.name,
+        // Its channel beside its name, when all of them are shown.
+        aside: selectedChannel ? null : n.channel,
+        rows: [[MeshI18n.t("Role"), n.role || "—", p.marker]]});
 }
 
 // -----------------------------------
@@ -354,7 +388,7 @@ function updateSelectedNode(id) {
     if (!n) return;
 
     document.getElementById("node-long-name").innerText = n.long_name || n.short_name || n.name;
-    document.getElementById("node-short-name").innerText = n.short_name || "—";
+    document.getElementById("node-short-name").innerText = n.short_name || n.name;
     document.getElementById("node-role").innerText = n.role || "—";
     document.getElementById("node-hw-model").innerText = n.hw_model || "—";
     document.getElementById("node-channel").innerText = n.channel || "—";
@@ -393,18 +427,32 @@ function searchNode() {
     status.textContent = found ? "" : MeshI18n.t("Node not found in current channel!");
     if (found) updateSelectedNode(found.name);
 }
+document.getElementById("node-search").addEventListener("input", () => {
+    document.getElementById("graph-search-status").textContent = "";
+});
 
 // -----------------------------------
 loadData();
 window.addEventListener("resize", () => chart.resize());
 new ResizeObserver(() => chart.resize()).observe(document.getElementById("mynetwork"));
-// Legend open on wider screens, folded to a pill on phones.
+// The legend folds to its chevron, as the map's filters: as it was left in
+// this browser, open to begin with.
 (() => {
-    const phone = window.matchMedia("(max-width:700px)");
+    const KEY = "meshview-graph-legend-folded";
     const legend = document.getElementById("legend");
-    const sync = () => { legend.open = !phone.matches; };
-    phone.addEventListener("change", sync);
-    sync();
+    const toggle = document.getElementById("graph-legend-toggle");
+    let saved = null;
+    try { saved = localStorage.getItem(KEY); } catch (_) { /* storage unavailable */ }
+    const fold = folded => {
+        legend.classList.toggle("is-folded", folded);
+        toggle.setAttribute("aria-expanded", String(!folded));
+    };
+    fold(saved === "1");
+    toggle.addEventListener("click", () => {
+        const folded = !legend.classList.contains("is-folded");
+        fold(folded);
+        try { localStorage.setItem(KEY, folded ? "1" : "0"); } catch (_) { /* storage unavailable */ }
+    });
 })();
 </script>
 
