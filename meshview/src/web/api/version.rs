@@ -21,9 +21,16 @@ pub struct Version {
     /// Its first seven characters, or `unknown`.
     #[schema(example = "75279f5")]
     pub git_revision_short: &'static str,
+    /// Which Meshview this is, always `rust`, to tell it from others that
+    /// answer `/version` too. The Python version does not give it.
+    #[schema(example = "rust")]
+    pub flavor: &'static str,
 }
 
 pub const REVISION: &str = env!("MESHVIEW_GIT_REVISION");
+
+/// What `flavor` says. A token for clients to compare, not a name to show.
+pub const FLAVOR: &str = "rust";
 
 /// The build: version, and the commit it was built from.
 pub fn current() -> Version {
@@ -36,6 +43,7 @@ pub fn current() -> Version {
         } else {
             &REVISION[..REVISION.len().min(7)]
         },
+        flavor: FLAVOR,
     }
 }
 

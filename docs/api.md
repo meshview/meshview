@@ -71,6 +71,7 @@ for changing in a future version instead.
 | `/api/v1/channels` window | Computed from the local time taken as UTC: off by the server's offset from UTC | From now. The same answer on a server running in UTC. |
 | `/version` `release_date` | The release's date | The date of the commit the build comes from. |
 | `/version` `git_revision` | Asked of git on every request, from the checkout the server runs from | Recorded at build time. |
+| `/version` `flavor` | Not there | `rust`, to tell this Meshview from others that answer `/version`. |
 | `/api/v1/config` `cleanup` | The values as written in `config.ini`, so `minute = 00` gave `"00"` | The configured numbers, as strings, as before: `"0"`. TOML numbers have no leading zeros. |
 | `/api/v1/config` `site.version` | The Python version's | Meshview's |
 | `/api/v1/config` `site.map_channel_colors` | Only the configured colours | The colours built in for the presets' channels too, which the configured ones replace. |

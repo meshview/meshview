@@ -72,6 +72,7 @@ async fn version_says_which_build_this_is() {
 
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["version"], env!("CARGO_PKG_VERSION"));
+    assert_eq!(body["flavor"], "rust");
     for key in ["release_date", "git_revision", "git_revision_short"] {
         assert!(body[key].is_string(), "{key}");
     }
