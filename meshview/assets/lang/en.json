@@ -425,6 +425,7 @@
     "No device metrics in recent telemetry packets.": "No device metrics in recent telemetry packets.",
     "No earlier check-ins.": "No earlier check-ins.",
     "No earlier messages.": "No earlier messages.",
+    "No matches since {date}.": "No matches since {date}.",
     "No gateways heard these packets.": "No gateways heard these packets.",
     "No main-channel matches in {sample} sampled packets": "No main-channel matches in {sample} sampled packets",
     "No messages match your filters.": "No messages match your filters.",

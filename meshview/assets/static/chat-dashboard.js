@@ -44,12 +44,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     let unread = 0;
     // Older messages, a page at a time, from where the first page ended.
     let olderBefore = null, olderLoading = false, olderDone = false;
+    // With a filter on, where the last search for earlier matches gave up.
+    let olderMiss = null;
     let chatLang = {};
     const colors = ['#b54136', '#2563b4', '#23824d', '#8553af', '#a65d19', '#15817b', '#b63b79'];
     const timeOf = p => Number(p.import_time_us) || Date.parse(p.import_time) * 1000 || 0;
     const atBottom = () => log.scrollHeight - log.scrollTop - log.clientHeight < 60;
     const nodeName = p => (p.long_name || '').trim() || MeshI18n.t("Node {id}", {id: p.from_node_id});
     const packetUrl = id => `/packet/${encodeURIComponent(id)}`;
+    // Whether a message passes the channel filter and the search.
+    const matches = p => (!channel.value || (p.channel || '') === channel.value) &&
+        `${nodeName(p)} ${p.payload || ''} ${p.from_node_id} ${p.channel || ''}`.toLowerCase().includes(search.value.trim().toLowerCase());
     function setStatus(text, state) { status.textContent = text; status.dataset.state = state; }
     // Unread messages show as a count badge on the "jump to latest" button.
     function showUnread() {
@@ -64,10 +69,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     function goLatest() { log.scrollTop = log.scrollHeight; unread = 0; showUnread(); }
 
     function render(scrollToBottom = false, highlights = new Set()) {
-        const query = search.value.trim().toLowerCase();
         const sorted = [...packets.values()].sort((a, b) => timeOf(a) - timeOf(b));
-        const visible = sorted.filter(p => (!channel.value || (p.channel || '') === channel.value) &&
-            `${nodeName(p)} ${p.payload || ''} ${p.from_node_id} ${p.channel || ''}`.toLowerCase().includes(query));
+        const visible = sorted.filter(matches);
         const fragment = document.createDocumentFragment();
         if (packets.size) fragment.append(olderControl());
         let lastDay = '';
@@ -139,6 +142,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (olderLoading) {
             top.textContent = MeshI18n.t("Loading earlier messages…");
         } else {
+            if (olderMiss !== null) {
+                const miss = document.createElement('span');
+                const date = new Date(olderMiss / 1000).toLocaleDateString(MeshI18n.language, {day:'numeric', month:'long', year:'numeric'});
+                miss.textContent = MeshI18n.t("No matches since {date}.", {date});
+                top.append(miss);
+            }
             const button = document.createElement('button');
             button.type = 'button'; button.className = 'mesh-button';
             button.textContent = MeshI18n.t("Load earlier messages");
@@ -148,25 +157,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         return top;
     }
 
-    // The page before the oldest message loaded, keeping in view what was.
+    // The page before the oldest message loaded, keeping in view what was. A
+    // filter can leave a page with nothing to show, so pages follow, ten at
+    // most, until one message shows or the history ends.
     async function loadOlder() {
         if (olderLoading || olderDone || !loaded) return;
         olderLoading = true;
+        olderMiss = null;
         render();
         try {
-            const url = new URL('/api/v1/packets', location.origin);
-            url.searchParams.set('portnum', '1'); url.searchParams.set('limit', '100');
-            url.searchParams.set('before', olderBefore);
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const data = await response.json();
-            if (!Array.isArray(data.packets)) throw new Error('Invalid packet response');
-            for (const packet of data.packets) {
-                if (!packets.has(String(packet.id))) packets.set(String(packet.id), packet);
-                addChannel(packet.channel);
+            let shown = 0;
+            for (let page = 0; page < 10 && !shown && !olderDone; page++) {
+                const url = new URL('/api/v1/packets', location.origin);
+                url.searchParams.set('portnum', '1'); url.searchParams.set('limit', '100');
+                url.searchParams.set('before', olderBefore);
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                if (!Array.isArray(data.packets)) throw new Error('Invalid packet response');
+                for (const packet of data.packets) {
+                    if (packets.has(String(packet.id))) continue;
+                    packets.set(String(packet.id), packet);
+                    addChannel(packet.channel);
+                    if (matches(packet)) shown++;
+                }
+                olderBefore = data.next_before ?? null;
+                olderDone = olderBefore === null;
             }
-            olderBefore = data.next_before ?? null;
-            olderDone = olderBefore === null;
+            if (!shown && !olderDone) olderMiss = olderBefore;
         } catch (error) {
             console.error('Chat older:', error);
         } finally {
@@ -204,8 +222,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (loaded && !follow && added.size) {
                 unread += [...added].filter(id => {
                     const p = packets.get(id);
-                    return p && (!channel.value || p.channel === channel.value) &&
-                        `${nodeName(p)} ${p.payload || ''} ${p.from_node_id} ${p.channel || ''}`.toLowerCase().includes(search.value.trim().toLowerCase());
+                    return p && matches(p);
                 }).length;
                 showUnread();
             }
@@ -220,8 +237,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         } finally { busy = false; }
     }
 
-    channel.addEventListener('change', () => render(true));
-    search.addEventListener('input', () => render(true));
+    // Another filter, another search for earlier matches.
+    channel.addEventListener('change', () => { olderMiss = null; render(true); });
+    search.addEventListener('input', () => { olderMiss = null; render(true); });
     latest.addEventListener('click', goLatest);
     log.addEventListener('scroll', () => {
         if (atBottom()) { unread = 0; showUnread(); } else syncLatest();

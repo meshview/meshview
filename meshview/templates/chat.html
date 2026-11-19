@@ -48,7 +48,7 @@ body:has(#chat-container) .mesh-footer { display:none; }
 .chat-channel-name { overflow:hidden; text-overflow:ellipsis; }
 /* Opened by a tap: as wide as its name, the sender giving way. */
 .chat-channel.is-open { max-width:none; }
-.chat-older { display:flex; justify-content:center; padding:4px 16px 10px; color:var(--mesh-muted); font-size:12.5px; }
+.chat-older { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:6px 12px; padding:4px 16px 10px; color:var(--mesh-muted); font-size:12.5px; }
 .chat-empty { padding:48px 20px; text-align:center; color:var(--mesh-muted); font-size:13.5px; }
 .chat-bottom { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 16px; border-top:1px solid var(--mesh-border); background:var(--mesh-surface); color:var(--mesh-muted); font-size:12px; flex-shrink:0; }
 .chat-bottom p { margin:0; }
