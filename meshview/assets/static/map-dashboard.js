@@ -29,7 +29,7 @@ function renderNodeExplorer() {
         row.type = 'button';
         row.className = 'mesh-node-row';
         const active = node.last_seen_us / 1000 >= Date.now() - 86400000;
-        row.innerHTML = `<span class="mesh-node-dot${active ? '' : ' offline'}" aria-hidden="true"></span><span class="mesh-node-copy"><strong>${escapeHtml(node.long_name || node.short_name || String(node.key))}</strong><small>${escapeHtml(node.short_name || MeshI18n.t("Node"))} · ${active ? MeshI18n.t("Seen within 24h") : MeshI18n.t("Seen within 3 days")}</small></span><span class="mesh-node-role">${markerById[node.key] ? '↗' : MeshI18n.t("No GPS")}</span>`;
+        row.innerHTML = `<span class="mesh-node-copy"><strong>${escapeHtml(node.long_name || node.short_name || String(node.key))}</strong><small><span class="mesh-node-short" style="${meshNodeStyle(node.key)}">${escapeHtml(node.short_name || MeshI18n.t("Node"))}</span> · ${active ? MeshI18n.t("Seen within 24h") : MeshI18n.t("Seen within 3 days")}</small></span><span class="mesh-node-role">${markerById[node.key] ? '↗' : MeshI18n.t("No GPS")}</span>`;
         row.addEventListener('click', () => {
             const marker = markerById[node.key];
             if (!marker) {

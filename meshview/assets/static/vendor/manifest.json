@@ -68,6 +68,21 @@
       "LICENSE"
     ]
   },
+  "@fontsource-variable/jetbrains-mono": {
+    "version": "5.3.0",
+    "source": "https://registry.npmjs.org/@fontsource-variable/jetbrains-mono/-/jetbrains-mono-5.3.0.tgz",
+    "archive_sha256": "996fe6368a480c9ce15d4de22a2682b7c40b403718fee2b15e7272f244fd993f",
+    "files": [
+      "wght.css",
+      "files/jetbrains-mono-cyrillic-ext-wght-normal.woff2",
+      "files/jetbrains-mono-cyrillic-wght-normal.woff2",
+      "files/jetbrains-mono-greek-wght-normal.woff2",
+      "files/jetbrains-mono-latin-ext-wght-normal.woff2",
+      "files/jetbrains-mono-latin-wght-normal.woff2",
+      "files/jetbrains-mono-vietnamese-wght-normal.woff2",
+      "LICENSE"
+    ]
+  },
   "@tabler/icons": {
     "version": "3.51.0",
     "source": "https://registry.npmjs.org/@tabler/icons/-/icons-3.51.0.tgz",

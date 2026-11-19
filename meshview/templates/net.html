@@ -4,7 +4,7 @@
 {% block css %}
 {% include "data-page-styles.html" %}
 <style>
-#weekly-message { display:grid; grid-template-columns:auto minmax(0,1fr); column-gap:12px; align-items:start; padding:14px 18px; background:var(--mesh-soft); border:1px solid var(--mesh-border); border-radius:9px; color:var(--mesh-text); font-size:13px; line-height:1.5; margin-bottom:16px; overflow-wrap:anywhere; }
+#weekly-message { display:grid; grid-template-columns:auto minmax(0,1fr); column-gap:12px; align-items:start; padding:14px 18px; background:var(--mesh-soft); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); color:var(--mesh-text); font-size:13px; line-height:1.5; margin-bottom:16px; overflow-wrap:anywhere; }
 /* The icon sits beside the first paragraph (centred on it); the rules line runs below. */
 #weekly-message > div { display:contents; }
 #weekly-message > .weekly-icon { grid-row:1; align-self:center; width:18px; height:18px; color:var(--mesh-primary); }
@@ -28,14 +28,14 @@
 .net-text.is-empty { color:var(--mesh-muted); cursor:default; }
 .net-message { display:flex; align-items:flex-start; gap:8px; }
 .net-message .net-text { flex:1; min-width:0; }
-.net-sent { flex-shrink:0; padding:0 6px; border-radius:9px; background:var(--mesh-soft); color:var(--mesh-muted); font-size:11px; line-height:18px; font-variant-numeric:tabular-nums; }
+.net-sent { flex-shrink:0; padding:0 6px; border-radius:var(--mesh-radius-pill); background:var(--mesh-soft); color:var(--mesh-muted); font-size:11px; line-height:18px; font-variant-numeric:tabular-nums; }
 /* Sortable headers, as on the reliability gateway table. */
 .mesh-data-page .mesh-content .net-sort { display:inline-flex; align-items:center; gap:2px; padding:0; border:0; background:transparent; color:inherit; font:inherit; letter-spacing:inherit; text-transform:inherit; cursor:pointer; }
 .mesh-data-page .mesh-content .net-sort:hover { background:transparent; }
 .mesh-data-page .mesh-content .net-sort:focus-visible { outline:2px solid #fff; outline-offset:2px; }
 .net-sort .sort-icon { font-size:10px; }
 /* The configured net tag, wherever it appears in a message. */
-.net-tag { padding:0 5px; border-radius:4px; background:var(--mesh-soft); white-space:nowrap; }
+.net-tag { padding:0 5px; border-radius:var(--mesh-radius-xs); background:var(--mesh-soft); white-space:nowrap; }
 #weekly-message .net-tag { background:var(--mesh-surface); border:1px solid var(--mesh-border); }
 /* Phones: number, node and time on top, the message below with its channel. */
 .mesh-data-page .net-table.card-table.is-cards tbody tr { grid-template-columns:auto minmax(0,1fr) auto; grid-template-areas:"num node time" "msg msg chan"; }
@@ -55,7 +55,11 @@
 .mesh-data-page .data-table-wrap.is-wide > .net-table tr.net-week-head th { top:36px; }
 .net-week-title { margin-right:10px; }
 .net-week-dates { color:var(--mesh-muted); font-weight:400; }
-.net-week-count { float:right; padding:0 8px; border-radius:10px; background:var(--mesh-surface); border:1px solid var(--mesh-border); color:var(--mesh-primary); font-size:12px; font-variant-numeric:tabular-nums; }
+.net-week-count { float:right; padding:0 8px; border-radius:var(--mesh-radius-pill); background:var(--mesh-surface); border:1px solid var(--mesh-border); color:var(--mesh-primary); font-size:12px; font-variant-numeric:tabular-nums; }
+/* The technical style's stamps: square, the figures in mono; the tag stays in
+   the message's own type. */
+[data-style="technical"] :is(.net-tag,.net-sent,.net-week-count) { border-radius:0; }
+[data-style="technical"] :is(.net-sent,.net-week-count) { font-family:var(--mesh-mono); }
 .mesh-data-page .net-table.card-table.is-cards tbody tr.net-week-head { grid-column:1 / -1; display:block; padding:0; border:0; background:none; }
 .mesh-data-page .data-table-wrap > .net-table.card-table.is-cards tbody tr.net-week-head th { position:static; display:block; padding:8px 2px 2px; border:0; background:none; }
 .mesh-data-page .net-table.card-table.is-cards tbody + tbody { margin-top:22px; padding-top:12px; border-top:2px solid var(--mesh-primary); }

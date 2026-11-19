@@ -26,6 +26,9 @@ QRCode.js is 1.0.0. There is no CSS framework: the pages are styled by
 The Inter typeface is bundled from `@fontsource-variable/inter` 5.3.0 (SIL Open Font
 License 1.1): only the variable weight axis, upright, for every subset.
 Browsers download just the subsets a page uses through `unicode-range`.
+The JetBrains Mono typeface, for the technical style's figures and ids, is
+bundled the same way from `@fontsource-variable/jetbrains-mono` 5.3.0 (SIL Open
+Font License 1.1); a page that does not use it never downloads it.
 
 Icons come from `@tabler/icons` 3.51.0 (MIT): only the SVG files the UI uses,
 unmodified. `/static/icons.css` maps each one to a `.ti-<name>` class that paints

@@ -21,7 +21,7 @@
 .snr-scale i { display:inline-block; width:10px; height:10px; margin-left:6px; border-radius:2px; }
 .radio-map-note { margin:0; padding:0 20px 12px; color:var(--mesh-muted); font-size:12px; }
 .radio-map-note[hidden] { display:none; }
-.radio-map-node { width:30px; height:30px; border:2px solid #fff; border-radius:50%; background:#111827; color:#fff; display:flex; align-items:center; justify-content:center; font-size:15px; box-shadow:0 2px 8px #0003; }
+.radio-map-node { width:30px; height:30px; border:2px solid #fff; border-radius:50%; background:#111827; color:#fff; display:flex; align-items:center; justify-content:center; font-size:15px; box-shadow:var(--mesh-shadow-float); }
 /* Rows that show or hide their node in the chart above them. */
 .signal-table.is-toggling tbody tr { cursor:pointer; }
 .signal-table.is-toggling tbody tr:hover { background:var(--mesh-soft); }
@@ -29,11 +29,11 @@
 .signal-swatch { display:inline-block; width:10px; height:10px; margin-right:8px; border-radius:2px; vertical-align:middle; }
 /* Show every node again, or swap the shown and the hidden ones. */
 .series-tools { display:flex; justify-content:flex-end; gap:6px; margin:4px 0 8px; }
-.mesh-data-page .mesh-content .series-tools > button { padding:3px 10px; border:1px solid var(--mesh-border); border-radius:999px; background:var(--mesh-soft); color:var(--mesh-text); font-size:12px; }
+.mesh-data-page .mesh-content .series-tools > button { padding:3px 10px; border:1px solid var(--mesh-border); border-radius:var(--mesh-radius-pill); background:var(--mesh-soft); color:var(--mesh-text); font-size:12px; }
 .mesh-data-page .mesh-content .series-tools > button:hover { color:var(--mesh-primary); }
 #neighbor_chart_container .chart-hint { margin:0; padding:0 20px 16px; }
 /* A relay is a byte, and the nodes it may be. */
-.relay-byte { display:inline-block; min-width:2.6em; padding:1px 6px; border-radius:5px; background:var(--mesh-soft); color:var(--mesh-text); font:600 12px ui-monospace,Consolas,monospace; text-align:center; }
+.relay-byte { display:inline-block; min-width:2.6em; padding:1px 6px; border-radius:var(--mesh-radius-xs); background:var(--mesh-soft); color:var(--mesh-text); font:600 12px ui-monospace,Consolas,monospace; text-align:center; }
 .relay-candidates { white-space:normal; }
 .relay-candidates > a + a::before { content:" · "; color:var(--mesh-muted); }
 .relay-direct { color:var(--mesh-muted); font-size:12px; }
@@ -875,10 +875,10 @@ function linkPopup(nodeId, node, kinds, distanceKm) {
         if (info.rssi != null) parts.push(`RSSI ${info.rssi} dBm`);
         if (info.shared) parts.push(MeshI18n.t("shared byte"));
         if (info.hint) parts.push(MeshI18n.t("not heard directly"));
-        return [info.label, parts.join(" · ")];
+        return [info.label, parts.join(" · "), true];
     });
     if (distanceKm != null) {
-        facts.push([MeshI18n.t("Distance"), `${distanceKm.toFixed(1)} km / ${(distanceKm * 0.621371).toFixed(1)} mi`]);
+        facts.push([MeshI18n.t("Distance"), `${distanceKm.toFixed(1)} km / ${(distanceKm * 0.621371).toFixed(1)} mi`, true]);
     }
     return meshNodePopup({id: nodeId, node, facts});
 }

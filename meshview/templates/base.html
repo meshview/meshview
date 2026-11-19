@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="{{ ui_language }}" data-theme="light" data-accent="blue" data-map-theme="light">
+<html lang="{{ ui_language }}" data-theme="light" data-accent="blue" data-map-theme="light" data-style="soft">
 <head>
     <title>{% if site_title %}{{ site_title }}{% else %}Meshview Rust{% endif %}</title>
     <meta charset="utf-8">
@@ -65,6 +65,7 @@
     </script>
     <script src="/static/i18n.js"></script>
     <link rel="stylesheet" href="/static/vendor/inter-5.3.0/wght.css">
+    <link rel="stylesheet" href="/static/vendor/jetbrains-mono-5.3.0/wght.css">
     {#- Leaflet, on the pages with a map: they include leaflet.html here. #}
     {% block leaflet %}{% endblock %}
     <link rel="stylesheet" href="/static/meshview.css">
@@ -154,6 +155,13 @@
             </div>
         </fieldset>
         <fieldset>
+            <legend>{{ "Style" | tr }}</legend>
+            <div class="mesh-segmented" style="--n:2">
+                <label><input type="radio" name="style" value="soft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8a4 4 0 0 1 4 -4h8a4 4 0 0 1 4 4v8a4 4 0 0 1 -4 4h-8a4 4 0 0 1 -4 -4z"/></svg>{{ "Soft" | tr }}</label>
+                <label><input type="radio" name="style" value="technical"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v16h-16zM4 10h16M10 10v10"/></svg>{{ "Technical" | tr }}</label>
+            </div>
+        </fieldset>
+        <fieldset>
             <legend>{{ "Colour" | tr }}</legend>
             <div class="mesh-segmented mesh-swatches" style="--n:6">
                 <label title="{{ "Blue" | tr }}"><input type="radio" name="accent" value="blue"><span class="mesh-swatch" style="--swatch:#245ea8;--swatch-dark:#8bbcff"></span><span class="visually-hidden">{{ "Blue" | tr }}</span></label>
@@ -185,7 +193,7 @@ function meshDialog(dialog, opener) {
 }
 meshDialog(document.getElementById("mesh-about"), document.getElementById("site-version"));
 
-// Preferences: theme, map theme and colour apply at once; a language reloads the page in it.
+// Preferences: theme, map theme, colour and style apply at once; a language reloads the page in it.
 (() => {
     const dialog = document.getElementById("mesh-prefs");
     meshDialog(dialog, document.getElementById("prefs-open"));
@@ -197,6 +205,7 @@ meshDialog(document.getElementById("mesh-about"), document.getElementById("site-
         form.theme.value = MeshPrefs.theme;
         form.accent.value = MeshPrefs.accent;
         form.mapTheme.value = MeshPrefs.mapTheme;
+        form.elements.style.value = MeshPrefs.style;
         form.language.value = chosenLanguage;
     });
     form.addEventListener("change", event => {
@@ -204,6 +213,7 @@ meshDialog(document.getElementById("mesh-about"), document.getElementById("site-
         if (field.name === "theme") MeshPrefs.theme = field.value;
         if (field.name === "accent") MeshPrefs.accent = field.value;
         if (field.name === "mapTheme") MeshPrefs.mapTheme = field.value;
+        if (field.name === "style") MeshPrefs.style = field.value;
         if (field.name === "language") {
             document.cookie = field.value
                 ? `${LANGUAGE_COOKIE}=${field.value}; path=/; max-age=31536000; samesite=lax`

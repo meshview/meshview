@@ -14,7 +14,7 @@
 .reach-table-wrap { overflow-x:auto; border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); background:var(--mesh-surface); margin-bottom:14px; }
 .reach-table { min-width:520px; }
 .reach-map { width:100%; height:450px; border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); overflow:hidden; margin-bottom:14px; background:var(--mesh-surface-2); }
-.reach-map-marker { width:34px; height:34px; border:2px solid white; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; font-size:10px; font-weight:800; line-height:1; text-shadow:0 1px 2px #000b; box-shadow:0 2px 8px #0003; }
+.reach-map-marker { width:34px; height:34px; border:2px solid white; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; font-size:10px; font-weight:800; line-height:1; text-shadow:0 1px 2px #000b; box-shadow:var(--mesh-shadow-float); }
 .reach-map-marker-source { font-size:14px; }
 .reach-gateway-panel { min-width:0; overflow:auto; border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); background:var(--mesh-surface); margin-bottom:14px; }
 .reach-gateway-table { min-width:480px; }
@@ -25,6 +25,9 @@
 .reach-count-bar-track { position:relative; height:24px; border-radius:6px; background:var(--mesh-surface-2); overflow:hidden; }
 .reach-count-bar-value span { background:var(--mesh-surface); border-radius:4px; padding:0 5px; }
 .reach-count-bar-fill { height:100%; border-radius:inherit; background:var(--reach-bar-color,#22c55e); }
+/* The technical style: square bars, the bands and their counts in mono. */
+[data-style="technical"] :is(.reach-count-bar-track,.reach-count-bar-value span) { border-radius:0; }
+[data-style="technical"] :is(.reach-band,.reach-count-bar-value) { font-family:var(--mesh-mono); }
 .reach-count-bar-value { position:absolute; inset:0; display:flex; align-items:center; padding-left:9px; font-size:12px; font-weight:600; font-variant-numeric:tabular-nums; color:var(--mesh-text); }
 .reach-muted { color:var(--mesh-muted); }
 /* The heard count reads as a link, keeping the lines it is on even. */
@@ -144,9 +147,9 @@
                 <thead>
                     <tr>
                         <th data-sort="gateway"><button type="button" class="reach-sort">{{ "Gateway" | tr }}<span class="sort-icon" aria-hidden="true"></span></button></th>
-                        <th data-sort="heard"><button type="button" class="reach-sort">{{ "Heard" | tr }}<span class="sort-icon" aria-hidden="true"></span></button></th>
-                        <th data-sort="hops"><button type="button" class="reach-sort">{{ "Avg Hops" | tr }}<span class="sort-icon" aria-hidden="true"></span></button></th>
-                        <th data-sort="reliability" aria-sort="descending"><button type="button" class="reach-sort">{{ "Reliability" | tr }}<span class="sort-icon" aria-hidden="true"></span></button></th>
+                        <th class="is-number" data-sort="heard"><button type="button" class="reach-sort">{{ "Heard" | tr }}<span class="sort-icon" aria-hidden="true"></span></button></th>
+                        <th class="is-number" data-sort="hops"><button type="button" class="reach-sort">{{ "Avg Hops" | tr }}<span class="sort-icon" aria-hidden="true"></span></button></th>
+                        <th class="is-number" data-sort="reliability" aria-sort="descending"><button type="button" class="reach-sort">{{ "Reliability" | tr }}<span class="sort-icon" aria-hidden="true"></span></button></th>
                     </tr>
                 </thead>
                 <tbody id="reach-gateway-body">
@@ -172,7 +175,7 @@
                         <th>{{ "Packet" | tr }}</th>
                         <th>{{ "Time" | tr }}</th>
                         <th>{{ "Type" | tr }}</th>
-                        <th>{{ "Hops" | tr }}</th>
+                        <th class="is-number">{{ "Hops" | tr }}</th>
                         <th>{{ "Status" | tr }}</th>
                     </tr>
                 </thead>
@@ -390,10 +393,10 @@ function renderReliabilityMap(gatewayRows, nodesById) {
         L.marker(latLng, {
             icon: reachMapIcon(`${Math.round(row.percent)}%`, bucket.color),
         }).bindPopup(reachNodePopup(row.nodeId, nodesById, MeshI18n.t("Gateway"), [
-            [MeshI18n.t("Reliability"), `${row.percent.toFixed(1)}%`],
-            [MeshI18n.t("Heard"), `<button class="reach-heard-link" type="button" onclick="openGatewayPacketModal(${row.nodeId})">${row.heardCount}</button><span class="reach-muted">/${row.total}</span>`],
-            [MeshI18n.t("Avg Hops"), formatAverageHopCountWithActual(row.avgHopCount)],
-            [MeshI18n.t("Distance"), sourceLatLng ? formatReachDistance(reliabilityMap.distance(sourceLatLng, latLng)) : null],
+            [MeshI18n.t("Reliability"), `${row.percent.toFixed(1)}%`, true],
+            [MeshI18n.t("Heard"), `<button class="reach-heard-link" type="button" onclick="openGatewayPacketModal(${row.nodeId})">${row.heardCount}</button><span class="reach-muted">/${row.total}</span>`, true],
+            [MeshI18n.t("Avg Hops"), formatAverageHopCountWithActual(row.avgHopCount), true],
+            [MeshI18n.t("Distance"), sourceLatLng ? formatReachDistance(reliabilityMap.distance(sourceLatLng, latLng)) : null, true],
         ]), {closeButton:false}).addTo(reliabilityMapLayer);
         bounds.push(latLng);
     });
@@ -570,7 +573,7 @@ async function loadReachReport(nodeId = reachNodeId) {
             const width = row.count > 0 ? Math.max((row.count / maxBucketCount) * 100, 8) : 0;
             return `
                 <tr>
-                    <td>${row.label}</td>
+                    <td class="reach-band">${row.label}</td>
                     <td class="reach-count-bar-cell">
                         <div class="reach-count-bar-track">
                             <div class="reach-count-bar-fill" style="width:${width}%; --reach-bar-color:${row.color};"></div>

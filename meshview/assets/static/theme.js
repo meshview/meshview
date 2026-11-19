@@ -1,7 +1,8 @@
 /* The visitor's preferences, kept in this browser and applied before the page
    paints: the theme (light, dark, or the system's), the accent (blue, green,
-   amber, tile, violet or graphite) and the maps' (the page's, light or dark), as data-theme, data-accent and
-   data-map-theme on <html>. The language is a cookie,
+   amber, tile, violet or graphite), the maps' (the page's, light or dark) and the
+   style (soft, the default, or technical), as data-theme, data-accent,
+   data-map-theme and data-style on <html>. The language is a cookie,
    since the server renders the page in it; see the preferences dialog. */
 (() => {
     const root = document.documentElement;
@@ -9,6 +10,8 @@
     const ACCENT_KEY = 'meshview-accent';
     const ACCENTS = ['blue', 'green', 'amber', 'tile', 'violet', 'graphite'];
     const MAP_KEY = 'meshview-map-theme';
+    const STYLE_KEY = 'meshview-style';
+    const STYLES = ['soft', 'technical'];
     const system = matchMedia('(prefers-color-scheme: dark)');
     const read = key => { try { return localStorage.getItem(key); } catch { return null; } };
     const write = (key, value) => {
@@ -21,10 +24,13 @@
     if (!ACCENTS.includes(accent)) accent = 'blue';
     let mapTheme = read(MAP_KEY);
     if (!['light', 'dark'].includes(mapTheme)) mapTheme = null;
+    let style = read(STYLE_KEY);
+    if (!STYLES.includes(style)) style = 'soft';
     const effective = () => theme || (system.matches ? 'dark' : 'light');
     root.dataset.theme = effective();
     root.dataset.accent = accent;
     root.dataset.mapTheme = mapTheme || effective();
+    root.dataset.style = style;
     // Nothing animates while the page loads: what it restores, a folded panel or
     // a theme, shows at once. Two frames after the document is ready, it may.
     root.classList.add('mesh-preload');
@@ -48,6 +54,8 @@
             muted:style.getPropertyValue('--mesh-muted').trim(),
             border:style.getPropertyValue('--mesh-border').trim(),
             font:style.getPropertyValue('--mesh-font').trim(),
+            radius:parseFloat(style.getPropertyValue('--mesh-radius-sm')) || 0,
+            square:root.dataset.style === 'technical',
             accent:style.getPropertyValue('--mesh-primary-rgb').trim(),
             second:style.getPropertyValue('--mesh-second-rgb').trim()
         };
@@ -69,6 +77,18 @@
     // A second series' colour beside the accent, as rgba(): one that stands apart
     // from it (orange, or a cool blue beside the warm accents), the same way.
     window.meshSecond = (alpha = 1) => `rgba(${seen().second},${alpha})`;
+    // A node's colours, as the Meshtastic apps show it: its number's low three
+    // bytes as its colour, under black or white text by how bright that is. As
+    // a style for its short name's chip (.node-short), which only the technical
+    // style paints with it; '' without a number.
+    window.meshNodeStyle = nodeId => {
+        const num = Number(nodeId);
+        if (!Number.isFinite(num)) return '';
+        const r = (num >>> 16) & 0xff, g = (num >>> 8) & 0xff, b = num & 0xff;
+        const bright = (r * 0.299 + g * 0.587 + b * 0.114) / 255 > 0.5;
+        const hex = '#' + [r, g, b].map(c => c.toString(16).padStart(2, '0')).join('');
+        return `--node-bg:${hex};--node-fg:${bright ? '#000' : '#fff'}`;
+    };
     // The alpha of a colour in one of these sets, else null.
     const alphaIn = (set, value) => {
         const match = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/.exec(value);
@@ -80,7 +100,14 @@
         function visit(value, key) {
             if (Array.isArray(value)) return value.map(item => visit(item,key));
             if (value && Object.getPrototypeOf(value) === Object.prototype) {
-                return Object.fromEntries(Object.entries(value).map(([k,v]) => [k,visit(v,k)]));
+                const visited = Object.fromEntries(Object.entries(value).map(([k,v]) => [k,visit(v,k)]));
+                // Rounded bars and slices end square in the technical style; their
+                // own rounding is kept beside, for the soft style to take back.
+                if (key === 'itemStyle' && 'borderRadius' in visited) {
+                    const own = visited._meshRadius ?? visited.borderRadius;
+                    return {...visited, _meshRadius:own, borderRadius:palette.square ? 0 : own};
+                }
+                return visited;
             }
             // A gradient, as an area under a line, recoloured stop by stop.
             if (value && Array.isArray(value.colorStops) && window.echarts) {
@@ -123,7 +150,7 @@
             ...(value?.renderMode === 'richText' ? {} : {formatter:params => Array.isArray(params)
                 ? axisTip(params, value?.valueFormatter) : itemTip(params, value?.valueFormatter)}),
             ...value,
-            backgroundColor:palette.surface,borderColor:palette.border,borderWidth:1,borderRadius:8,
+            backgroundColor:palette.surface,borderColor:palette.border,borderWidth:1,borderRadius:palette.radius,
             padding:[8,12],className:'mesh-chart-tip',
             // Themed again on a theme change, an option already has its shadow.
             extraCssText:(value?.extraCssText || '').includes('--mesh-shadow') ? value.extraCssText
@@ -207,6 +234,7 @@
         root.dataset.theme = effective();
         root.dataset.accent = accent;
         root.dataset.mapTheme = mapTheme || effective();
+        root.dataset.style = style;
         if (window.echarts) {
             document.querySelectorAll('[_echarts_instance_]').forEach(el => {
                 const chart = window.echarts.getInstanceByDom(el);
@@ -238,18 +266,27 @@
             write(MAP_KEY, mapTheme);
             apply();
         },
+        /** The look: 'soft' (rounded cards) or 'technical' (square, dense, figures in mono). */
+        get style() { return style; },
+        set style(value) {
+            style = STYLES.includes(value) ? value : 'soft';
+            write(STYLE_KEY, style === 'soft' ? null : style);
+            apply();
+        },
     };
 
     system.addEventListener('change', () => { if (!theme) apply(); });
     // Another tab changed them.
     window.addEventListener('storage', event => {
-        if (![THEME_KEY, ACCENT_KEY, MAP_KEY, null].includes(event.key)) return;
+        if (![THEME_KEY, ACCENT_KEY, MAP_KEY, STYLE_KEY, null].includes(event.key)) return;
         theme = read(THEME_KEY);
         if (!['light', 'dark'].includes(theme)) theme = null;
         accent = read(ACCENT_KEY);
         if (!ACCENTS.includes(accent)) accent = 'blue';
         mapTheme = read(MAP_KEY);
         if (!['light', 'dark'].includes(mapTheme)) mapTheme = null;
+        style = read(STYLE_KEY);
+        if (!STYLES.includes(style)) style = 'soft';
         apply();
     });
 })();

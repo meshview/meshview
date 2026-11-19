@@ -12,13 +12,15 @@
 #nodesTable td:nth-child(n+4) { font-variant-numeric:tabular-nums; }
 #nodesTable .node-link { font-weight:600; }
 /* How many gateways hear a node, on average: a pill of good, fair or poor. */
-.good-x,.ok-x,.bad-x { display:inline-block; min-width:38px; padding:2px 8px; border-radius:6px; font-weight:600; font-size:12px; text-align:center; }
+.good-x,.ok-x,.bad-x { display:inline-block; min-width:38px; padding:2px 8px; border-radius:var(--mesh-radius-xs); font-weight:600; font-size:12px; text-align:center; }
 .good-x { background:#e8f5ee; color:#187346; }
 .ok-x { background:#fff4d9; color:#8a6200; }
 .bad-x { background:#fff0ed; color:#b23d2f; }
 [data-theme="dark"] .good-x { background:#173a29; color:#7fd3a3; }
 [data-theme="dark"] .ok-x { background:#3a3015; color:#f0c76a; }
 [data-theme="dark"] .bad-x { background:#3e201c; color:#f2a093; }
+/* The technical style's stamps: square, the figure in mono. */
+[data-style="technical"] :is(.good-x,.ok-x,.bad-x) { border-radius:0; font-family:var(--mesh-mono); }
 
 /* Cards: the short name, the name and the average on top; the channel and the
    counts, each under its own word, below. */
@@ -63,9 +65,9 @@
                 <th data-translate-lang="long_name">Long Name</th>
                 <th data-translate-lang="short_name">Short Name</th>
                 <th data-translate-lang="channel">Channel</th>
-                <th data-translate-lang="packets_sent">Sent</th>
-                <th data-translate-lang="times_seen">Seen</th>
-                <th data-translate-lang="avg_gateways">Avg Gateways</th>
+                <th class="is-number" data-translate-lang="packets_sent">Sent</th>
+                <th class="is-number" data-translate-lang="times_seen">Seen</th>
+                <th class="is-number" data-translate-lang="avg_gateways">Avg Gateways</th>
             </tr>
         </thead>
         <tbody></tbody>
@@ -207,7 +209,7 @@ async function loadMore() {
                     ${escapeHtml(n.long_name || n.node_id)}
                 </a>
             </td>
-            <td class="c-short">${n.short_name ? `<span class="node-short">${escapeHtml(n.short_name)}</span>` : ""}</td>
+            <td class="c-short">${n.short_name ? `<span class="node-short" style="${meshNodeStyle(n.node_id)}">${escapeHtml(n.short_name)}</span>` : ""}</td>
             <td class="c-channel">${escapeHtml(n.channel || "")}</td>
             <td class="c-sent" data-label="${headings[3] || ""}">${n.sent.toLocaleString(MeshI18n.language)}</td>
             <td class="c-seen" data-label="${headings[4] || ""}">${n.seen.toLocaleString(MeshI18n.language)}</td>

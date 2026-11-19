@@ -14,6 +14,10 @@
 .node-info-col > div > strong + strong { display:none; }
 .node-info-col > div > strong { flex-shrink:0; }
 .node-info-col > div > span { min-width:0; text-align:right; font-weight:500; }
+/* The short name's chip keeps its name in its middle. */
+.node-info-col > div > span.node-short { text-align:center; }
+/* The technical style: ids, coordinates and times in mono. */
+[data-style="technical"] :is(#info-id,#info-node-id,#info-lat,#info-lon,#info-altitude,#info-first-update,#info-last-update) { font-family:var(--mesh-mono); font-size:12.5px; }
 .node-info-col { position:relative; }
 /* Loading: in the middle of the room under the card's heading. */
 .node-info-loading { position:absolute; inset:52px 0 0; display:flex; align-items:center; justify-content:center; margin:0; color:var(--mesh-muted); }
@@ -52,13 +56,13 @@
 .packet-filter-actions { display:flex; align-items:center; gap:8px; margin-left:auto; }
 .filter-container { display:flex; gap:10px; flex-wrap:wrap; padding:12px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); margin-bottom:18px; }
 #qrModal { display:none; position:fixed; inset:0; background:#17263c99; z-index:9999; align-items:center; justify-content:center; padding:16px; }
-#qrModal > div { background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:12px; padding:24px; width:380px; max-width:100%; text-align:center; }
+#qrModal > div { background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius-lg); padding:24px; width:380px; max-width:100%; text-align:center; }
 .qr-header { display:flex; justify-content:space-between; align-items:center; gap:10px; }
 .qr-title { font-size:18px; margin:0; }
 .qr-node-name { font-size:15px; margin:16px 0; overflow-wrap:anywhere; }
 .qr-image { display:inline-block; padding:16px; background:var(--mesh-surface); margin-bottom:14px; }
 .qr-image img,.qr-image canvas { max-width:100%; }
-.qr-url-container { border:1px solid var(--mesh-border); border-radius:6px; background:var(--mesh-page); padding:12px; margin-bottom:16px; }
+.qr-url-container { border:1px solid var(--mesh-border); border-radius:var(--mesh-radius-xs); background:var(--mesh-page); padding:12px; margin-bottom:16px; }
 .qr-url { display:block; max-height:80px; overflow:auto; overflow-wrap:anywhere; font:11px/1.6 monospace; color:var(--mesh-muted); }
 .qr-actions { display:flex; justify-content:center; }
 .mesh-data-page .copied { background:#e8f5ee; color:#187346; }
@@ -343,7 +347,7 @@
             <th data-translate-lang="from">From</th>
             <th data-translate-lang="to">To</th>
             <th data-translate-lang="port">Port</th>
-            <th data-translate-lang="size">Size</th>
+            <th class="is-number" data-translate-lang="size">Size</th>
         </tr>
     </thead>
 
@@ -441,10 +445,10 @@ function makeNodePopup(node) {
         [MeshI18n.t("Role"), node.role],
         [MeshI18n.t("Channel"), node.channel],
         ["Hardware", node.hw_model],
-        [MeshI18n.t("Firmware"), node.firmware],
+        [MeshI18n.t("Firmware"), node.firmware, true],
         [MeshI18n.t("Last seen"), node.last_seen_us
             ? new Date(Number(node.last_seen_us) / 1000).toLocaleString(MeshI18n.language)
-            : MeshI18n.t("Unknown")],
+            : MeshI18n.t("Unknown"), !!node.last_seen_us],
     ]});
 }
 
@@ -543,7 +547,12 @@ async function loadNodeInfo(){
         document.getElementById("info-id").textContent    = node.id ?? "—";
         document.getElementById("info-node-id").textContent    = node.node_id ?? "—";
         document.getElementById("info-long-name").textContent  = node.long_name ?? "—";
-        document.getElementById("info-short-name").textContent = node.short_name ?? "—";
+        // Its short name as its chip, in its colours in the technical style.
+        const shortName = document.getElementById("info-short-name");
+        shortName.textContent = node.short_name ?? "—";
+        shortName.className = node.short_name ? "node-short" : "";
+        if (node.short_name) shortName.setAttribute("style", meshNodeStyle(node.node_id));
+        else shortName.removeAttribute("style");
         document.getElementById("info-hw-model").textContent   = node.hw_model ?? "—";
         document.getElementById("info-firmware").textContent   = node.firmware ?? "—";
         document.getElementById("info-role").textContent       = node.role ?? "—";

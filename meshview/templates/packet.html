@@ -14,6 +14,8 @@
 .packet-card .card-header { display:flex; align-items:baseline; justify-content:space-between; gap:6px 12px; flex-wrap:wrap; padding:14px 20px; border-bottom:1px solid var(--mesh-border); font-size:15px; font-weight:650; }
 .packet-card .card-header .packet-id { font-variant-numeric:tabular-nums; }
 .packet-card .card-header time { color:var(--mesh-muted); font-size:12.5px; font-weight:400; }
+/* The technical style: the packet's id, its time and its port's number in mono. */
+[data-style="technical"] :is(.packet-card .card-header :is(.packet-id,time),.packet-port-number,.packet-location) { font-family:var(--mesh-mono); }
 .packet-card .card-body { padding:18px 20px; }
 .packet-card .packet-port-number { margin-left:6px; color:var(--mesh-muted); }
 /* Each label on its value's line, also beside a taller tag. */
@@ -73,9 +75,9 @@
                 <thead>
                     <tr>
                         <th data-translate-lang="gateway">Gateway</th>
-                        <th data-translate-lang="rssi">RSSI</th>
-                        <th data-translate-lang="snr">SNR</th>
-                        <th data-translate-lang="hops">Hops</th>
+                        <th class="is-number" data-translate-lang="rssi">RSSI</th>
+                        <th class="is-number" data-translate-lang="snr">SNR</th>
+                        <th class="is-number" data-translate-lang="hops">Hops</th>
                         <th data-translate-lang="channel">Channel</th>
                         <th data-translate-lang="time">Time</th>
                     </tr>
@@ -247,7 +249,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 ${
                     lat && lon
                     ? `<dt data-translate-lang="location">${packetTranslations.location || MeshI18n.t("Location")}:</dt>
-                       <dd>${lat.toFixed(6)}, ${lon.toFixed(6)}</dd>`
+                       <dd class="packet-location">${lat.toFixed(6)}, ${lon.toFixed(6)}</dd>`
                     : ""
                 }
             </dl>
@@ -306,7 +308,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             MeshI18n.t("Packet Source"), [
                 [MeshI18n.t("Channel"), p.channel],
                 [MeshI18n.t("Port"), `${PORT_NAMES[p.portnum] || MeshI18n.t("UNKNOWN APP")} (${p.portnum})`],
-                [MeshI18n.t("Position"), `${srcLat.toFixed(6)}, ${srcLon.toFixed(6)}`],
+                [MeshI18n.t("Position"), `${srcLat.toFixed(6)}, ${srcLon.toFixed(6)}`, true],
             ]), {closeButton:false});
     } else {
         map.setView([0,0], 2);
@@ -436,7 +438,7 @@ seenTableBody.innerHTML = Object.keys(hopGroups)
                     ["Hardware", node?.hw_model],
                     [MeshI18n.t("Channel"), s.channel],
                     [MeshI18n.t("Distance"), distanceKm !== null
-                        ? `${oneDecimal(distanceKm)} km / ${oneDecimal(distanceMi)} mi` : null],
+                        ? `${oneDecimal(distanceKm)} km / ${oneDecimal(distanceMi)} mi` : null, true],
                 ], [
                     ["RSSI", decimal(s.rx_rssi) && `${decimal(s.rx_rssi)} dBm`],
                     ["SNR", decimal(s.rx_snr) && `${decimal(s.rx_snr)} dB`],

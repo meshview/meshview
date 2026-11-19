@@ -11,13 +11,13 @@
 .mesh-data-page .data-title { display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; min-width:0; }
 .mesh-data-page .data-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-left:auto; }
 .mesh-data-page .data-actions label { margin:0; font-size:13px; color:var(--mesh-muted); }
-.mesh-data-page .data-count { display:inline-flex; align-items:center; height:24px; padding:0 9px; border-radius:999px; background:var(--mesh-soft); color:var(--mesh-primary); font-size:12.5px; font-weight:600; }
+.mesh-data-page .data-count { display:inline-flex; align-items:center; height:24px; padding:0 9px; border-radius:var(--mesh-radius-pill); background:var(--mesh-soft); color:var(--mesh-primary); font-size:12.5px; font-weight:600; }
 /* Loading, the count keeps its width and shows a spinner in its figures' place. */
 .mesh-data-page .data-count[aria-busy="true"] { position:relative; color:transparent; }
 .mesh-data-page .data-count[aria-busy="true"]::before { position:absolute; inset:0; margin:auto; color:var(--mesh-primary); }
 .mesh-data-page .data-context { font-size:12.5px; color:var(--mesh-muted); }
 /* The live state as a pill beside the title. */
-.mesh-data-page .data-title .live-status { height:26px; padding:0 10px; border-radius:13px; background:var(--mesh-soft); color:var(--mesh-primary); font-weight:600; }
+.mesh-data-page .data-title .live-status { height:26px; padding:0 10px; border-radius:var(--mesh-radius-pill); background:var(--mesh-soft); color:var(--mesh-primary); font-weight:600; }
 .mesh-data-page .data-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:0 0 14px; padding:12px; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); }
 
 /* Tables. The wrapper clips rather than scrolls, so that the heading row can
@@ -28,10 +28,10 @@
 /* Separate borders, none between: collapsed ones do not move with the heading
    cells that stay in view, and the rows under them show through. */
 .mesh-data-page table { width:100%; font-size:13px; border-collapse:separate; border-spacing:0; }
-.mesh-data-page table th { position:sticky; top:0; z-index:2; height:36px; padding:8px 14px; background:var(--mesh-surface-2); border-bottom:1px solid var(--mesh-border); color:var(--mesh-muted); font-size:11.5px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; white-space:nowrap; text-align:left; vertical-align:middle; transition:top .2s ease; }
+.mesh-data-page table th { position:sticky; top:0; z-index:2; height:36px; padding:8px var(--mesh-cell-x); background:var(--mesh-surface-2); border-bottom:1px solid var(--mesh-border); color:var(--mesh-muted); font-size:11.5px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; white-space:nowrap; text-align:left; vertical-align:middle; transition:top .2s ease; }
 .mesh-data-page .data-table-wrap:not(.is-wide) > table th { top:var(--header-offset,0px); }
 .mesh-data-page .data-table-wrap.is-switching > table th { transition:none; }
-.mesh-data-page table td { height:40px; padding:4px 14px; border-bottom:1px solid var(--mesh-border-soft); vertical-align:middle; }
+.mesh-data-page table td { height:var(--mesh-row); padding:var(--mesh-cell-y) var(--mesh-cell-x); border-bottom:1px solid var(--mesh-border-soft); vertical-align:middle; }
 .mesh-data-page table tbody tr:hover { background:var(--mesh-surface-2); }
 .mesh-data-page table a { color:var(--mesh-text); font-weight:500; }
 /* In packet tables the packet id is the row's link out, in the accent. */

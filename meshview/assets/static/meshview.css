@@ -2,7 +2,8 @@
    The theme is two attributes on <html>, set by theme.js before the page paints:
    data-theme (light or dark) and data-accent (blue, the default, green, amber,
    tile, violet or graphite); each accent also tints the neutrals its way.
-   data-map-theme (light or dark) only darkens the maps' tiles.
+   data-map-theme (light or dark) only darkens the maps' tiles, and data-style
+   (soft or technical, at the end) changes only the shapes and the type.
    The --mesh-* names are the ones every page's styles use. */
 
 /* ---- Theme ------------------------------------------------------------- */
@@ -11,9 +12,16 @@
     color-scheme:light;
     --mesh-font:"Inter Variable",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
     --mesh-mono:ui-monospace,"SFMono-Regular",Consolas,monospace;
+    --mesh-figure-font:var(--mesh-font);
     --mesh-radius:10px;
     --mesh-radius-sm:8px;
+    --mesh-radius-xs:6px;
+    --mesh-radius-lg:14px;
+    --mesh-radius-pill:999px;
     --mesh-control:36px;
+    --mesh-row:40px;
+    --mesh-cell-y:4px;
+    --mesh-cell-x:14px;
 
     --mesh-page:#f1f4f9;
     --mesh-surface:#ffffff;
@@ -42,6 +50,9 @@
     --mesh-danger:#b42318;
     --mesh-scrim:rgba(16,25,37,.45);
     --mesh-shadow:0 12px 32px rgba(16,25,37,.16);
+    --mesh-shadow-card:0 2px 12px rgba(16,25,37,.10);
+    --mesh-shadow-float:0 2px 8px rgba(16,25,37,.18);
+    --mesh-shadow-thumb:0 1px 3px rgba(16,25,37,.14);
 }
 :root[data-theme="dark"] {
     color-scheme:dark;
@@ -426,9 +437,10 @@ hr { margin:1rem 0; border:0; border-top:1px solid var(--mesh-border); }
 .mesh-button.is-primary:hover { border-color:var(--mesh-primary-dark); background:var(--mesh-primary-dark); color:var(--mesh-on-primary); }
 .mesh-button.is-ghost { border-color:transparent; background:transparent; color:var(--mesh-primary); font-weight:600; }
 .mesh-button.is-ghost:hover { background:var(--mesh-soft); }
-.mesh-button svg { width:16px; height:16px; }
-/* A node's short name, as a chip. */
-.node-short { display:inline-block; padding:2px 7px; border-radius:6px; background:var(--mesh-soft); color:var(--mesh-primary); font-size:12px; font-weight:600; white-space:nowrap; }
+.mesh-button svg { flex-shrink:0; width:16px; height:16px; }
+/* A node's short name, as a chip; all as wide as four letters at least, so that
+   a column of them lines up, with shorter names (or an emoji) in the middle. */
+.node-short { display:inline-block; min-width:calc(3.4em + 14px); padding:2px 7px; border-radius:var(--mesh-radius-xs); background:var(--mesh-soft); color:var(--mesh-primary); font-size:12px; font-weight:600; text-align:center; white-space:nowrap; }
 /* Chart tooltips: their card is set in theme.js; inside, meshTip's pieces. */
 .mesh-chart-tip { font-variant-numeric:tabular-nums; }
 .mesh-tip-title { display:flex; align-items:baseline; gap:16px; font-weight:600; margin-bottom:4px; }
@@ -451,13 +463,13 @@ hr { margin:1rem 0; border:0; border-top:1px solid var(--mesh-border); }
 }
 .mesh-input,.mesh-select { height:var(--mesh-control); padding:0 10px; border:1px solid var(--mesh-border-strong); border-radius:var(--mesh-radius-sm); background:var(--mesh-surface); color:var(--mesh-text); font-size:13.5px; }
 .mesh-input::placeholder { color:var(--mesh-muted); }
-.mesh-chip { display:inline-flex; align-items:center; gap:8px; height:32px; padding:0 12px 0 10px; border:1px solid var(--mesh-border-strong); border-radius:16px; background:var(--mesh-surface); font-size:13px; font-weight:500; white-space:nowrap; cursor:pointer; user-select:none; }
+.mesh-chip { display:inline-flex; align-items:center; gap:8px; height:32px; padding:0 12px 0 10px; border:1px solid var(--mesh-border-strong); border-radius:var(--mesh-radius-pill); background:var(--mesh-surface); font-size:13px; font-weight:500; white-space:nowrap; cursor:pointer; user-select:none; }
 .mesh-chip:has(input:checked) { background:var(--mesh-soft); border-color:var(--mesh-hover); }
 .mesh-chip input { margin:0; }
 .mesh-dot { flex-shrink:0; width:8px; height:8px; border-radius:50%; background:var(--dot-color,var(--mesh-muted)); box-shadow:inset 0 0 0 1px rgba(0,0,0,.18); }
-.mesh-tag { display:inline-flex; align-items:center; gap:7px; height:24px; padding:0 9px; border:1px solid var(--mesh-border-strong); border-radius:6px; font-size:12px; font-weight:500; white-space:nowrap; }
+.mesh-tag { display:inline-flex; align-items:center; gap:7px; height:24px; padding:0 9px; border:1px solid var(--mesh-border-strong); border-radius:var(--mesh-radius-xs); font-size:12px; font-weight:500; white-space:nowrap; }
 .mesh-label { font-size:11.5px; font-weight:650; letter-spacing:.05em; text-transform:uppercase; color:var(--mesh-muted); }
-@media(pointer:coarse) { :root { --mesh-control:44px; } .mesh-chip { height:40px; border-radius:20px; } }
+@media(pointer:coarse) { :root { --mesh-control:44px; } .mesh-chip { height:40px; border-radius:var(--mesh-radius-pill); } }
 
 /* Live feed status: green live, grey paused, amber stale, red offline. */
 .live-status { display:inline-flex; align-items:center; gap:7px; font-size:12.5px; color:var(--mesh-muted); }
@@ -484,13 +496,13 @@ hr { margin:1rem 0; border:0; border-top:1px solid var(--mesh-border); }
 .mesh-metric-in { display:grid; grid-template-columns:40px minmax(0,1fr); grid-template-areas:"icon value" "icon name" "icon caption"; column-gap:14px; align-items:center; line-height:1.2; }
 .mesh-metric-icon { grid-area:icon; display:flex; align-items:center; justify-content:center; width:40px; height:40px; border-radius:var(--mesh-radius); background:var(--mesh-soft); color:var(--mesh-primary); }
 .mesh-metric-icon svg { width:22px; height:22px; }
-.mesh-metric-in strong { grid-area:value; font-size:24px; font-weight:650; color:var(--mesh-text); }
+.mesh-metric-in strong { grid-area:value; font-family:var(--mesh-figure-font); font-size:24px; font-weight:650; color:var(--mesh-text); }
 .mesh-metric-name { grid-area:name; min-width:0; font-size:12.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .mesh-metric-in small { grid-area:caption; min-width:0; font-size:11.5px; color:var(--mesh-muted); }
 /* Little room: a small icon beside the name, then the value and the caption. */
 @container (max-width:210px) {
     .mesh-metric-in { grid-template-columns:22px minmax(0,1fr); grid-template-areas:"icon name" "value value" "caption caption"; column-gap:8px; row-gap:2px; }
-    .mesh-metric-icon { width:22px; height:22px; border-radius:6px; }
+    .mesh-metric-icon { width:22px; height:22px; border-radius:var(--mesh-radius-xs); }
     .mesh-metric-icon svg { width:14px; height:14px; }
 }
 /* The figures two by two where four in a row do not fit. */
@@ -504,7 +516,7 @@ hr { margin:1rem 0; border:0; border-top:1px solid var(--mesh-border); }
     /* Phones: the short figure, icon beside value and name, with no caption. */
     .mesh-metric { padding:12px; }
     .mesh-metric-in { grid-template-columns:32px minmax(0,1fr); grid-template-areas:"icon value" "icon name"; column-gap:10px; row-gap:0; }
-    .mesh-metric-icon { width:32px; height:32px; border-radius:8px; }
+    .mesh-metric-icon { width:32px; height:32px; border-radius:var(--mesh-radius-sm); }
     .mesh-metric-icon svg { width:18px; height:18px; }
     .mesh-metric-in strong { font-size:20px; }
     .mesh-metric-in small { display:none; }
@@ -515,9 +527,9 @@ hr { margin:1rem 0; border:0; border-top:1px solid var(--mesh-border); }
    tag, the arrow that opens a packet's payload, the payload, and the cue a new
    packet gets. */
 
-:is(.port-tag,.mesh-traffic-type) { display:inline-flex; align-items:center; gap:7px; height:24px; padding:0 9px; border:1px solid var(--mesh-border-strong); border-radius:6px; font-size:12px; font-weight:500; white-space:nowrap; vertical-align:middle; }
+:is(.port-tag,.mesh-traffic-type) { display:inline-flex; align-items:center; gap:7px; height:24px; padding:0 9px; border:1px solid var(--mesh-border-strong); border-radius:var(--mesh-radius-xs); font-size:12px; font-weight:500; white-space:nowrap; vertical-align:middle; }
 :is(.port-tag,.mesh-traffic-type)::before { content:""; flex-shrink:0; width:8px; height:8px; border-radius:50%; background:var(--port-color,#6c757d); box-shadow:inset 0 0 0 1px rgba(0,0,0,.18); }
-.packet-toggle { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; margin-right:6px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--mesh-muted); vertical-align:middle; }
+.packet-toggle { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; margin-right:6px; padding:0; border:0; border-radius:var(--mesh-radius-xs); background:transparent; color:var(--mesh-muted); vertical-align:middle; }
 .packet-toggle:hover { background:var(--mesh-soft); color:var(--mesh-primary); }
 .packet-toggle .ti { transition:transform .15s ease; }
 .packet-toggle[aria-expanded="true"] .ti { transform:rotate(90deg); }
@@ -538,7 +550,7 @@ hr { margin:1rem 0; border:0; border-top:1px solid var(--mesh-border); }
 .leaflet-container { font:inherit; background:var(--mesh-surface-2); }
 /* Popups as the house's cards; a node's (node-popup.js) as the map page's node
    card: its short name, its long name, its id, its facts. */
-.leaflet-popup-content-wrapper { border-radius:var(--mesh-radius); box-shadow:0 2px 12px rgba(16,25,37,.16); }
+.leaflet-popup-content-wrapper { border-radius:var(--mesh-radius); box-shadow:var(--mesh-shadow-float); }
 .leaflet-popup-tip { box-shadow:none; }
 .leaflet-container a.node-popup-short,.node-popup-short { display:inline-block; color:var(--mesh-primary); font-size:14px; font-weight:650; }
 .node-popup { min-width:240px; font-size:12.5px; }
@@ -607,7 +619,7 @@ hr { margin:1rem 0; border:0; border-top:1px solid var(--mesh-border); }
 
 /* ---- Dialogs ----------------------------------------------------------- */
 
-.mesh-dialog { width:min(640px, calc(100vw - 32px)); max-height:min(80vh, 720px); padding:0; border:1px solid var(--mesh-border); border-radius:14px; background:var(--mesh-surface); color:var(--mesh-text); box-shadow:var(--mesh-shadow); }
+.mesh-dialog { width:min(640px, calc(100vw - 32px)); max-height:min(80vh, 720px); padding:0; border:1px solid var(--mesh-border); border-radius:var(--mesh-radius-lg); background:var(--mesh-surface); color:var(--mesh-text); box-shadow:var(--mesh-shadow); }
 .mesh-dialog::backdrop { background:var(--mesh-scrim); }
 .mesh-dialog[open] { display:flex; flex-direction:column; }
 .mesh-dialog-header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 14px 12px 22px; border-bottom:1px solid var(--mesh-border); }
@@ -627,6 +639,8 @@ hr { margin:1rem 0; border:0; border-top:1px solid var(--mesh-border); }
 .mesh-about-version { margin-bottom:16px !important; color:var(--mesh-muted); font-size:13px; }
 .mesh-about-links { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; margin:0 0 18px; }
 .mesh-about-links a { justify-content:center; }
+/* Three links (no Planet's): the website alone on the first line, the other two under it. */
+.mesh-about-links.is-three a:first-child { grid-column:1 / -1; }
 .mesh-about-links svg { color:var(--mesh-primary); }
 .mesh-about-small { margin-bottom:6px !important; color:var(--mesh-muted); font-size:12.5px; text-wrap:balance; }
 .mesh-about-small a { color:var(--mesh-muted); }
@@ -638,7 +652,7 @@ hr { margin:1rem 0; border:0; border-top:1px solid var(--mesh-border); }
 /* An expanded chart (chart-modal.html, chart-kit.js): its title, its card's selects
    and a close, over the chart filling the rest. */
 .chart-modal { display:none; position:fixed; inset:0; z-index:2000; align-items:center; justify-content:center; padding:16px; background:var(--mesh-scrim); }
-.chart-modal-box { display:flex; flex-direction:column; width:min(1200px, 100%); height:min(85dvh, 820px); background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:14px; box-shadow:var(--mesh-shadow); overflow:hidden; }
+.chart-modal-box { display:flex; flex-direction:column; width:min(1200px, 100%); height:min(85dvh, 820px); background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius-lg); box-shadow:var(--mesh-shadow); overflow:hidden; }
 .chart-modal-head { display:flex; align-items:center; flex-wrap:wrap; gap:8px 12px; padding:10px 10px 10px 20px; border-bottom:1px solid var(--mesh-border); }
 .chart-modal-head h2 { flex:1 1 auto; min-width:0; margin:0; font-size:16px; }
 .chart-modal-controls { display:flex; align-items:center; gap:8px; }
@@ -654,7 +668,7 @@ hr { margin:1rem 0; border:0; border-top:1px solid var(--mesh-border); }
 /* Segmented choice: a pill slides under the chosen option. --n is the number of
    options, set where it is used; --i, which one is chosen, follows the radios. */
 .mesh-segmented { --n:2; --i:0; position:relative; display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:4px; padding:4px; border-radius:var(--mesh-radius); background:var(--mesh-surface-2); border:1px solid var(--mesh-border); }
-.mesh-segmented::before { content:""; position:absolute; top:4px; bottom:4px; left:4px; width:calc((100% - 8px - (var(--n) - 1) * 4px) / var(--n)); border-radius:var(--mesh-radius-sm); background:var(--mesh-surface); box-shadow:0 1px 3px rgba(16,25,37,.14); transform:translateX(calc(var(--i) * (100% + 4px))); transition:transform .25s cubic-bezier(.3,.7,.4,1); }
+.mesh-segmented::before { content:""; position:absolute; top:4px; bottom:4px; left:4px; width:calc((100% - 8px - (var(--n) - 1) * 4px) / var(--n)); border-radius:var(--mesh-radius-sm); background:var(--mesh-surface); box-shadow:var(--mesh-shadow-thumb); transform:translateX(calc(var(--i) * (100% + 4px))); transition:transform .25s cubic-bezier(.3,.7,.4,1); }
 .mesh-segmented:has(> label:nth-of-type(2) input:checked) { --i:1; }
 .mesh-segmented:has(> label:nth-of-type(3) input:checked) { --i:2; }
 .mesh-segmented:has(> label:nth-of-type(4) input:checked) { --i:3; }
@@ -684,3 +698,106 @@ hr { margin:1rem 0; border:0; border-top:1px solid var(--mesh-border); }
 @media(max-width:420px) { .mesh-segmented label { gap:6px; font-size:12.5px; white-space:nowrap; } }
 .mesh-prefs .mesh-select { width:100%; }
 .mesh-prefs-note { margin:8px 0 0; font-size:12.5px; color:var(--mesh-muted); }
+
+/* ---- Technical style ----------------------------------------------------
+   data-style="technical": the same pages as a tool's, square, flat and dense,
+   with figures, ids and times in a monospaced face. Only tokens and type
+   change here, never what a page shows. */
+
+:root[data-style="technical"] {
+    --mesh-mono:"JetBrains Mono Variable",ui-monospace,"SFMono-Regular",Consolas,monospace;
+    --mesh-figure-font:var(--mesh-mono);
+    --mesh-radius:2px;
+    --mesh-radius-sm:2px;
+    --mesh-radius-xs:2px;
+    --mesh-radius-lg:3px;
+    --mesh-radius-pill:2px;
+    --mesh-row:30px;
+    --mesh-cell-y:2px;
+    --mesh-cell-x:12px;
+    --mesh-shadow:0 8px 24px rgba(16,25,37,.18);
+    --mesh-shadow-card:none;
+    --mesh-shadow-float:0 1px 4px rgba(16,25,37,.16);
+    --mesh-shadow-thumb:none;
+}
+:root[data-style="technical"][data-theme="dark"] { --mesh-shadow:0 8px 24px rgba(0,0,0,.5); }
+/* The current page underlined in the bar, as a tab, rather than in a pill. */
+@media(min-width:861px) {
+    [data-style="technical"] :is(#site-menu a:not(.mesh-more-menu a),.mesh-more-button) { height:52px; border-radius:0; }
+    [data-style="technical"] :is(#site-menu a:not(.mesh-more-menu a),.mesh-more-button).active { background:none; box-shadow:inset 0 -2px 0 var(--mesh-primary); }
+}
+/* Figures: no icons; a small label over the value, in mono. */
+[data-style="technical"] .mesh-metric-icon { display:none; }
+[data-style="technical"] .mesh-metric-in { grid-template-columns:minmax(0,1fr); grid-template-areas:"name" "value" "caption"; row-gap:4px; }
+[data-style="technical"] .mesh-metric-name { font-size:11px; font-weight:500; letter-spacing:.07em; text-transform:uppercase; color:var(--mesh-muted); }
+[data-style="technical"] .mesh-metric-in strong { font-weight:500; letter-spacing:-.02em; }
+/* Ids, short names, times, counts and figures in tables, in mono. */
+[data-style="technical"] :is(.node-short,.c-time,.chat-time,.c-id,.subject-id,.data-count,.mesh-count,td.is-number) { font-family:var(--mesh-mono); font-size:12px; }
+[data-style="technical"] .node-short { min-width:calc(4ch + 4 * .03em + 14px); letter-spacing:.03em; }
+[data-style="technical"] :is(.mesh-count,.data-count) { border-radius:0; }
+/* Map popups: the figures in a row, and the facts that are data, in mono. */
+[data-style="technical"] :is(.node-popup-figures dd,.node-popup-facts dd.is-data) { font-family:var(--mesh-mono); font-size:12px; }
+/* The map's node card: its id, firmware, last seen and position in mono. */
+[data-style="technical"] :is(#inspector-facts dd,#inspector-node-meta span).is-data { font-family:var(--mesh-mono); font-size:12px; }
+[data-style="technical"] .mesh-data-page table th { font-size:11px; letter-spacing:.06em; }
+[data-style="technical"] .mesh-data-page .mesh-content .favorite-star { width:26px; height:26px; }
+/* Tables as tables (not as cards): a darker heading, figures in mono and to the
+   right, short names as stamps in the accent, and on Nodes a last seen that
+   fades with age. */
+[data-style="technical"] :is(.mesh-data-page table,.mesh-traffic-table):not(.is-cards) th { background:var(--mesh-page); }
+[data-style="technical"] :is(
+    .nodes-table :is(.c-lat,.c-lon,.c-alt),
+    .top-table :is(.c-sent,.c-seen,.c-avg),
+    .packet-table :is(.c-size,.c-gw,.c-rssi,.c-snr,.c-hops),
+    .seen-table :is(.c-rssi,.c-snr,.c-hops),
+    .reach-table :is(.c-heard,.c-hops,.c-rel),
+    .net-table .c-num
+):is(td) { font-family:var(--mesh-mono); font-size:12px; }
+[data-style="technical"] table:not(.is-cards) :is(
+    .nodes-table :is(.c-lat,.c-lon,.c-alt),
+    .top-table :is(.c-sent,.c-seen,.c-avg),
+    .packet-table :is(.c-size,.c-gw,.c-rssi,.c-snr,.c-hops),
+    .seen-table :is(.c-rssi,.c-snr,.c-hops),
+    .reach-table :is(.c-heard,.c-hops,.c-rel),
+    .net-table .c-num
+), [data-style="technical"] table:not(.is-cards) th.is-number { text-align:right; }
+/* Short names as stamps: in the node's own colours (meshNodeStyle in theme.js),
+   as the Meshtastic apps show them, but within a band of lightness and with
+   the loudest toned down, so that each keeps its hue and how light it is
+   beside the others, under black or white text by its new lightness; with a
+   faint edge for those close to the page's, and in the accent where there is
+   no node. The soft style keeps them in the accent's soft tint, whose calm a
+   column of colours would break. */
+[data-style="technical"] .node-short { border-radius:0; background:var(--mesh-primary); color:var(--mesh-on-primary); }
+[data-style="technical"] .node-short[style*="--node-bg"] { background:var(--node-bg); color:var(--node-fg); box-shadow:inset 0 0 0 1px rgba(0,0,0,.12); }
+[data-style="technical"][data-theme="dark"] .node-short[style*="--node-bg"] { box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); }
+@supports (color:oklch(from red l c h)) {
+    [data-style="technical"] .node-short[style*="--node-bg"] { background:oklch(from var(--node-bg) clamp(.45, l, .85) min(c, .16) h); color:oklch(from var(--node-bg) clamp(0, (.66 - clamp(.45, l, .85)) * 1000, 1) 0 0); }
+    [data-style="technical"][data-theme="dark"] .node-short[style*="--node-bg"] { background:oklch(from var(--node-bg) clamp(.38, l, .78) min(c, .14) h); color:oklch(from var(--node-bg) clamp(0, (.62 - clamp(.38, l, .78)) * 1000, 1) 0 0); }
+}
+/* Home's list of nodes: the short name under each, plain text in the soft
+   style, the same stamp here. */
+[data-style="technical"] .mesh-node-short { display:inline-block; min-width:calc(4ch + 4 * .03em + 12px); margin-right:2px; padding:0 6px; font-family:var(--mesh-mono); font-size:11.5px; font-weight:600; letter-spacing:.03em; line-height:18px; text-align:center; background:var(--node-bg); color:var(--node-fg); box-shadow:inset 0 0 0 1px rgba(0,0,0,.12); }
+[data-style="technical"][data-theme="dark"] .mesh-node-short { box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); }
+@supports (color:oklch(from red l c h)) {
+    [data-style="technical"] .mesh-node-short { background:oklch(from var(--node-bg) clamp(.45, l, .85) min(c, .16) h); color:oklch(from var(--node-bg) clamp(0, (.66 - clamp(.45, l, .85)) * 1000, 1) 0 0); }
+    [data-style="technical"][data-theme="dark"] .mesh-node-short { background:oklch(from var(--node-bg) clamp(.38, l, .78) min(c, .14) h); color:oklch(from var(--node-bg) clamp(0, (.62 - clamp(.38, l, .78)) * 1000, 1) 0 0); }
+}
+/* Ports, and the chat's channels, to match: the whole tag in its colour's hue,
+   without the dot, in one range per theme so that all weigh the same: a pale
+   fill under dark text of that hue in the light theme, a deep one under light
+   text in the dark. Where the browser cannot derive colours, the colour itself
+   under white text. */
+[data-style="technical"] :is(.port-tag,.mesh-traffic-type) { --tag:var(--port-color,#6c757d); }
+[data-style="technical"] .chat-channel { --tag:var(--channel-color,#6c757d); }
+[data-style="technical"] :is(.port-tag,.mesh-traffic-type,.chat-channel) { gap:0; border-color:transparent; border-radius:0; background:var(--tag); color:#fff; font-weight:600; }
+@supports (color:oklch(from red l c h)) {
+    [data-style="technical"] :is(.port-tag,.mesh-traffic-type,.chat-channel) { background:oklch(from var(--tag) .9 calc(c * .45) h); color:oklch(from var(--tag) .36 calc(c * .8) h); }
+    [data-style="technical"][data-theme="dark"] :is(.port-tag,.mesh-traffic-type,.chat-channel) { background:oklch(from var(--tag) .4 calc(c * .55) h); color:oklch(from var(--tag) .93 calc(c * .35) h); }
+}
+[data-style="technical"] :is(.port-tag,.mesh-traffic-type,.chat-channel)::before { display:none; }
+[data-style="technical"] .nodes-table .c-seen { font-family:var(--mesh-mono); font-size:12px; }
+[data-style="technical"] .nodes-table tr[data-age="hours"] .c-seen { color:var(--mesh-muted); }
+[data-style="technical"] .nodes-table tr[data-age="days"] .c-seen { color:color-mix(in srgb, var(--mesh-muted) 75%, var(--mesh-surface)); }
+/* Leaflet's own controls, square too. */
+[data-style="technical"] :is(.leaflet-bar,.leaflet-bar a,.leaflet-control-layers) { border-radius:var(--mesh-radius-sm); }

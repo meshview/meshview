@@ -19,7 +19,7 @@ if (new URLSearchParams(location.search).has('kiosk')) {
    away. On phones it all stacks: figures, map, filters, nodes, traffic. */
 
 /* Map pieces drawn by the scripts. */
-.blinking-tooltip { background:var(--mesh-surface); color:var(--mesh-text); border:1px solid var(--mesh-border-strong); border-radius:6px; padding:3px 7px; font-size:12px; box-shadow:0 2px 8px rgba(16,25,37,.18); }
+.blinking-tooltip { background:var(--mesh-surface); color:var(--mesh-text); border:1px solid var(--mesh-border-strong); border-radius:var(--mesh-radius-xs); padding:3px 7px; font-size:12px; box-shadow:var(--mesh-shadow-float); }
 .blinking-tooltip.text-packet { animation:textPulse 1.1s ease-in-out 6; border-color:#ff8c00; }
 @keyframes textPulse { 50% { box-shadow:0 4px 14px rgba(255,140,0,.45); } }
 .mesh-map-panel { --packet-reach-color:#1f2937; }
@@ -35,8 +35,8 @@ if (new URLSearchParams(location.search).has('kiosk')) {
 }
 
 /* Floating cards: on the map, and the map's own controls, framed alike. */
-.mesh-float { background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); box-shadow:0 2px 12px rgba(16,25,37,.10); }
-.mesh-map-panel .leaflet-bar,.mesh-map-panel .leaflet-control-layers { border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); box-shadow:0 2px 12px rgba(16,25,37,.10); background-clip:padding-box; overflow:hidden; }
+.mesh-float { background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); box-shadow:var(--mesh-shadow-card); }
+.mesh-map-panel .leaflet-bar,.mesh-map-panel .leaflet-control-layers { border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); box-shadow:var(--mesh-shadow-card); background-clip:padding-box; overflow:hidden; }
 .mesh-map-panel .leaflet-bar a { width:36px; height:36px; line-height:36px; border-bottom-color:var(--mesh-border); color:var(--mesh-text); }
 .mesh-map-panel .leaflet-control-layers-toggle { width:40px; height:40px; }
 .mesh-map-panel .leaflet-control-layers-expanded { padding:10px 12px; font-size:13px; }
@@ -75,7 +75,7 @@ if (new URLSearchParams(location.search).has('kiosk')) {
 #unmapped-list li { display:flex; gap:6px; padding:3px 0; border-bottom:1px solid var(--mesh-border-soft); }
 #unmapped-list li:last-child { border-bottom:0; }
 .unmapped-empty { color:var(--mesh-muted); }
-.map-overlay-count { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--mesh-primary); color:var(--mesh-on-primary); font-size:11px; font-weight:700; }
+.map-overlay-count { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; border-radius:var(--mesh-radius-pill); background:var(--mesh-primary); color:var(--mesh-on-primary); font-size:11px; font-weight:700; }
 #map-load-status:empty { display:none; }
 #map-load-status { position:absolute; top:12px; left:50%; z-index:900; transform:translateX(-50%); margin:0; padding:8px 12px; color:var(--mesh-danger); }
 
@@ -109,7 +109,7 @@ if (new URLSearchParams(location.search).has('kiosk')) {
 }
 .map-filter-group { display:contents; }
 .map-filter-group:empty { display:none; }
-.map-filter { display:inline-flex; align-items:center; gap:7px; height:32px; margin:0; padding:0 12px 0 10px; border:1px solid var(--mesh-border-strong); border-radius:16px; background:var(--mesh-surface); font-size:13px; font-weight:500; white-space:nowrap; cursor:pointer; user-select:none; }
+.map-filter { display:inline-flex; align-items:center; gap:7px; height:32px; margin:0; padding:0 12px 0 10px; border:1px solid var(--mesh-border-strong); border-radius:var(--mesh-radius-pill); background:var(--mesh-surface); font-size:13px; font-weight:500; white-space:nowrap; cursor:pointer; user-select:none; }
 .map-filter:has(input:checked) { background:var(--mesh-soft); border-color:var(--mesh-hover); }
 .map-filter:hover { border-color:var(--mesh-muted); }
 .map-filter input { margin:0; }
@@ -125,7 +125,7 @@ button.map-filter-dot:hover,button.map-filter-dot[aria-expanded="true"] { box-sh
 .mesh-footer-attribution { display:none; }
 .mesh-footer-attribution a { color:inherit; }
 .mesh-footer-attribution a:hover { color:var(--mesh-primary); text-decoration:none; }
-@media(pointer:coarse) { .map-filter,.map-filter-reset { height:34px; border-radius:17px; } }
+@media(pointer:coarse) { .map-filter,.map-filter-reset { height:34px; border-radius:var(--mesh-radius-pill); } }
 
 /* Channel colour picker, on the map page. */
 .map-color-popover { position:fixed; z-index:2000; padding:10px; font-size:12px; }
@@ -134,7 +134,7 @@ button.map-filter-dot:hover,button.map-filter-dot[aria-expanded="true"] { box-sh
 .map-color-swatch:hover { transform:scale(1.12); }
 .map-color-swatch[aria-pressed="true"] { box-shadow:inset 0 0 0 1px rgba(0,0,0,.18), 0 0 0 2px var(--mesh-surface), 0 0 0 4px var(--mesh-text); }
 .map-color-actions { position:relative; display:flex; flex-direction:column; gap:2px; margin-top:10px; padding-top:8px; border-top:1px solid var(--mesh-border); }
-.map-color-actions button { display:flex; align-items:center; gap:8px; padding:6px 8px; border:0; border-radius:6px; background:none; text-align:left; }
+.map-color-actions button { display:flex; align-items:center; gap:8px; padding:6px 8px; border:0; border-radius:var(--mesh-radius-xs); background:none; text-align:left; }
 .map-color-actions button:hover { background:var(--mesh-soft); }
 .map-color-actions .ti { font-size:15px; color:var(--mesh-primary); }
 .map-color-input { position:absolute; left:8px; bottom:0; width:1px; height:1px; padding:0; border:0; opacity:0; pointer-events:none; }
@@ -147,10 +147,10 @@ button.map-filter-dot:hover,button.map-filter-dot[aria-expanded="true"] { box-sh
 .mesh-node-picker .leaflet-popup-content { margin:0; width:260px !important; max-width:calc(100vw - 64px); }
 .node-picker-head { display:flex; align-items:center; gap:8px; padding:2px 2px 2px 8px; }
 .mesh-node-picker .node-picker-title { flex:1; margin:0; color:var(--mesh-muted); font-size:12px; font-weight:500; }
-.node-picker-zoom { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--mesh-muted); }
+.node-picker-zoom { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; padding:0; border:0; border-radius:var(--mesh-radius-xs); background:transparent; color:var(--mesh-muted); }
 .node-picker-zoom:hover { background:var(--mesh-hover); color:var(--mesh-text); }
 .node-picker-list { display:flex; flex-direction:column; gap:1px; overflow-y:auto; margin:0; padding:0; list-style:none; }
-.node-picker-item { display:grid; grid-template-columns:10px minmax(0,1fr) auto; align-items:center; gap:9px; width:100%; min-height:40px; padding:6px 8px; border:0; border-radius:6px; background:transparent; font-size:13px; line-height:1.3; text-align:left; }
+.node-picker-item { display:grid; grid-template-columns:10px minmax(0,1fr) auto; align-items:center; gap:9px; width:100%; min-height:40px; padding:6px 8px; border:0; border-radius:var(--mesh-radius-xs); background:transparent; font-size:13px; line-height:1.3; text-align:left; }
 .node-picker-item:hover,.node-picker-item:focus-visible { background:var(--mesh-hover); }
 .node-picker-dot { width:10px; height:10px; border-radius:50%; background:var(--node-color); box-shadow:0 0 0 1px #fff, 0 0 0 2px rgba(0,0,0,.18); }
 .node-picker-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -164,7 +164,7 @@ button.map-filter-dot:hover,button.map-filter-dot[aria-expanded="true"] { box-sh
 .mesh-node-browser-body { display:flex; flex-direction:column; flex:1; min-height:0; }
 .mesh-panel-title { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:52px; padding:8px 14px; border-bottom:1px solid var(--mesh-border); }
 .mesh-panel-title h2 { margin:0; font-size:15px; }
-.mesh-count { padding:2px 9px; border-radius:999px; background:var(--mesh-soft); color:var(--mesh-primary); font-size:12.5px; font-weight:600; }
+.mesh-count { padding:2px 9px; border-radius:var(--mesh-radius-pill); background:var(--mesh-soft); color:var(--mesh-primary); font-size:12.5px; font-weight:600; }
 .mesh-panel-toggle { display:inline-flex; align-items:center; gap:8px; padding:0; border:0; background:none; font:inherit; text-align:left; }
 .mesh-panel-toggle svg { width:18px; height:18px; color:var(--mesh-muted); transition:transform .2s ease; }
 .mesh-panel-toggle[aria-expanded="false"] svg { transform:rotate(-90deg); }
@@ -180,8 +180,6 @@ button.map-filter-dot:hover,button.map-filter-dot[aria-expanded="true"] { box-sh
 .mesh-node-list { flex:1; min-height:0; overflow:auto; }
 .mesh-node-row { display:flex; align-items:center; gap:12px; width:100%; min-height:56px; padding:8px 14px; border:0; border-bottom:1px solid var(--mesh-border-soft); background:transparent; text-align:left; }
 .mesh-node-row:hover,.mesh-node-row:focus-visible { background:var(--mesh-surface-2); }
-.mesh-node-dot { flex-shrink:0; width:8px; height:8px; border-radius:50%; background:var(--mesh-live); }
-.mesh-node-dot.offline { background:var(--mesh-border-strong); }
 .mesh-node-copy { flex:1; min-width:0; }
 .mesh-node-copy strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; font-weight:600; }
 .mesh-node-copy small { display:block; margin-top:2px; font-size:12px; color:var(--mesh-muted); }
@@ -204,7 +202,7 @@ button.map-filter-dot:hover,button.map-filter-dot[aria-expanded="true"] { box-sh
 .mesh-inspector-facts dd { margin:0; overflow-wrap:anywhere; }
 .mesh-inspector-section { margin:18px 0 10px; padding-top:14px; border-top:1px solid var(--mesh-border); font-size:11.5px; font-weight:650; letter-spacing:.05em; text-transform:uppercase; color:var(--mesh-muted); }
 .mesh-inspector-actions { display:flex; flex-wrap:wrap; gap:12px; margin-top:14px; font-size:13px; font-weight:600; }
-.mesh-inspector-packet { display:block; margin:0 -8px; padding:9px 8px; border-bottom:1px solid var(--mesh-border-soft); border-radius:6px; color:var(--mesh-text); font-size:12.5px; text-decoration:none; }
+.mesh-inspector-packet { display:block; margin:0 -8px; padding:9px 8px; border-bottom:1px solid var(--mesh-border-soft); border-radius:var(--mesh-radius-xs); color:var(--mesh-text); font-size:12.5px; text-decoration:none; }
 .mesh-inspector-packet:last-child { border-bottom:0; }
 a.mesh-inspector-packet:hover { background:var(--mesh-surface-2); color:var(--mesh-text); text-decoration:none; }
 .mesh-inspector-packet-top { display:flex; align-items:center; gap:8px; min-width:0; }
@@ -303,7 +301,7 @@ a.mesh-inspector-packet:hover { background:var(--mesh-surface-2); color:var(--me
     .mesh-map-only #map-wrapper { height:100%; min-height:0; }
     .mesh-map-only #unmapped-packets { top:10px; left:58px; bottom:auto; }
     /* The filters: the fold down their left, the legend over the pills. */
-    .mesh-map-only #filter-container { position:absolute; z-index:1000; left:12px; bottom:12px; display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:6px 10px; max-width:calc(100% - 220px); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); box-shadow:0 2px 12px rgba(16,25,37,.10); }
+    .mesh-map-only #filter-container { position:absolute; z-index:1000; left:12px; bottom:12px; display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:6px 10px; max-width:calc(100% - 220px); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); box-shadow:var(--mesh-shadow-card); }
     .mesh-map-only .map-legend-inline,.mesh-map-only .map-filter-pills { grid-column:2; }
     .mesh-map-only .map-legend-inline { padding:2px 0 0; }
     .mesh-map-only .map-legend-toggle { display:flex; align-items:center; justify-content:center; grid-row:1 / span 2; align-self:stretch; width:22px; margin:-8px 0 -8px -8px; padding:0; border:0; border-radius:var(--mesh-radius) 0 0 var(--mesh-radius); background:transparent; color:var(--mesh-muted); }
@@ -350,7 +348,7 @@ html.mesh-kiosk,.mesh-kiosk body { width:100%; height:100%; overflow:hidden; }
 /* The filters float over the map, as on the map page, at any width, and the
    unmapped packets stay beside the zoom, above them. */
 .mesh-kiosk #unmapped-packets { top:10px; left:58px; bottom:auto; }
-.mesh-kiosk #filter-container { position:absolute; z-index:1000; left:16px; bottom:16px; max-width:calc(100% - 220px); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); box-shadow:0 2px 12px rgba(16,25,37,.10); }
+.mesh-kiosk #filter-container { position:absolute; z-index:1000; left:16px; bottom:16px; max-width:calc(100% - 220px); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); box-shadow:var(--mesh-shadow-card); }
 /* A kiosk proper (map_kiosk_lock) has no way out of its full screen. */
 .mesh-kiosk-locked.mesh-kiosk #kiosk-button { display:none; }
 </style>

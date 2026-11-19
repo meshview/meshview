@@ -3,7 +3,8 @@
    node), its long name under it, what it is here beside its id, and its facts,
    leaving out those it has none for, and figures, each its label over its
    value, in a row under them. Facts are text, escaped here, unless given as
-   HTML already. */
+   HTML already; a third item, true, marks one as data (a figure, a position, a
+   version), set in mono by the technical style as the figures are. */
 (() => {
     // A popup is drawn in the map, which never goes above the map's controls:
     // as it opens, the map moves it clear of them instead. Beside them on a
@@ -35,7 +36,7 @@
         const meta = [role, unnamed + hexId(id)].filter(Boolean).join(" · ");
         const rows = facts
             .filter(([, value]) => value != null && value !== "")
-            .map(([label, value]) => `<dt>${esc(label)}</dt><dd>${html ? value : esc(value)}</dd>`)
+            .map(([label, value, data]) => `<dt>${esc(label)}</dt><dd${data ? ' class="is-data"' : ""}>${html ? value : esc(value)}</dd>`)
             .join("");
         const shown = figures.filter(([, value]) => value != null && value !== "")
             .map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`)

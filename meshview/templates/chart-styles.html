@@ -1,6 +1,6 @@
 <style>
 /* The chart cards of the node and radio pages; their script is chart-kit.js. */
-.chart-container { position:relative; width:100%; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:9px; margin-bottom:20px; overflow:hidden; }
+.chart-container { position:relative; width:100%; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); margin-bottom:20px; overflow:hidden; }
 .chart-header { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:16px 20px; border-bottom:1px solid var(--mesh-border); font-size:14px; font-weight:600; }
 .chart-title { display:flex; align-items:center; gap:8px; min-width:0; margin:0; font-size:15px; font-weight:650; }
 .chart-title .ti { color:var(--mesh-primary); font-size:18px; }
@@ -13,11 +13,11 @@
 /* Controls over a chart: pill toggles and a note beside them. */
 .chart-controls { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:14px 20px 0; }
 .chart-note { flex:1 1 220px; margin:0; color:var(--mesh-muted); font-size:13px; }
-.pill-toggle { position:relative; z-index:0; display:inline-flex; padding:3px; border:1px solid var(--mesh-border); border-radius:999px; background:var(--mesh-soft); }
+.pill-toggle { position:relative; z-index:0; display:inline-flex; padding:3px; border:1px solid var(--mesh-border); border-radius:var(--mesh-radius-pill); background:var(--mesh-soft); }
 /* The thumb slides to the pressed option; JS gives it that option's place and width. */
-.pill-toggle::before { content:""; position:absolute; z-index:-1; top:3px; bottom:3px; left:0; width:var(--thumb-w,0); transform:translateX(var(--thumb-x,0)); border-radius:999px; background:var(--mesh-primary); box-shadow:0 1px 3px rgba(0,0,0,.18); }
+.pill-toggle::before { content:""; position:absolute; z-index:-1; top:3px; bottom:3px; left:0; width:var(--thumb-w,0); transform:translateX(var(--thumb-x,0)); border-radius:var(--mesh-radius-pill); background:var(--mesh-primary); box-shadow:var(--mesh-shadow-thumb); }
 .pill-toggle.is-ready::before { transition:transform .25s ease, width .25s ease; }
-.mesh-data-page .mesh-content .pill-toggle > button { display:inline-flex; align-items:center; gap:4px; padding:5px 13px; border:0; border-radius:999px; background:transparent; color:var(--mesh-text); transition:color .25s ease; }
+.mesh-data-page .mesh-content .pill-toggle > button { display:inline-flex; align-items:center; gap:4px; padding:5px 13px; border:0; border-radius:var(--mesh-radius-pill); background:transparent; color:var(--mesh-text); transition:color .25s ease; }
 /* Tabler icons leave room inside their box: shift what has one a little left to look centred. */
 .mesh-data-page .mesh-content .pill-toggle > button:has(> .ti) { padding-left:11px; padding-right:15px; }
 .mesh-data-page .mesh-content .pill-toggle > button:hover:not(:disabled) { background:transparent; color:var(--mesh-primary); }

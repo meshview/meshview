@@ -53,15 +53,17 @@
             const facts = byId('inspector-facts');
             facts.replaceChildren();
             // Hardware and firmware only when the node has told us; last seen always closes.
-            for (const [label, value] of [
+            for (const [label, value, data] of [
                 [MeshI18n.t("Role"), node.role || MeshI18n.t("Unknown")],
                 [MeshI18n.t("Channel"), node.channel || MeshI18n.t("Unknown")],
                 ...(node.hw_model ? [['Hardware', node.hw_model]] : []),
-                ...(node.firmware ? [[MeshI18n.t("Firmware"), node.firmware]] : []),
-                [MeshI18n.t("Last seen"), node.last_seen_us ? new Date(Number(node.last_seen_us) / 1000).toLocaleString(MeshI18n.language) : MeshI18n.t("Unknown")]
+                ...(node.firmware ? [[MeshI18n.t("Firmware"), node.firmware, true]] : []),
+                [MeshI18n.t("Last seen"), node.last_seen_us ? new Date(Number(node.last_seen_us) / 1000).toLocaleString(MeshI18n.language) : MeshI18n.t("Unknown"), !!node.last_seen_us]
             ]) {
                 const dt = document.createElement('dt'); dt.textContent = label;
                 const dd = document.createElement('dd'); dd.textContent = value;
+                // Figures and versions, in mono in the technical style.
+                if (data) dd.className = 'is-data';
                 facts.append(dt, dd);
             }
             panel.hidden = false;
@@ -102,17 +104,26 @@
     }
     function facts(node) {
         byId('inspector-name').textContent = node.long_name || node.short_name || MeshI18n.t("Node {id}", {id: nodeKey(node)});
-        byId('inspector-node-meta').textContent = `${node.short_name || MeshI18n.t("Node")} · ${nodeKey(node)}`;
+        // Its short name as in the list of nodes beside: a stamp in the technical style.
+        const meta = byId('inspector-node-meta'); meta.replaceChildren();
+        if (node.short_name) {
+            const short = document.createElement('span'); short.className = 'mesh-node-short';
+            short.setAttribute('style', meshNodeStyle(nodeKey(node))); short.textContent = node.short_name;
+            meta.append(short);
+        } else meta.append(MeshI18n.t("Node"));
+        const id = document.createElement('span'); id.className = 'is-data'; id.textContent = nodeKey(node);
+        meta.append(' · ', id);
         const container = byId('inspector-facts'); container.replaceChildren();
-        for (const [label, value] of [
+        for (const [label, value, data] of [
             [MeshI18n.t("Role"), node.role || MeshI18n.t("Unknown")], ['Hardware', node.hw_model || MeshI18n.t("Unknown")],
-            [MeshI18n.t("Firmware"), node.firmware || MeshI18n.t("Unknown")], [MeshI18n.t("Channel"), node.channel || MeshI18n.t("Unknown")],
+            [MeshI18n.t("Firmware"), node.firmware || MeshI18n.t("Unknown"), !!node.firmware], [MeshI18n.t("Channel"), node.channel || MeshI18n.t("Unknown")],
             [MeshI18n.t("Gateway"), node.is_mqtt_gateway == null ? MeshI18n.t("Unknown") : node.is_mqtt_gateway ? MeshI18n.t("Yes") : MeshI18n.t("No")],
-            [MeshI18n.t("Last seen"), dateText(node.last_seen_us)],
-            [MeshI18n.t("Location"), isInvalidCoord(node) ? MeshI18n.t("No reported position") : `${node.lat.toFixed(5)}, ${node.long.toFixed(5)}`]
+            [MeshI18n.t("Last seen"), dateText(node.last_seen_us), !!node.last_seen_us],
+            [MeshI18n.t("Location"), isInvalidCoord(node) ? MeshI18n.t("No reported position") : `${node.lat.toFixed(5)}, ${node.long.toFixed(5)}`, !isInvalidCoord(node)]
         ]) {
             const dt = document.createElement('dt'); dt.textContent = label;
             const dd = document.createElement('dd'); dd.textContent = value;
+            if (data) dd.className = 'is-data';
             container.append(dt, dd);
         }
     }

@@ -14,7 +14,7 @@ body.mesh-traceroute-page { height:100dvh; overflow:hidden; }
 .mesh-traceroute-page .mesh-content { position:relative; flex:1 1 auto; min-height:0; max-width:none; padding:0; }
 .trace-stage { position:absolute; inset:0; overflow:hidden; background:var(--mesh-surface-2); }
 #traceroute-graph { position:absolute; inset:0; }
-.trace-float { position:absolute; z-index:5; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); box-shadow:0 2px 12px rgba(16,25,37,.10); color:var(--mesh-text); }
+.trace-float { position:absolute; z-index:5; background:var(--mesh-surface); border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); box-shadow:var(--mesh-shadow-card); color:var(--mesh-text); }
 
 #traceroute-meta { top:16px; left:16px; max-width:calc(100% - 96px); padding:12px 16px; font-size:13px; }
 #traceroute-meta h1 { margin:0; font-size:15px; font-weight:650; }
@@ -25,7 +25,7 @@ body.mesh-traceroute-page { height:100dvh; overflow:hidden; }
 .traceroute-help { margin:4px 0 0; color:var(--mesh-muted); font-size:12px; }
 @media(hover:none) { .traceroute-help { display:none; } }
 
-a.mesh-button.trace-live { position:absolute; z-index:5; top:16px; right:16px; box-shadow:0 2px 12px rgba(16,25,37,.10); }
+a.mesh-button.trace-live { position:absolute; z-index:5; top:16px; right:16px; box-shadow:var(--mesh-shadow-card); }
 
 #traceroute-legend { left:16px; bottom:16px; display:grid; gap:7px; padding:12px 14px; font-size:12px; color:var(--mesh-nav-text); pointer-events:none; }
 .traceroute-legend-row { display:grid; grid-template-columns:28px auto; align-items:center; gap:10px; }

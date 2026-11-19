@@ -19,7 +19,7 @@ body:has(#chat-container) .mesh-footer { display:none; }
 .chat-search svg { position:absolute; left:11px; width:17px; height:17px; color:var(--mesh-muted); pointer-events:none; }
 .chat-search input { width:100%; padding-left:36px; }
 /* The state, a pill with its dot: live, paused, loading or failing. */
-.chat-status { display:inline-flex; align-items:center; gap:7px; height:26px; padding:0 10px; border-radius:13px; background:var(--mesh-soft); color:var(--mesh-primary); font-size:12.5px; font-weight:600; white-space:nowrap; }
+.chat-status { display:inline-flex; align-items:center; gap:7px; height:26px; padding:0 10px; border-radius:var(--mesh-radius-pill); background:var(--mesh-soft); color:var(--mesh-primary); font-size:12.5px; font-weight:600; white-space:nowrap; }
 .chat-status::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--mesh-live); }
 .chat-status:is([data-state="paused"],[data-state="loading"]) { background:var(--mesh-surface-2); color:var(--mesh-muted); }
 .chat-status:is([data-state="paused"],[data-state="loading"])::before { background:var(--mesh-muted); }
@@ -27,7 +27,7 @@ body:has(#chat-container) .mesh-footer { display:none; }
 .chat-status[data-state="error"]::before { background:#dc3545; }
 .chat-latest svg { color:var(--mesh-primary); }
 .chat-latest:disabled { opacity:.5; cursor:default; }
-.chat-unread { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--mesh-primary); color:var(--mesh-on-primary); font-size:11px; font-weight:700; }
+.chat-unread { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; border-radius:var(--mesh-radius-pill); background:var(--mesh-primary); color:var(--mesh-on-primary); font-size:11px; font-weight:700; }
 
 /* The messages, oldest to newest. */
 .chat-messages { flex:1; min-height:0; overflow-y:auto; overflow-anchor:none; padding:8px 0 12px; background:var(--mesh-surface); font-size:14px; line-height:1.5; scrollbar-gutter:stable; }
@@ -43,7 +43,7 @@ body:has(#chat-container) .mesh-footer { display:none; }
 .replying-to { display:block; margin:4px 0 2px; padding:1px 10px; border-left:2px solid var(--mesh-border-strong); color:var(--mesh-muted); font-size:12.5px; white-space:normal; }
 .chat-meta { display:flex; align-items:center; gap:10px; font-size:12px; }
 /* The channel's tag, with the dot of its colour on the maps. */
-.chat-channel { display:inline-flex; align-items:center; gap:6px; max-width:150px; padding:1px 8px 1px 7px; border:1px solid var(--mesh-border); border-radius:6px; color:var(--mesh-muted); white-space:nowrap; }
+.chat-channel { display:inline-flex; align-items:center; gap:6px; max-width:150px; padding:1px 8px 1px 7px; border:1px solid var(--mesh-border); border-radius:var(--mesh-radius-xs); color:var(--mesh-muted); white-space:nowrap; }
 .chat-channel::before { content:""; flex-shrink:0; width:8px; height:8px; border-radius:2px; background:var(--channel-color,var(--mesh-muted)); box-shadow:inset 0 0 0 1px rgba(0,0,0,.18); }
 .chat-channel-name { overflow:hidden; text-overflow:ellipsis; }
 /* Opened by a tap: as wide as its name, the sender giving way. */
