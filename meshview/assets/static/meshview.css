@@ -478,5 +478,7 @@ hr { margin:1rem 0; border:0; border-top:1px solid var(--mesh-border); }
 .mesh-segmented input { position:absolute; opacity:0; pointer-events:none; }
 .mesh-segmented svg { width:16px; height:16px; }
 .mesh-swatch { width:16px; height:16px; border-radius:50%; background:var(--swatch); box-shadow:inset 0 0 0 1px rgba(0,0,0,.15); }
+/* On a phone the options keep to one line. */
+@media(max-width:420px) { .mesh-segmented label { gap:6px; font-size:12.5px; white-space:nowrap; } }
 .mesh-prefs .mesh-select { width:100%; }
 .mesh-prefs-note { margin:8px 0 0; font-size:12.5px; color:var(--mesh-muted); }

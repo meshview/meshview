@@ -55,7 +55,7 @@
         const palette = colors();
         const text = new Set(['#333','#334155','#243247','#26364a','#e7eef7','#e2ece5','#e2eaf6']);
         const muted = new Set(['#ccc','#64748b','#566579','#888','#9faea6','#8190a5','#a0aec2','#a9b6c9']);
-        const border = new Set(['#aaa','#c3cfdf','#34483c','#dce7df','#dce4ef','#34465f']);
+        const border = new Set(['#aaa','#c3cfdf','#34483c','#dce7df','#dce4ef','#34465f','#dbdee4']);
         function visit(value, key) {
             if (Array.isArray(value)) return value.map(item => visit(item,key));
             if (value && Object.getPrototypeOf(value) === Object.prototype) {
@@ -81,9 +81,13 @@
         themed.textStyle = {...themed.textStyle,color:palette.text};
         // Keep ECharts 5's softer default series colors, which suit the site better.
         if (!themed.color) themed.color = ['#5470c6','#91cc75','#fac858','#ee6666','#73c0de','#3ba272','#fc8452','#9a60b4','#ea7ccc'];
-        // ECharts 6 gives axis labels a fixed grey instead of the text color.
+        // ECharts 6 gives axis labels a fixed grey instead of the text color, and
+        // its grid lines a light grey, bright on a dark card: the theme's border.
+        const gridLine = color => !color || border.has(String(color).toLowerCase()) ? palette.border : color;
         for (const name of ['xAxis','yAxis','radiusAxis','angleAxis']) {
-            const axis = value => value && {...value,axisLabel:{color:palette.text,...value.axisLabel}};
+            const axis = value => value && {...value,axisLabel:{color:palette.text,...value.axisLabel},
+                splitLine:{...value.splitLine,lineStyle:{...value.splitLine?.lineStyle,
+                    color:gridLine(value.splitLine?.lineStyle?.color)}}};
             if (Array.isArray(themed[name])) themed[name] = themed[name].map(axis);
             else if (themed[name]) themed[name] = axis(themed[name]);
         }
@@ -183,7 +187,8 @@
         if (window.echarts) {
             document.querySelectorAll('[_echarts_instance_]').forEach(el => {
                 const chart = window.echarts.getInstanceByDom(el);
-                if (chart) chart.setOption(chartOption(chart.getOption()));
+                // One still waiting for its data has nothing to recolour yet.
+                if (chart?.getOption()) chart.setOption(chartOption(chart.getOption()));
             });
         }
         document.dispatchEvent(new CustomEvent('meshview:themechange', {detail:{theme:effective(), accent}}));
