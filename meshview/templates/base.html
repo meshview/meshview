@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="{{ ui_language }}" data-theme="light" data-accent="blue">
+<html lang="{{ ui_language }}" data-theme="light" data-accent="blue" data-map-theme="light">
 <head>
     <title>{% if site_title %}{{ site_title }}{% else %}Meshview Rust{% endif %}</title>
     <meta charset="utf-8">
@@ -146,6 +146,14 @@
             </div>
         </fieldset>
         <fieldset>
+            <legend>{{ "Map theme" | tr }}</legend>
+            <div class="mesh-segmented" style="--n:3">
+                <label><input type="radio" name="mapTheme" value="page">{{ "As the page" | tr }}</label>
+                <label><input type="radio" name="mapTheme" value="light"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7"/></svg>{{ "Light" | tr }}</label>
+                <label><input type="radio" name="mapTheme" value="dark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z"/></svg>{{ "Dark" | tr }}</label>
+            </div>
+        </fieldset>
+        <fieldset>
             <legend>{{ "Colour" | tr }}</legend>
             <div class="mesh-segmented">
                 <label><input type="radio" name="accent" value="blue"><span class="mesh-swatch" style="--swatch:#245ea8"></span>{{ "Blue" | tr }}</label>
@@ -173,7 +181,7 @@ function meshDialog(dialog, opener) {
 }
 meshDialog(document.getElementById("mesh-about"), document.getElementById("site-version"));
 
-// Preferences: theme and colour apply at once; a language reloads the page in it.
+// Preferences: theme, map theme and colour apply at once; a language reloads the page in it.
 (() => {
     const dialog = document.getElementById("mesh-prefs");
     meshDialog(dialog, document.getElementById("prefs-open"));
@@ -184,12 +192,14 @@ meshDialog(document.getElementById("mesh-about"), document.getElementById("site-
         if (!dialog.open) return;
         form.theme.value = MeshPrefs.theme;
         form.accent.value = MeshPrefs.accent;
+        form.mapTheme.value = MeshPrefs.mapTheme;
         form.language.value = chosenLanguage;
     });
     form.addEventListener("change", event => {
         const field = event.target;
         if (field.name === "theme") MeshPrefs.theme = field.value;
         if (field.name === "accent") MeshPrefs.accent = field.value;
+        if (field.name === "mapTheme") MeshPrefs.mapTheme = field.value;
         if (field.name === "language") {
             document.cookie = field.value
                 ? `${LANGUAGE_COOKIE}=${field.value}; path=/; max-age=31536000; samesite=lax`

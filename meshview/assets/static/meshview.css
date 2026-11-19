@@ -1,6 +1,7 @@
 /* Meshview's own stylesheet: the theme, a reset, and what every page shares.
    The theme is two attributes on <html>, set by theme.js before the page paints:
-   data-theme (light or dark) and data-accent (blue, the default, or green).
+   data-theme (light or dark) and data-accent (blue, the default, or green);
+   data-map-theme (light or dark) only darkens the maps' tiles.
    The --mesh-* names are the ones every page's styles use. */
 
 /* ---- Theme ------------------------------------------------------------- */
@@ -335,10 +336,11 @@ hr { margin:1rem 0; border:0; border-top:1px solid var(--mesh-border); }
 @media(prefers-reduced-motion:reduce) { .packet-arrival-glow > td { animation:none; background:var(--mesh-soft); } }
 
 /* ---- Maps ---------------------------------------------------------------
-   Every Leaflet map: the page's font, and in the dark theme its tiles darkened
-   and its controls on the theme's surfaces. */
+   Every Leaflet map: the page's font, its tiles darkened when the maps' theme
+   (the page's unless chosen apart) is dark, and in the dark theme its controls
+   on the theme's surfaces. */
 
-[data-theme="dark"] .leaflet-tile-pane { filter:invert(1) hue-rotate(180deg) brightness(.85) saturate(.75); }
+[data-map-theme="dark"] .leaflet-tile-pane { filter:invert(1) hue-rotate(180deg) brightness(.85) saturate(.75); }
 .leaflet-container { font:inherit; background:var(--mesh-surface-2); }
 /* Popups as the house's cards; a node's (node-popup.js) as the map page's node
    card: its short name, its long name, its id, its facts. */

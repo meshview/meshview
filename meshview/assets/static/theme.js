@@ -1,12 +1,14 @@
 /* The visitor's preferences, kept in this browser and applied before the page
-   paints: the theme (light, dark, or the system's) and the accent (blue or
-   green), as data-theme and data-accent on <html>. The language is a cookie,
+   paints: the theme (light, dark, or the system's), the accent (blue or green)
+   and the maps' (the page's, light or dark), as data-theme, data-accent and
+   data-map-theme on <html>. The language is a cookie,
    since the server renders the page in it; see the preferences dialog. */
 (() => {
     const root = document.documentElement;
     const THEME_KEY = 'meshview-theme';
     const ACCENT_KEY = 'meshview-accent';
     const ACCENTS = ['blue', 'green'];
+    const MAP_KEY = 'meshview-map-theme';
     const system = matchMedia('(prefers-color-scheme: dark)');
     const read = key => { try { return localStorage.getItem(key); } catch { return null; } };
     const write = (key, value) => {
@@ -17,9 +19,12 @@
     if (!['light', 'dark'].includes(theme)) theme = null;
     let accent = read(ACCENT_KEY);
     if (!ACCENTS.includes(accent)) accent = 'blue';
+    let mapTheme = read(MAP_KEY);
+    if (!['light', 'dark'].includes(mapTheme)) mapTheme = null;
     const effective = () => theme || (system.matches ? 'dark' : 'light');
     root.dataset.theme = effective();
     root.dataset.accent = accent;
+    root.dataset.mapTheme = mapTheme || effective();
     // Nothing animates while the page loads: what it restores, a folded panel or
     // a theme, shows at once. Two frames after the document is ready, it may.
     root.classList.add('mesh-preload');
@@ -174,6 +179,7 @@
         fading = setTimeout(() => root.classList.remove('mesh-theme-changing'), 400);
         root.dataset.theme = effective();
         root.dataset.accent = accent;
+        root.dataset.mapTheme = mapTheme || effective();
         if (window.echarts) {
             document.querySelectorAll('[_echarts_instance_]').forEach(el => {
                 const chart = window.echarts.getInstanceByDom(el);
@@ -197,16 +203,25 @@
             write(ACCENT_KEY, accent === 'blue' ? null : accent);
             apply();
         },
+        /** The maps': 'light', 'dark', or 'page' for the page's theme. */
+        get mapTheme() { return mapTheme || 'page'; },
+        set mapTheme(value) {
+            mapTheme = ['light', 'dark'].includes(value) ? value : null;
+            write(MAP_KEY, mapTheme);
+            apply();
+        },
     };
 
     system.addEventListener('change', () => { if (!theme) apply(); });
     // Another tab changed them.
     window.addEventListener('storage', event => {
-        if (![THEME_KEY, ACCENT_KEY, null].includes(event.key)) return;
+        if (![THEME_KEY, ACCENT_KEY, MAP_KEY, null].includes(event.key)) return;
         theme = read(THEME_KEY);
         if (!['light', 'dark'].includes(theme)) theme = null;
         accent = read(ACCENT_KEY);
         if (!ACCENTS.includes(accent)) accent = 'blue';
+        mapTheme = read(MAP_KEY);
+        if (!['light', 'dark'].includes(mapTheme)) mapTheme = null;
         apply();
     });
 })();
