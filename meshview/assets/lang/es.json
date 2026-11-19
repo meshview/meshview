@@ -294,6 +294,7 @@
     "Dismiss announcement": "Cerrar aviso",
     "Distance": "Distancia",
     "Drag nodes to rearrange · Scroll to zoom": "Arrastre los nodos para reorganizar · Desplace para ampliar",
+    "No answer heard yet. The dotted line joins the node that asked and the node it asked; the route between them shows once that node replies.": "Aún no se ha oído respuesta. La línea de puntos une el nodo que preguntó con el preguntado; la ruta entre ellos aparece cuando este conteste.",
     "Environment current (mA)": "Corriente ambiental (mA)",
     "Environment voltage (V)": "Voltaje ambiental (V)",
     "Error Details": "Detalles del error",

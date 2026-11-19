@@ -287,6 +287,7 @@
     "Dismiss announcement": "Dismiss announcement",
     "Distance": "Distance",
     "Drag nodes to rearrange · Scroll to zoom": "Drag nodes to rearrange · Scroll to zoom",
+    "No answer heard yet. The dotted line joins the node that asked and the node it asked; the route between them shows once that node replies.": "No answer heard yet. The dotted line joins the node that asked and the node it asked; the route between them shows once that node replies.",
     "Environment current (mA)": "Environment current (mA)",
     "Environment voltage (V)": "Environment voltage (V)",
     "Error Details": "Error Details",

@@ -23,6 +23,9 @@ body.mesh-traceroute-page { height:100dvh; overflow:hidden; }
 #traceroute-error:empty { display:none; }
 [data-theme="dark"] #traceroute-error { color:#ffb4a6; }
 .traceroute-help { margin:4px 0 0; color:var(--mesh-muted); font-size:12px; }
+/* A request with no answer heard yet: what the dotted line between its ends means. */
+.traceroute-note { max-width:340px; margin:6px 0 0; color:var(--mesh-nav-text); font-size:12.5px; line-height:1.45; }
+.traceroute-note[hidden] { display:none; }
 @media(hover:none) { .traceroute-help { display:none; } }
 
 a.mesh-button.trace-live { position:absolute; z-index:5; top:16px; right:16px; box-shadow:var(--mesh-shadow-card); }
@@ -51,6 +54,7 @@ a.mesh-button.trace-live { position:absolute; z-index:5; top:16px; right:16px; b
     <div id="traceroute-meta" class="trace-float">
         <h1 id="traceroute-heading">{{ "Traceroute" | tr }} <a id="traceroute-title" href="#"></a></h1>
         <div id="traceroute-error" role="status"></div>
+        <p id="traceroute-note" class="traceroute-note" hidden>{{ "No answer heard yet. The dotted line joins the node that asked and the node it asked; the route between them shows once that node replies." | tr }}</p>
         <p class="traceroute-help">{{ "Drag nodes to rearrange · Scroll to zoom" | tr }}</p>
     </div>
 
@@ -179,6 +183,17 @@ async function loadTraceroute() {
         addPathEdges(path, edges, { color: "#ff3b30", width: 2, type: "dashed" });
     });
 
+    // A request whose answer has not been heard: no route at all, only its two
+    // ends, joined by a dotted line without an arrow, and a note that says so.
+    const unanswered = !nodes.size && originId && targetId && originId !== targetId;
+    if (unanswered) {
+        nodes.set(originId, { name: originId });
+        nodes.set(targetId, { name: targetId });
+        edges.push({ source: originId, target: targetId, symbol: ["none", "none"],
+            lineStyle: { color: "#7c858f", width: 2, opacity: 0.7, type: "dotted", curveness: 0 } });
+        document.getElementById("traceroute-note").hidden = false;
+    }
+
     // Names only for the nodes on these routes, not the whole node list.
     const routeNodes = await meshFetchNodes([...nodes.keys()], "short_name,long_name")
         .catch(err => { console.error("Failed to load nodes", err); return []; });
@@ -235,7 +250,7 @@ async function loadTraceroute() {
                 roam: true,
                 zoom: 1.2,
                 draggable: true,
-                force: { repulsion: 200, edgeLength: 80 },
+                force: { repulsion: 200, edgeLength: unanswered ? 220 : 80 },
                 data: graphNodes,
                 edges: edges,
                 lineStyle: { opacity: 0.8, curveness: 0.1 },
