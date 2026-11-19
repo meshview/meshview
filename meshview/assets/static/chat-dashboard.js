@@ -142,17 +142,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (olderLoading) {
             top.textContent = MeshI18n.t("Loading earlier messages…");
         } else {
+            const button = document.createElement('button');
+            button.type = 'button'; button.className = 'mesh-button';
+            button.textContent = MeshI18n.t("Load earlier messages");
+            button.addEventListener('click', loadOlder);
+            top.append(button);
+            // Under the button, how far back the last search looked.
             if (olderMiss !== null) {
                 const miss = document.createElement('span');
                 const date = new Date(olderMiss / 1000).toLocaleDateString(MeshI18n.language, {day:'numeric', month:'long', year:'numeric'});
                 miss.textContent = MeshI18n.t("No matches since {date}.", {date});
                 top.append(miss);
             }
-            const button = document.createElement('button');
-            button.type = 'button'; button.className = 'mesh-button';
-            button.textContent = MeshI18n.t("Load earlier messages");
-            button.addEventListener('click', loadOlder);
-            top.append(button);
         }
         return top;
     }
