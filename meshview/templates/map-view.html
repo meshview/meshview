@@ -472,10 +472,11 @@ html.mesh-kiosk,.mesh-kiosk body { width:100%; height:100%; overflow:hidden; }
         </div>
     </div>
     <script>
-    // The legend and the filters fold away, and stay so in this browser, on Home
-    // and the map alike.
+    // The legend and the filters fold away, and stay so in this browser, kept
+    // apart for Home and the map: folded on one, they may be wanted on the other.
     (() => {
-        const KEY = "meshview-map-filters-folded";
+        const KEY = document.body.classList.contains("mesh-dashboard")
+            ? "meshview-home-filters-folded" : "meshview-map-filters-folded";
         const filters = document.getElementById("filter-container");
         const toggle = document.getElementById("map-legend-toggle");
         const set = folded => {
