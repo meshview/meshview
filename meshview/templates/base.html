@@ -155,9 +155,13 @@
         </fieldset>
         <fieldset>
             <legend>{{ "Colour" | tr }}</legend>
-            <div class="mesh-segmented">
-                <label><input type="radio" name="accent" value="blue"><span class="mesh-swatch" style="--swatch:#245ea8"></span>{{ "Blue" | tr }}</label>
-                <label><input type="radio" name="accent" value="green"><span class="mesh-swatch" style="--swatch:#0b7a52"></span>{{ "Green" | tr }}</label>
+            <div class="mesh-segmented mesh-swatches" style="--n:6">
+                <label title="{{ "Blue" | tr }}"><input type="radio" name="accent" value="blue"><span class="mesh-swatch" style="--swatch:#245ea8;--swatch-dark:#8bbcff"></span><span class="visually-hidden">{{ "Blue" | tr }}</span></label>
+                <label title="{{ "Green" | tr }}"><input type="radio" name="accent" value="green"><span class="mesh-swatch" style="--swatch:#0b7a52;--swatch-dark:#4cc38a"></span><span class="visually-hidden">{{ "Green" | tr }}</span></label>
+                <label title="{{ "Amber" | tr }}"><input type="radio" name="accent" value="amber"><span class="mesh-swatch" style="--swatch:#875c00;--swatch-dark:#ecb54e"></span><span class="visually-hidden">{{ "Amber" | tr }}</span></label>
+                <label title="{{ "Tile" | tr }}"><input type="radio" name="accent" value="tile"><span class="mesh-swatch" style="--swatch:#a14a2c;--swatch-dark:#f0a385"></span><span class="visually-hidden">{{ "Tile" | tr }}</span></label>
+                <label title="{{ "Violet" | tr }}"><input type="radio" name="accent" value="violet"><span class="mesh-swatch" style="--swatch:#6247aa;--swatch-dark:#b6a4f2"></span><span class="visually-hidden">{{ "Violet" | tr }}</span></label>
+                <label title="{{ "Graphite" | tr }}"><input type="radio" name="accent" value="graphite"><span class="mesh-swatch" style="--swatch:#3e4c5e;--swatch-dark:#b9c6d6"></span><span class="visually-hidden">{{ "Graphite" | tr }}</span></label>
             </div>
         </fieldset>
         <fieldset>

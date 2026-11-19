@@ -1,13 +1,13 @@
 /* The visitor's preferences, kept in this browser and applied before the page
-   paints: the theme (light, dark, or the system's), the accent (blue or green)
-   and the maps' (the page's, light or dark), as data-theme, data-accent and
+   paints: the theme (light, dark, or the system's), the accent (blue, green,
+   amber, tile, violet or graphite) and the maps' (the page's, light or dark), as data-theme, data-accent and
    data-map-theme on <html>. The language is a cookie,
    since the server renders the page in it; see the preferences dialog. */
 (() => {
     const root = document.documentElement;
     const THEME_KEY = 'meshview-theme';
     const ACCENT_KEY = 'meshview-accent';
-    const ACCENTS = ['blue', 'green'];
+    const ACCENTS = ['blue', 'green', 'amber', 'tile', 'violet', 'graphite'];
     const MAP_KEY = 'meshview-map-theme';
     const system = matchMedia('(prefers-color-scheme: dark)');
     const read = key => { try { return localStorage.getItem(key); } catch { return null; } };
@@ -31,6 +31,15 @@
     document.addEventListener('DOMContentLoaded', () => requestAnimationFrame(() =>
         requestAnimationFrame(() => root.classList.remove('mesh-preload'))));
 
+    // Every palette's colours seen on this page, so a chart drawn in any of them
+    // takes the current one's: the accents' and their seconds' (as r,g,b), texts,
+    // muted, borders.
+    const ACCENT_RGB = new Set(['36,94,168', '139,188,255', '11,122,82', '76,195,138']);
+    const SECOND_RGB = new Set(['232,152,40']);
+    const TEXT = new Set(['#333','#334155','#243247','#26364a','#e7eef7','#e2ece5','#e2eaf6']);
+    const MUTED = new Set(['#ccc','#64748b','#566579','#888','#9faea6','#8190a5','#a0aec2','#a9b6c9']);
+    const BORDER = new Set(['#aaa','#c3cfdf','#34483c','#dce7df','#dce4ef','#34465f','#dbdee4']);
+    const SURFACE = new Set(['#fff','#ffffff','#18231e','#182335']);
     const colors = () => {
         const style = getComputedStyle(root);
         return {
@@ -39,23 +48,35 @@
             muted:style.getPropertyValue('--mesh-muted').trim(),
             border:style.getPropertyValue('--mesh-border').trim(),
             font:style.getPropertyValue('--mesh-font').trim(),
-            accent:style.getPropertyValue('--mesh-primary-rgb').trim()
+            accent:style.getPropertyValue('--mesh-primary-rgb').trim(),
+            second:style.getPropertyValue('--mesh-second-rgb').trim()
         };
+    };
+    // Remember the palette in use, before a chart draws in it.
+    const seen = () => {
+        const palette = colors();
+        ACCENT_RGB.add(palette.accent.replace(/\s+/g, ''));
+        SECOND_RGB.add(palette.second.replace(/\s+/g, ''));
+        TEXT.add(palette.text.toLowerCase());
+        MUTED.add(palette.muted.toLowerCase());
+        BORDER.add(palette.border.toLowerCase());
+        SURFACE.add(palette.surface.toLowerCase());
+        return palette;
     };
     // The accent's colour, as rgba(): what a chart draws in the accent asks for,
     // and, whichever accent it was drawn in, takes the one chosen now.
-    window.meshAccent = (alpha = 1) => `rgba(${colors().accent},${alpha})`;
-    const ACCENT_RGB = ['36,94,168', '139,188,255', '11,122,82', '76,195,138'];
-    const accentAlpha = value => {
+    window.meshAccent = (alpha = 1) => `rgba(${seen().accent},${alpha})`;
+    // A second series' colour beside the accent, as rgba(): one that stands apart
+    // from it (orange, or a cool blue beside the warm accents), the same way.
+    window.meshSecond = (alpha = 1) => `rgba(${seen().second},${alpha})`;
+    // The alpha of a colour in one of these sets, else null.
+    const alphaIn = (set, value) => {
         const match = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/.exec(value);
-        return match && ACCENT_RGB.includes(match.slice(1, 4).join(',')) ? (match[4] ?? '1') : null;
+        return match && set.has(match.slice(1, 4).join(',')) ? (match[4] ?? '1') : null;
     };
     // Neutral chart colors follow the theme; packet/route/series colors stay intact.
     function chartOption(option) {
-        const palette = colors();
-        const text = new Set(['#333','#334155','#243247','#26364a','#e7eef7','#e2ece5','#e2eaf6']);
-        const muted = new Set(['#ccc','#64748b','#566579','#888','#9faea6','#8190a5','#a0aec2','#a9b6c9']);
-        const border = new Set(['#aaa','#c3cfdf','#34483c','#dce7df','#dce4ef','#34465f','#dbdee4']);
+        const palette = seen();
         function visit(value, key) {
             if (Array.isArray(value)) return value.map(item => visit(item,key));
             if (value && Object.getPrototypeOf(value) === Object.prototype) {
@@ -67,14 +88,16 @@
                     value.colorStops.map(stop => ({...stop, color:visit(stop.color, 'color')})));
             }
             if (typeof value !== 'string') return value;
-            const alpha = accentAlpha(value);
+            const alpha = alphaIn(ACCENT_RGB, value);
             if (alpha !== null) return `rgba(${palette.accent},${alpha})`;
+            const secondAlpha = alphaIn(SECOND_RGB, value);
+            if (secondAlpha !== null) return `rgba(${palette.second},${secondAlpha})`;
             const hex = value.toLowerCase();
-            if (key === 'backgroundColor' && ['#fff','#ffffff','#18231e','#182335'].includes(hex)) return palette.surface;
-            if (['borderColor','textBorderColor'].includes(key) && ['#fff','#ffffff','#000','#18231e','#182335'].includes(hex)) return palette.surface;
-            if (key === 'color' && text.has(hex)) return palette.text;
-            if (key === 'color' && muted.has(hex)) return palette.muted;
-            if (key === 'color' && border.has(hex)) return palette.border;
+            if (key === 'backgroundColor' && SURFACE.has(hex)) return palette.surface;
+            if (['borderColor','textBorderColor'].includes(key) && (hex === '#000' || SURFACE.has(hex))) return palette.surface;
+            if (key === 'color' && TEXT.has(hex)) return palette.text;
+            if (key === 'color' && MUTED.has(hex)) return palette.muted;
+            if (key === 'color' && BORDER.has(hex)) return palette.border;
             return value;
         }
         const themed = visit(option,'');
@@ -83,7 +106,7 @@
         if (!themed.color) themed.color = ['#5470c6','#91cc75','#fac858','#ee6666','#73c0de','#3ba272','#fc8452','#9a60b4','#ea7ccc'];
         // ECharts 6 gives axis labels a fixed grey instead of the text color, and
         // its grid lines a light grey, bright on a dark card: the theme's border.
-        const gridLine = color => !color || border.has(String(color).toLowerCase()) ? palette.border : color;
+        const gridLine = color => !color || BORDER.has(String(color).toLowerCase()) ? palette.border : color;
         for (const name of ['xAxis','yAxis','radiusAxis','angleAxis']) {
             const axis = value => value && {...value,axisLabel:{color:palette.text,...value.axisLabel},
                 splitLine:{...value.splitLine,lineStyle:{...value.splitLine?.lineStyle,

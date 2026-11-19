@@ -826,7 +826,7 @@ function renderDailySnapshotNodesGatewaysChart(domId,data){
         },
         series:[
             makeTelemetryLine(MeshI18n.t("Nodes"), meshAccent(), nodeCounts),
-            makeTelemetryLine(MeshI18n.t("Gateways"), "rgba(232,152,40,1)", gatewayCounts)
+            makeTelemetryLine(MeshI18n.t("Gateways"), meshSecond(), gatewayCounts)
         ]
     });
     return chart;
@@ -894,7 +894,8 @@ async function init(){
     // Daily port 1
     const dailyPort1Data=await fetchStats('day',14,1);
     updateTotalCount('total_daily_portnum_1',dailyPort1Data);
-    chartDailyPortnum1=renderChart('chart_daily_portnum_1',dailyPort1Data,'bar','#ff5722');
+    // Text messages in the second colour: orange, or a cool blue beside a warm accent.
+    chartDailyPortnum1=renderChart('chart_daily_portnum_1',dailyPort1Data,'bar',meshSecond());
 
     // Hourly all ports
     const hourlyAllData=await fetchStats('hour',24);
@@ -903,7 +904,7 @@ async function init(){
 
     // Hourly per port
     const portnums=[1,3,4,67,70,71];
-    const colors=['#ff5722','#2196f3','#9c27b0','#b88a15','#795548','#4caf50'];
+    const colors=[meshSecond(),'#2196f3','#9c27b0','#b88a15','#795548','#4caf50'];
     const domIds=['chart_portnum_1','chart_portnum_3','chart_portnum_4','chart_portnum_67','chart_portnum_70','chart_portnum_71'];
     const totalIds=['total_portnum_1','total_portnum_3','total_portnum_4','total_portnum_67','total_portnum_70','total_portnum_71'];
 

@@ -1,6 +1,7 @@
 /* Meshview's own stylesheet: the theme, a reset, and what every page shares.
    The theme is two attributes on <html>, set by theme.js before the page paints:
-   data-theme (light or dark) and data-accent (blue, the default, or green);
+   data-theme (light or dark) and data-accent (blue, the default, green, amber,
+   tile, violet or graphite); each accent also tints the neutrals its way.
    data-map-theme (light or dark) only darkens the maps' tiles.
    The --mesh-* names are the ones every page's styles use. */
 
@@ -27,6 +28,7 @@
     --mesh-primary:#245ea8;
     --mesh-primary-dark:#19467f;
     --mesh-primary-rgb:36,94,168;
+    --mesh-second-rgb:232,152,40;
     --mesh-on-primary:#ffffff;
     --mesh-soft:#e6eef9;
     --mesh-hover:#dce8f8;
@@ -117,6 +119,198 @@
     --mesh-pulse-peak:#2f6b4c;
     --mesh-pulse-mid:#244234;
     --mesh-live:#4cc38a;
+}
+/* Amber, tile, violet and graphite (all but neutral): the blue's lightnesses with
+   their own hue, so every accent reads the same. Beside the warm ones, amber and
+   tile, a chart's second series (--mesh-second-rgb, orange) turns a cool blue. */
+:root[data-accent="amber"] {
+    --mesh-page:#f6f3ef;
+    --mesh-surface-2:#f9f8f5;
+    --mesh-stripe:#f9f8f5;
+    --mesh-border:#e5dfd6;
+    --mesh-border-soft:#f0ece6;
+    --mesh-border-strong:#d8d0c2;
+    --mesh-text:#312819;
+    --mesh-nav-text:#564a37;
+    --mesh-muted:#6d6251;
+    --mesh-primary:#875c00;
+    --mesh-primary-dark:#674500;
+    --mesh-primary-rgb:135,92,0;
+    --mesh-second-rgb:30,124,176;
+    --mesh-on-primary:#ffffff;
+    --mesh-soft:#f3ece3;
+    --mesh-hover:#efe5d8;
+    --mesh-brand:#7e5603;
+    --mesh-brand-deep:#5f3f00;
+    --mesh-chat-stripe:#f6f2ec;
+    --mesh-pulse-soft:#f9f3ea;
+    --mesh-pulse-peak:#eadac2;
+    --mesh-pulse-mid:#f2e8da;
+}
+:root[data-accent="amber"][data-theme="dark"] {
+    --mesh-page:#1c160a;
+    --mesh-surface:#281e0f;
+    --mesh-surface-2:#2e2413;
+    --mesh-stripe:#2e2413;
+    --mesh-border:#443825;
+    --mesh-border-soft:#3a2e1a;
+    --mesh-border-strong:#57462a;
+    --mesh-text:#efe8df;
+    --mesh-nav-text:#ccc2b1;
+    --mesh-muted:#b1a695;
+    --mesh-primary:#ecb54e;
+    --mesh-primary-dark:#ffd180;
+    --mesh-primary-rgb:236,181,78;
+    --mesh-second-rgb:112,186,232;
+    --mesh-on-primary:#1c160a;
+    --mesh-soft:#442e00;
+    --mesh-hover:#5d4103;
+    --mesh-brand:#553b00;
+    --mesh-brand-deep:#3a2700;
+    --mesh-chat-stripe:#412c02;
+    --mesh-pulse-soft:#473100;
+    --mesh-pulse-peak:#775402;
+    --mesh-pulse-mid:#5d4103;
+}
+:root[data-accent="tile"] {
+    --mesh-page:#f8f3f1;
+    --mesh-surface-2:#faf7f6;
+    --mesh-stripe:#faf7f6;
+    --mesh-border:#e9ded9;
+    --mesh-border-soft:#f2ebe8;
+    --mesh-border-strong:#ddcdc6;
+    --mesh-text:#36251d;
+    --mesh-nav-text:#5c463d;
+    --mesh-muted:#735f56;
+    --mesh-primary:#a14a2c;
+    --mesh-primary-dark:#84300f;
+    --mesh-primary-rgb:161,74,44;
+    --mesh-second-rgb:30,124,176;
+    --mesh-soft:#f7eae5;
+    --mesh-hover:#f6e2db;
+    --mesh-brand:#974123;
+    --mesh-brand-deep:#723018;
+    --mesh-chat-stripe:#faf0ed;
+    --mesh-pulse-soft:#fdf0ec;
+    --mesh-pulse-peak:#f6d3c8;
+    --mesh-pulse-mid:#fae4de;
+}
+:root[data-accent="tile"][data-theme="dark"] {
+    --mesh-page:#20140e;
+    --mesh-surface:#2c1b14;
+    --mesh-surface-2:#332119;
+    --mesh-stripe:#332119;
+    --mesh-border:#4b352b;
+    --mesh-border-soft:#402a20;
+    --mesh-border-strong:#5f4133;
+    --mesh-text:#f2e7e1;
+    --mesh-nav-text:#d2beb6;
+    --mesh-muted:#b7a39a;
+    --mesh-primary:#f0a385;
+    --mesh-primary-dark:#fec2aa;
+    --mesh-primary-rgb:240,163,133;
+    --mesh-second-rgb:112,186,232;
+    --mesh-on-primary:#20140e;
+    --mesh-soft:#4b281b;
+    --mesh-hover:#643a29;
+    --mesh-brand:#61311d;
+    --mesh-brand-deep:#441f10;
+    --mesh-chat-stripe:#45281d;
+    --mesh-pulse-soft:#4d2b1e;
+    --mesh-pulse-peak:#834a34;
+    --mesh-pulse-mid:#643a29;
+}
+:root[data-accent="violet"] {
+    --mesh-page:#f4f3f8;
+    --mesh-surface-2:#f8f7fb;
+    --mesh-stripe:#f8f7fb;
+    --mesh-border:#e1deeb;
+    --mesh-border-soft:#edebf3;
+    --mesh-border-strong:#d2cee0;
+    --mesh-text:#2a2639;
+    --mesh-nav-text:#4d4861;
+    --mesh-muted:#656077;
+    --mesh-primary:#6247aa;
+    --mesh-primary-dark:#4b2c8d;
+    --mesh-primary-rgb:98,71,170;
+    --mesh-soft:#edebfa;
+    --mesh-hover:#e7e4f9;
+    --mesh-brand:#6349ac;
+    --mesh-brand-deep:#4a3582;
+    --mesh-chat-stripe:#f3f1fb;
+    --mesh-pulse-soft:#f3f2ff;
+    --mesh-pulse-peak:#dcd7fc;
+    --mesh-pulse-mid:#eae6fd;
+}
+:root[data-accent="violet"][data-theme="dark"] {
+    --mesh-page:#181423;
+    --mesh-surface:#211c30;
+    --mesh-surface-2:#272237;
+    --mesh-stripe:#272237;
+    --mesh-border:#3c3650;
+    --mesh-border-soft:#312b45;
+    --mesh-border-strong:#4c4366;
+    --mesh-text:#eae7f5;
+    --mesh-nav-text:#c4bfd6;
+    --mesh-muted:#a9a4bb;
+    --mesh-primary:#b6a4f2;
+    --mesh-primary-dark:#cec0ff;
+    --mesh-primary-rgb:182,164,242;
+    --mesh-on-primary:#181423;
+    --mesh-soft:#352c50;
+    --mesh-hover:#493e6a;
+    --mesh-brand:#433668;
+    --mesh-brand-deep:#2d2349;
+    --mesh-chat-stripe:#322b48;
+    --mesh-pulse-soft:#372f51;
+    --mesh-pulse-peak:#5f508b;
+    --mesh-pulse-mid:#493e6a;
+}
+:root[data-accent="graphite"] {
+    --mesh-page:#f3f4f5;
+    --mesh-surface-2:#f7f8f9;
+    --mesh-stripe:#f7f8f9;
+    --mesh-border:#dee0e3;
+    --mesh-border-soft:#ebedee;
+    --mesh-border-strong:#ced1d5;
+    --mesh-text:#26292e;
+    --mesh-nav-text:#484c52;
+    --mesh-muted:#606469;
+    --mesh-primary:#3e4c5e;
+    --mesh-primary-dark:#273546;
+    --mesh-primary-rgb:62,76,94;
+    --mesh-soft:#ebedf0;
+    --mesh-hover:#e4e7eb;
+    --mesh-brand:#526073;
+    --mesh-brand-deep:#3c4856;
+    --mesh-chat-stripe:#f1f3f5;
+    --mesh-pulse-soft:#f1f4f6;
+    --mesh-pulse-peak:#d7dde4;
+    --mesh-pulse-mid:#e6eaee;
+}
+:root[data-accent="graphite"][data-theme="dark"] {
+    --mesh-page:#15171a;
+    --mesh-surface:#1d2025;
+    --mesh-surface-2:#23262b;
+    --mesh-stripe:#23262b;
+    --mesh-border:#373b40;
+    --mesh-border-soft:#2c3036;
+    --mesh-border-strong:#444a52;
+    --mesh-text:#e7e9ec;
+    --mesh-nav-text:#c0c3c8;
+    --mesh-muted:#a4a8ad;
+    --mesh-primary:#b9c6d6;
+    --mesh-primary-dark:#d2dff0;
+    --mesh-primary-rgb:185,198,214;
+    --mesh-on-primary:#15171a;
+    --mesh-soft:#2e343b;
+    --mesh-hover:#404750;
+    --mesh-brand:#39414b;
+    --mesh-brand-deep:#252b33;
+    --mesh-chat-stripe:#2c3137;
+    --mesh-pulse-soft:#30363d;
+    --mesh-pulse-peak:#535c68;
+    --mesh-pulse-mid:#404750;
 }
 
 /* ---- Reset ------------------------------------------------------------- */
@@ -464,6 +658,8 @@ hr { margin:1rem 0; border:0; border-top:1px solid var(--mesh-border); }
 .mesh-segmented:has(> label:nth-of-type(2) input:checked) { --i:1; }
 .mesh-segmented:has(> label:nth-of-type(3) input:checked) { --i:2; }
 .mesh-segmented:has(> label:nth-of-type(4) input:checked) { --i:3; }
+.mesh-segmented:has(> label:nth-of-type(5) input:checked) { --i:4; }
+.mesh-segmented:has(> label:nth-of-type(6) input:checked) { --i:5; }
 .mesh-segmented:not(:has(input:checked))::before { opacity:0; }
 .mesh-segmented label { position:relative; display:flex; align-items:center; justify-content:center; gap:8px; height:36px; border-radius:var(--mesh-radius-sm); color:var(--mesh-nav-text); font-size:13.5px; cursor:pointer; transition:color .2s ease; }
 .mesh-segmented label:has(input:checked) { color:var(--mesh-text); font-weight:600; }
@@ -478,6 +674,12 @@ hr { margin:1rem 0; border:0; border-top:1px solid var(--mesh-border); }
 .mesh-segmented input { position:absolute; opacity:0; pointer-events:none; }
 .mesh-segmented svg { width:16px; height:16px; }
 .mesh-swatch { width:16px; height:16px; border-radius:50%; background:var(--swatch); box-shadow:inset 0 0 0 1px rgba(0,0,0,.15); }
+/* Colours only as swatches, a bit bigger, their names in a tooltip; in the dark
+   theme, each in its dark shade, and the chosen one ringed. */
+.mesh-swatches .mesh-swatch { width:20px; height:20px; transition:box-shadow .2s ease; }
+[data-theme="dark"] .mesh-swatch { background:var(--swatch-dark, var(--swatch)); }
+.mesh-swatches label:has(input:checked) .mesh-swatch { box-shadow:0 0 0 2px var(--mesh-surface), 0 0 0 4px var(--swatch); }
+[data-theme="dark"] .mesh-swatches label:has(input:checked) .mesh-swatch { box-shadow:0 0 0 2px var(--mesh-surface), 0 0 0 4px var(--swatch-dark, var(--swatch)); }
 /* On a phone the options keep to one line. */
 @media(max-width:420px) { .mesh-segmented label { gap:6px; font-size:12.5px; white-space:nowrap; } }
 .mesh-prefs .mesh-select { width:100%; }
