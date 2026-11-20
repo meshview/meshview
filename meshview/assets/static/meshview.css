@@ -567,7 +567,9 @@ hr { margin:1rem 0; border:0; border-top:1px solid var(--mesh-border); }
    credit, which is not a licence's (the map page clears it by script too). */
 .leaflet-container .leaflet-control-attribution { padding:1px 6px; border-top-left-radius:6px; background:color-mix(in srgb, var(--mesh-surface) 85%, transparent); color:var(--mesh-muted); font-size:11px; }
 .leaflet-container .leaflet-control-attribution a { color:inherit; }
-.leaflet-control-attribution > a[href*="leafletjs.com"], .leaflet-control-attribution > a[href*="leafletjs.com"] + span { display:none; }
+/* Map buttons (zoom and the like) are links to Leaflet; not underlined. */
+.leaflet-bar a:hover { text-decoration:none; }
+.leaflet-control-attribution > a[href*="leafletjs.com"],.leaflet-control-attribution > a[href*="leafletjs.com"] + span { display:none; }
 [data-theme="dark"] :is(.leaflet-bar a,.leaflet-control-layers,.leaflet-popup-content-wrapper,.leaflet-popup-tip,.leaflet-tooltip,.leaflet-control-attribution,.leaflet-control-scale-line) { background:var(--mesh-surface); color:var(--mesh-text); border-color:var(--mesh-border); }
 [data-theme="dark"] .leaflet-bar a:hover { background:var(--mesh-surface-2); }
 
