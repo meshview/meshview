@@ -1355,6 +1355,7 @@ function renderUnmappedPackets(){
    soft halo behind it, so it stands out among its neighbours. Blinking only
    changes the fill, so it keeps working on the selected node. */
 let selectedMarker = null, selectedHalo = null;
+const HALO_OPACITY = 0.22;
 function highlightSelectedNode(id){
     if(selectedMarker){
         selectedMarker.setRadius(6);
@@ -1371,11 +1372,16 @@ function highlightSelectedNode(id){
     marker.setStyle({ color: primary, weight: 3 });
     marker.bringToFront();
     selectedHalo = L.circleMarker(marker.getLatLng(), {
-        radius: 20, stroke: false, fillColor: primary, fillOpacity: 0.22, interactive: false
+        radius: 20, stroke: false, fillColor: primary, fillOpacity: HALO_OPACITY, interactive: false
     }).addTo(map);
     selectedHalo.bringToBack();
 }
 window.clearMapSelection = () => { selectedNodeId = null; edgeLayer.clearLayers(); highlightSelectedNode(null); };
+/* Leaflet scales its vector layers with a zoom's animation and only draws them
+   at their size once it ends: the halo would swell (or shrink) all the while.
+   It hides for the zoom, and comes back after it. */
+map.on("zoomstart", () => selectedHalo?.setStyle({ fillOpacity: 0 }));
+map.on("zoomend", () => selectedHalo?.setStyle({ fillOpacity: HALO_OPACITY }));
 
 async function onNodeClick(node){
     if (typeof openMapNodeInspector === "function") openMapNodeInspector(node);
