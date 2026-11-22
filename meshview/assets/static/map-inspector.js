@@ -269,6 +269,7 @@
         byId('mesh-node-browser').hidden = true;
         byId('mesh-node-inspector').hidden = false;
         byId('inspector-node-link').href = `/node/${encodeURIComponent(id)}`;
+        byId('inspector-radio-link').href = `/radio/${encodeURIComponent(id)}`;
         byId('inspector-reliability-link').href = `/reliability/${encodeURIComponent(id)}`;
         facts(node);
         note(byId('inspector-telemetry'), MeshI18n.t("Loading telemetry…"), true);
