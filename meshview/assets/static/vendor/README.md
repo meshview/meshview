@@ -23,6 +23,13 @@ version. Leaflet is 1.9.4, Leaflet Heat is 0.2.0, PolylineDecorator is 1.6.0 and
 QRCode.js is 1.0.0. There is no CSS framework: the pages are styled by
 `/static/meshview.css`.
 
+Vector maps use MapLibre GL JS 6.18.0 (BSD-3-Clause), drawn inside Leaflet by
+`@maplibre/maplibre-gl-leaflet` 0.1.4 (ISC). Of MapLibre only
+`dist/maplibre-gl.mjs`, `dist/maplibre-gl-worker.mjs` (which the first loads
+by its own address) and `dist/maplibre-gl.css` are kept, without their source
+maps (several megabytes); `/static/map-vector.js` loads them the first time a
+vector map is wanted. Their styles and tiles come from OpenFreeMap.
+
 The Inter typeface is bundled from `@fontsource-variable/inter` 5.3.0 (SIL Open Font
 License 1.1): only the variable weight axis, upright, for every subset.
 Browsers download just the subsets a page uses through `unicode-range`.

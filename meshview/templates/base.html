@@ -51,11 +51,7 @@
         };
         // Base map tiles from the [site] map_tile_* options (OpenStreetMap by default).
         window.meshMapTiles = {{ map_tiles|tojson }};
-        window.meshTileLayer = (options = {}) => L.tileLayer(meshMapTiles.url, {
-            maxZoom: meshMapTiles.max_zoom,
-            attribution: meshMapTiles.attribution,
-            ...options
-        });
+        // The base layer itself, PNG tiles or vector, is meshTileLayer(), in map-vector.js.
         // Topographic tiles, offered only with the default tiles: a custom tile
         // server usually means a network without Internet access.
         window.meshTopoLayer = () => meshMapTiles.custom ? null : L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
@@ -154,6 +150,30 @@
                 <label><input type="radio" name="mapTheme" value="dark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z"/></svg>{{ "Dark" | tr }}</label>
             </div>
         </fieldset>
+        {%- if not map_tiles.custom %}
+        <fieldset id="prefs-map-type">
+            <legend>{{ "Map type" | tr }}</legend>
+            <div class="mesh-segmented" style="--n:2">
+                <label><input type="radio" name="mapType" value="png">{{ "PNG" | tr }}</label>
+                <label><input type="radio" name="mapType" value="vector">{{ "Vector" | tr }}</label>
+            </div>
+        </fieldset>
+        {%- endif %}
+        <fieldset id="prefs-map-colors-png">
+            <legend>{{ "Map colours" | tr }}</legend>
+            <div class="mesh-segmented" style="--n:2">
+                <label><input type="radio" name="mapColorsPng" value="full">{{ "In colour" | tr }}</label>
+                <label><input type="radio" name="mapColorsPng" value="gray">{{ "Black and white" | tr }}</label>
+            </div>
+        </fieldset>
+        <fieldset id="prefs-map-colors-vector" hidden>
+            <legend>{{ "Map colours" | tr }}</legend>
+            <div class="mesh-segmented" style="--n:3">
+                <label><input type="radio" name="mapColorsVector" value="full">{{ "Detailed" | tr }}</label>
+                <label><input type="radio" name="mapColorsVector" value="vivid">{{ "Vivid" | tr }}</label>
+                <label><input type="radio" name="mapColorsVector" value="gray">{{ "Plain" | tr }}</label>
+            </div>
+        </fieldset>
         <fieldset>
             <legend>{{ "Style" | tr }}</legend>
             <div class="mesh-segmented" style="--n:2">
@@ -200,11 +220,36 @@ meshDialog(document.getElementById("mesh-about"), document.getElementById("site-
     const form = dialog.querySelector("form");
     const LANGUAGE_COOKIE = "meshview-lang";
     const chosenLanguage = (document.cookie.match(/(?:^|;\s*)meshview-lang=([^;]*)/) || [])[1] || "";
+    // The maps' type is offered where vector maps can be drawn: not with the
+    // site's own tiles, nor without WebGL 2. Their colours, as their type has.
+    let webgl2;
+    const vectorMaps = () => {
+        if (meshMapTiles.custom) return false;
+        if (webgl2 === undefined) {
+            try {
+                const gl = document.createElement("canvas").getContext("webgl2");
+                webgl2 = !!gl;
+                gl?.getExtension("WEBGL_lose_context")?.loseContext();
+            } catch (_) { webgl2 = false; }
+        }
+        return webgl2;
+    };
+    const syncMapPrefs = () => {
+        const able = vectorMaps();
+        const vector = able && MeshPrefs.mapType === "vector";
+        const type = document.getElementById("prefs-map-type");
+        if (type) { type.hidden = !able; form.mapType.value = MeshPrefs.mapType; }
+        document.getElementById("prefs-map-colors-png").hidden = vector;
+        document.getElementById("prefs-map-colors-vector").hidden = !vector;
+        form.mapColorsPng.value = MeshPrefs.mapColors === "gray" ? "gray" : "full";
+        form.mapColorsVector.value = MeshPrefs.mapColors;
+    };
     dialog.addEventListener("toggle", () => {
         if (!dialog.open) return;
         form.theme.value = MeshPrefs.theme;
         form.accent.value = MeshPrefs.accent;
         form.mapTheme.value = MeshPrefs.mapTheme;
+        syncMapPrefs();
         form.elements.style.value = MeshPrefs.style;
         form.language.value = chosenLanguage;
     });
@@ -213,6 +258,8 @@ meshDialog(document.getElementById("mesh-about"), document.getElementById("site-
         if (field.name === "theme") MeshPrefs.theme = field.value;
         if (field.name === "accent") MeshPrefs.accent = field.value;
         if (field.name === "mapTheme") MeshPrefs.mapTheme = field.value;
+        if (field.name === "mapType") { MeshPrefs.mapType = field.value; syncMapPrefs(); }
+        if (field.name === "mapColorsPng" || field.name === "mapColorsVector") { MeshPrefs.mapColors = field.value; syncMapPrefs(); }
         if (field.name === "style") MeshPrefs.style = field.value;
         if (field.name === "language") {
             document.cookie = field.value

@@ -1,8 +1,10 @@
 /* The visitor's preferences, kept in this browser and applied before the page
    paints: the theme (light, dark, or the system's), the accent (blue, green,
-   amber, tile, violet or graphite), the maps' (the page's, light or dark) and the
-   style (soft, the default, or technical), as data-theme, data-accent,
-   data-map-theme and data-style on <html>. The language is a cookie,
+   amber, tile, violet or graphite), the maps' (the page's, light or dark), their
+   type (PNG tiles or vector) and colours (their own, the default; gray, black
+   and white or plain; vivid, on vector maps) and the style (soft, the default,
+   or technical), as data-theme, data-accent, data-map-theme, data-map-type,
+   data-map-colors and data-style on <html>. The language is a cookie,
    since the server renders the page in it; see the preferences dialog. */
 (() => {
     const root = document.documentElement;
@@ -10,6 +12,9 @@
     const ACCENT_KEY = 'meshview-accent';
     const ACCENTS = ['blue', 'green', 'amber', 'tile', 'violet', 'graphite'];
     const MAP_KEY = 'meshview-map-theme';
+    const MAP_TYPE_KEY = 'meshview-map-type';
+    const MAP_COLORS_KEY = 'meshview-map-colors';
+    const MAP_COLORS = ['gray', 'vivid'];
     const STYLE_KEY = 'meshview-style';
     const STYLES = ['soft', 'technical'];
     const system = matchMedia('(prefers-color-scheme: dark)');
@@ -24,12 +29,23 @@
     if (!ACCENTS.includes(accent)) accent = 'blue';
     let mapTheme = read(MAP_KEY);
     if (!['light', 'dark'].includes(mapTheme)) mapTheme = null;
+    let mapType = read(MAP_TYPE_KEY) === 'vector' ? 'vector' : 'png';
+    let mapColors = read(MAP_COLORS_KEY);
+    if (!MAP_COLORS.includes(mapColors)) mapColors = null;
     let style = read(STYLE_KEY);
     if (!STYLES.includes(style)) style = 'soft';
+    // Vivid is only for vector maps: PNG tiles show their own colours then.
+    const shownColors = () => mapColors === 'vivid' && mapType !== 'vector' ? null : mapColors;
+    const setMapDataset = () => {
+        root.dataset.mapType = mapType;
+        if (shownColors()) root.dataset.mapColors = shownColors();
+        else delete root.dataset.mapColors;
+    };
     const effective = () => theme || (system.matches ? 'dark' : 'light');
     root.dataset.theme = effective();
     root.dataset.accent = accent;
     root.dataset.mapTheme = mapTheme || effective();
+    setMapDataset();
     root.dataset.style = style;
     // Nothing animates while the page loads: what it restores, a folded panel or
     // a theme, shows at once. Two frames after the document is ready, it may.
@@ -234,6 +250,7 @@
         root.dataset.theme = effective();
         root.dataset.accent = accent;
         root.dataset.mapTheme = mapTheme || effective();
+        setMapDataset();
         root.dataset.style = style;
         if (window.echarts) {
             document.querySelectorAll('[_echarts_instance_]').forEach(el => {
@@ -266,6 +283,20 @@
             write(MAP_KEY, mapTheme);
             apply();
         },
+        /** The maps' type: 'png' (tiles) or 'vector'. */
+        get mapType() { return mapType; },
+        set mapType(value) {
+            mapType = value === 'vector' ? 'vector' : 'png';
+            write(MAP_TYPE_KEY, mapType === 'png' ? null : mapType);
+            apply();
+        },
+        /** The maps' colours: 'full' (their own), 'gray' or 'vivid' (vector maps only). */
+        get mapColors() { return shownColors() || 'full'; },
+        set mapColors(value) {
+            mapColors = MAP_COLORS.includes(value) ? value : null;
+            write(MAP_COLORS_KEY, mapColors);
+            apply();
+        },
         /** The look: 'soft' (rounded cards) or 'technical' (square, dense, figures in mono). */
         get style() { return style; },
         set style(value) {
@@ -278,13 +309,16 @@
     system.addEventListener('change', () => { if (!theme) apply(); });
     // Another tab changed them.
     window.addEventListener('storage', event => {
-        if (![THEME_KEY, ACCENT_KEY, MAP_KEY, STYLE_KEY, null].includes(event.key)) return;
+        if (![THEME_KEY, ACCENT_KEY, MAP_KEY, MAP_TYPE_KEY, MAP_COLORS_KEY, STYLE_KEY, null].includes(event.key)) return;
         theme = read(THEME_KEY);
         if (!['light', 'dark'].includes(theme)) theme = null;
         accent = read(ACCENT_KEY);
         if (!ACCENTS.includes(accent)) accent = 'blue';
         mapTheme = read(MAP_KEY);
         if (!['light', 'dark'].includes(mapTheme)) mapTheme = null;
+        mapType = read(MAP_TYPE_KEY) === 'vector' ? 'vector' : 'png';
+        mapColors = read(MAP_COLORS_KEY);
+        if (!MAP_COLORS.includes(mapColors)) mapColors = null;
         style = read(STYLE_KEY);
         if (!STYLES.includes(style)) style = 'soft';
         apply();

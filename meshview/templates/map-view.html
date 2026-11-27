@@ -688,7 +688,9 @@ map.attributionControl.setPrefix(false);
         fit();
     });
 })();
-var baseLayers = { [escapeHtml(meshMapTiles.name)]: meshTileLayer() };
+const baseLayer = meshTileLayer();
+let baseLayerName = meshMapName();
+var baseLayers = { [escapeHtml(baseLayerName)]: baseLayer };
 const topoLayer = meshTopoLayer();
 if (topoLayer) baseLayers["OpenTopoMap"] = topoLayer;
 Object.values(baseLayers)[0].addTo(map);
@@ -730,6 +732,17 @@ var overlayLayers = {
 // Always folded: the choices are remembered, so it only needs opening to change them.
 var mapLayerControl = L.control.layers(baseLayers, overlayLayers, { collapsed: true }).addTo(map);
 const layerToggle = mapLayerControl.getContainer().querySelector('.leaflet-control-layers-toggle');
+// The base map named as it is now: PNG tiles, or vector ones, which the
+// preferences change in place.
+document.addEventListener('meshview:themechange', () => {
+    if (meshMapName() === baseLayerName) return;
+    baseLayerName = meshMapName();
+    // Taken out and put back with the others after it, to keep their order.
+    for (const layer of Object.values(baseLayers)) mapLayerControl.removeLayer(layer);
+    delete baseLayers[Object.keys(baseLayers)[0]];
+    baseLayers = { [escapeHtml(baseLayerName)]: baseLayer, ...baseLayers };
+    for (const [name, layer] of Object.entries(baseLayers)) mapLayerControl.addBaseLayer(layer, name);
+});
 layerToggle.title = MeshI18n.t("Map layers");
 layerToggle.setAttribute('aria-label', MeshI18n.t("Map layers"));
 

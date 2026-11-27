@@ -158,7 +158,7 @@ once it is restarted.
 | `map_top_left_lon` | number | `-180.0` | Map bounds: longitude of the top left corner. |
 | `map_bottom_right_lat` | number | `-60.0` | Map bounds: latitude of the bottom right corner. |
 | `map_bottom_right_lon` | number | `180.0` | Map bounds: longitude of the bottom right corner. |
-| `map_tile_url` | string | `""` | Tile server URL template. Empty means OpenStreetMap. |
+| `map_tile_url` | string | `""` | Tile server URL template. Empty means OpenStreetMap, and visitors may pick vector maps from OpenFreeMap in their preferences instead; with a tile server of its own, only its tiles are offered. |
 | `map_tile_attribution` | string | `""` | Attribution for a custom tile server. |
 | `map_tile_max_zoom` | whole number | `19` | Highest zoom level the tiles have. |
 | `map_tile_name` | string | `""` | Name of the tile layer in the layer picker. |
