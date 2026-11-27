@@ -52,6 +52,17 @@ if (new URLSearchParams(location.search).has('kiosk')) {
 /* Full screen: the way in, or, in kiosk mode, the way out. */
 .mesh-map-tools svg { width:17px; height:17px; }
 #kiosk-button[aria-pressed="true"] .kiosk-enter, #kiosk-button:not([aria-pressed="true"]) .kiosk-exit { display:none; }
+/* How long ago the nodes shown were heard: a clock whose choices open to its
+   left, out of the bar, which clips what overflows it. Tinted while the choice
+   is not the usual one. */
+#age-button[aria-pressed="true"] { background:rgba(var(--mesh-primary-rgb),.14); }
+.mesh-map-age-options { position:absolute; right:calc(100% + 6px); display:flex; height:40px; border:1px solid var(--mesh-border); border-radius:var(--mesh-radius); box-shadow:var(--mesh-shadow-card); background:var(--mesh-surface); overflow:hidden; }
+.mesh-map-age-options[hidden] { display:none; }
+.mesh-map-age-options button { padding:0 11px; border:0; border-right:1px solid var(--mesh-border); background:var(--mesh-surface); color:var(--mesh-text); font:inherit; font-size:12px; font-weight:600; white-space:nowrap; cursor:pointer; }
+.mesh-map-age-options button:last-child { border-right:0; }
+.mesh-map-age-options button:hover { background:var(--mesh-surface-2); }
+.mesh-map-age-options button[aria-pressed="true"] { color:var(--mesh-primary); font-weight:700; }
+[data-style="technical"] .mesh-map-age-options { border-radius:var(--mesh-radius-sm); }
 
 /* Legend, beside the zoom; unmapped packets in a corner. */
 .legend-utilization { display:flex; flex-wrap:wrap; align-items:center; gap:2px 10px; margin-top:6px; }
@@ -411,13 +422,21 @@ html.mesh-kiosk,.mesh-kiosk body { width:100%; height:100%; overflow:hidden; }
 {% endif %}
 
 <section class="mesh-map-panel" aria-label="{{ "Network map" | tr }}">
-    <!-- Fit (and share, on the map page) live in a map control under the layer picker (moved in by script). -->
+    <!-- Fit (and, on the map page, how long ago, full screen and share) live in a map control under the layer picker (moved in by script). -->
+    <div id="map-tools-control">
     <div id="map-tools" class="mesh-map-tools leaflet-bar">
         <button type="button" id="fit-network" title="{{ "Fit network" | tr }}"><span class="ti ti-focus-centered" aria-hidden="true"></span><span class="mesh-map-tool-label">{{ "Fit network" | tr }}</span></button>
         {% if not dashboard %}
+        <button type="button" id="age-button" aria-expanded="false" aria-controls="age-options" aria-pressed="false"><span class="ti ti-clock" aria-hidden="true"></span><span id="age-label" class="mesh-map-tool-label"></span></button>
         <button type="button" id="kiosk-button" title="{{ "Full screen" | tr }}" data-title-exit="{{ "Exit full screen" | tr }}"><svg class="kiosk-enter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4h4v4"/><path d="M14 10l6 -6"/><path d="M8 20h-4v-4"/><path d="M4 20l6 -6"/><path d="M16 20h4v-4"/><path d="M14 14l6 6"/><path d="M8 4h-4v4"/><path d="M4 4l6 6"/></svg><svg class="kiosk-exit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9h4v-4"/><path d="M3 3l6 6"/><path d="M5 15h4v4"/><path d="M3 21l6 -6"/><path d="M19 9h-4v-4"/><path d="M15 9l6 -6"/><path d="M19 15h-4v4"/><path d="M15 15l6 6"/></svg><span class="mesh-map-tool-label">{{ "Full screen" | tr }}</span></button>
         <button type="button" id="share-button" onclick="shareCurrentView()" title="{{ "Share this view" | tr }}"><span id="share-icon" class="ti ti-link" aria-hidden="true"></span><span id="share-label" class="mesh-map-tool-label" data-translate-lang="share_view">Share This View</span></button>
         {% endif %}
+    </div>
+    {% if not dashboard %}
+    <div id="age-options" class="mesh-map-age-options" role="group" aria-label="{{ "How long ago nodes were heard" | tr }}" hidden>
+        <button type="button" data-hours="8">8 h</button><button type="button" data-hours="24">24 h</button><button type="button" data-hours="72">3 d</button><button type="button" data-hours="168">7 d</button>
+    </div>
+    {% endif %}
     </div>
     <p id="map-load-status" class="mesh-float" role="status"></p>
 
@@ -748,7 +767,7 @@ if (mapLegend?.matches('details')) {
     new MapLegend({position: 'topleft'}).addTo(map);
 }
 // Map page: fit and share as a control under the layer picker.
-const mapTools = document.getElementById('map-tools');
+const mapTools = document.getElementById('map-tools-control');
 if (mapTools) {
     const MapTools = L.Control.extend({
         onAdd() {
@@ -1140,33 +1159,71 @@ initMapPolling();
    LOAD NODES
    ====================================================== */
 
-fetch('/api/v1/nodes?days_active=3')
+/* How long ago the nodes shown were heard, on the map page: within the last
+   8 hours, a day, 3 days (as Home, and as ever) or a week. A shared link's
+   choice wins, then this browser's; kiosk screens take only the link's. The
+   nodes of the last 3 days are read, or of the week when it is wanted. */
+const AGE_HOURS = [8, 24, 72, 168];
+const AGE_DEFAULT = 72;
+const AGE_KEY = "mapMaxAge";
+const ageButton = document.getElementById("age-button");
+let mapMaxAge = AGE_DEFAULT;
+if (ageButton) {
+    const params = new URLSearchParams(window.location.search);
+    let saved = NaN;
+    if (!params.has("kiosk")) {
+        try { saved = parseInt(localStorage.getItem(AGE_KEY), 10); } catch (_) { /* storage unavailable */ }
+    }
+    const linked = parseInt(params.get("hours"), 10);
+    mapMaxAge = AGE_HOURS.includes(linked) ? linked : AGE_HOURS.includes(saved) ? saved : AGE_DEFAULT;
+}
+const ageDays = hours => hours > 72 ? 7 : 3;
+let loadedDays = ageDays(mapMaxAge);
+
+function passesAge(n){
+    return !ageButton || !n.last_seen_us || n.last_seen_us / 1000 >= Date.now() - mapMaxAge * 3600e3;
+}
+
+function toMapNode(n){
+    return {
+        key: n.node_id ?? n.id,
+        id: n.id,
+        node_id: n.node_id,
+        lat: n.last_lat ? n.last_lat/1e7 : null,
+        long: n.last_long ? n.last_long/1e7 : null,
+        long_name: n.long_name || "",
+        short_name: n.short_name || "",
+        channel: n.channel || "",
+        hw_model: n.hw_model || "",
+        role: n.role || "",
+        firmware: n.firmware || "",
+        last_seen_us: n.last_seen_us || null,
+        is_mqtt_gateway: n.is_mqtt_gateway === true,
+        isRouter: (n.role||"").toLowerCase().includes("router")
+    };
+}
+
+// Adds the nodes not already on the map; returns them.
+function addNodes(list){
+    const added = [];
+    list.forEach(raw => {
+        const n = toMapNode(raw);
+        if(nodeMap.has(n.key)) return;
+        nodes.push(n);
+        nodeMap.set(n.key, n);
+        if(n.channel) channelSet.add(n.channel);
+        added.push(n);
+    });
+    return added;
+}
+
+const nodesLoaded = fetch(`/api/v1/nodes?days_active=${loadedDays}`)
     .then(r=>r.json())
     .then(async data=>{
         await waitForConfig();
         if(!Array.isArray(data.nodes)) throw new Error("Invalid node response");
 
-        nodes = data.nodes.map(n=>({
-            key: n.node_id ?? n.id,
-            id: n.id,
-            node_id: n.node_id,
-            lat: n.last_lat ? n.last_lat/1e7 : null,
-            long: n.last_long ? n.last_long/1e7 : null,
-            long_name: n.long_name || "",
-            short_name: n.short_name || "",
-            channel: n.channel || "",
-            hw_model: n.hw_model || "",
-            role: n.role || "",
-            firmware: n.firmware || "",
-            last_seen_us: n.last_seen_us || null,
-            is_mqtt_gateway: n.is_mqtt_gateway === true,
-            isRouter: (n.role||"").toLowerCase().includes("router")
-        }));
-
-        nodes.forEach(n=>{
-            nodeMap.set(n.key, n);
-            if(n.channel) channelSet.add(n.channel);
-        });
+        addNodes(data.nodes);
 
         renderNodesOnMap();
         createChannelFilters();
@@ -1193,12 +1250,78 @@ fetch('/api/v1/nodes?days_active=3')
         }
     });
 
+// The week's nodes, read once when a week is first picked, added to the
+// three days' with their channels' filters.
+let extendingNodes = null;
+function loadNodeDays(days){
+    if(days <= loadedDays) return Promise.resolve();
+    extendingNodes ??= nodesLoaded
+        .then(() => fetch(`/api/v1/nodes?days_active=${days}`))
+        .then(r => { if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+        .then(data => {
+            const known = new Set(channelSet);
+            const added = addNodes(data.nodes || []);
+            loadedDays = days;
+            renderNodesOnMap(added);
+            const saved = JSON.parse(localStorage.getItem("mapFilters") || "{}");
+            [...channelSet].filter(ch => !known.has(ch)).forEach(ch => addChannelFilter(ch, saved));
+            precisionLoaded = null;
+            if(map.hasLayer(precisionLayer)) loadPrecision();
+            if(map.hasLayer(utilizationLayer)) loadUtilization();
+        })
+        .catch(err => console.error("Failed to load the week's nodes:", err))
+        .finally(() => { extendingNodes = null; });
+    return extendingNodes;
+}
+
+if (ageButton) {
+    const options = document.getElementById("age-options");
+    const shortLabel = hours => options.querySelector(`[data-hours="${hours}"]`).textContent;
+    const sync = () => {
+        const label = MeshI18n.t("Nodes heard in the last {age}", {age: shortLabel(mapMaxAge)});
+        ageButton.title = label;
+        document.getElementById("age-label").textContent = label;
+        ageButton.setAttribute("aria-pressed", String(mapMaxAge !== AGE_DEFAULT));
+        options.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.hours) === mapMaxAge)));
+    };
+    const toggle = open => {
+        if(open){
+            // Level with the clock, wherever it sits in the bar.
+            options.style.top = `${ageButton.getBoundingClientRect().top - ageButton.closest("#map-tools-control").getBoundingClientRect().top}px`;
+        }
+        options.hidden = !open;
+        ageButton.setAttribute("aria-expanded", String(open));
+    };
+    ageButton.addEventListener("click", () => toggle(options.hidden));
+    options.addEventListener("click", event => {
+        const hours = Number(event.target.closest("button[data-hours]")?.dataset.hours);
+        if(!AGE_HOURS.includes(hours)) return;
+        mapMaxAge = hours;
+        try {
+            if(hours === AGE_DEFAULT) localStorage.removeItem(AGE_KEY);
+            else localStorage.setItem(AGE_KEY, String(hours));
+        } catch (_) { /* storage unavailable */ }
+        sync();
+        toggle(false);
+        ageButton.focus();
+        updateNodeVisibility();
+        loadNodeDays(ageDays(hours)).then(updateNodeVisibility);
+    });
+    document.addEventListener("click", event => {
+        if(!options.hidden && !event.target.closest("#age-options, #age-button")) toggle(false);
+    });
+    document.addEventListener("keydown", event => {
+        if(event.key === "Escape" && !options.hidden){ toggle(false); ageButton.focus(); }
+    });
+    sync();
+}
+
 /* ======================================================
    RENDER NODES
    ====================================================== */
 
-function renderNodesOnMap(){
-    nodes.forEach(node=>{
+function renderNodesOnMap(list = nodes){
+    list.forEach(node=>{
         if(isInvalidCoord(node)) return;
 
         const color = hashToColor(node.channel);
@@ -1821,44 +1944,49 @@ function blinkNode(marker,longName,portnum,payload){
    CHANNEL FILTERS
    ====================================================== */
 
-function createChannelFilters(){
+// A channel's filter, in its place among the others by name.
+function addChannelFilter(channel, saved){
     const filterContainer = document.getElementById("map-channel-filters");
+    const cb=document.createElement("input");
+    cb.type="checkbox";
+    cb.className="filter-checkbox";
+    cb.id=`filter-channel-${channel}`;
+    cb.checked = saved[channel] !== false;
+
+    cb.addEventListener("change", saveFiltersToLocalStorage);
+    cb.addEventListener("change", updateNodeVisibility);
+
+    // One pill per channel: checkbox, channel color dot and name stay together.
+    const label=document.createElement("label");
+    label.className="map-filter";
+    // On the map page the dot also picks the channel's color.
+    const dot=document.createElement(CHANNEL_COLORS_EDITABLE ? "button" : "span");
+    dot.className="map-filter-dot";
+    dot.dataset.channel=channel;
+    dot.style.setProperty("--chip-color", hashToColor(channel));
+    if(CHANNEL_COLORS_EDITABLE){
+        dot.type="button";
+        dot.title=MeshI18n.t("Change the color of {channel}", {channel});
+        dot.setAttribute("aria-label", dot.title);
+        dot.setAttribute("aria-haspopup", "dialog");
+        dot.setAttribute("aria-expanded", "false");
+        dot.addEventListener("click", event => {
+            event.preventDefault();
+            toggleChannelColors(channel, dot);
+        });
+    }
+    const name=document.createElement("span");
+    name.textContent=channel;
+    label.append(cb, dot, name);
+    label.dataset.channel=channel;
+    const next=[...filterContainer.children].find(el => el.dataset.channel?.localeCompare(channel) > 0);
+    filterContainer.insertBefore(label, next || null);
+}
+
+function createChannelFilters(){
     const saved = JSON.parse(localStorage.getItem("mapFilters") || "{}");
 
-    [...channelSet].sort((a, b) => a.localeCompare(b)).forEach(channel=>{
-        const cb=document.createElement("input");
-        cb.type="checkbox";
-        cb.className="filter-checkbox";
-        cb.id=`filter-channel-${channel}`;
-        cb.checked = saved[channel] !== false;
-
-        cb.addEventListener("change", saveFiltersToLocalStorage);
-        cb.addEventListener("change", updateNodeVisibility);
-
-        // One pill per channel: checkbox, channel color dot and name stay together.
-        const label=document.createElement("label");
-        label.className="map-filter";
-        // On the map page the dot also picks the channel's color.
-        const dot=document.createElement(CHANNEL_COLORS_EDITABLE ? "button" : "span");
-        dot.className="map-filter-dot";
-        dot.dataset.channel=channel;
-        dot.style.setProperty("--chip-color", hashToColor(channel));
-        if(CHANNEL_COLORS_EDITABLE){
-            dot.type="button";
-            dot.title=MeshI18n.t("Change the color of {channel}", {channel});
-            dot.setAttribute("aria-label", dot.title);
-            dot.setAttribute("aria-haspopup", "dialog");
-            dot.setAttribute("aria-expanded", "false");
-            dot.addEventListener("click", event => {
-                event.preventDefault();
-                toggleChannelColors(channel, dot);
-            });
-        }
-        const name=document.createElement("span");
-        name.textContent=channel;
-        label.append(cb, dot, name);
-        filterContainer.appendChild(label);
-    });
+    [...channelSet].sort((a, b) => a.localeCompare(b)).forEach(channel => addChannelFilter(channel, saved));
 
     const routerOnly=document.getElementById("filter-routers-only");
     const mqttOnly=document.getElementById("filter-mqtt-only");
@@ -2050,7 +2178,7 @@ function passesFilters(n){
     const routerOnly = document.getElementById("filter-routers-only").checked;
     const mqttOnly = document.getElementById("filter-mqtt-only").checked;
     const channel = n.channel && document.getElementById(`filter-channel-${n.channel}`);
-    return (!routerOnly || n.isRouter) && (!mqttOnly || n.is_mqtt_gateway) && !!channel?.checked;
+    return (!routerOnly || n.isRouter) && (!mqttOnly || n.is_mqtt_gateway) && !!channel?.checked && passesAge(n);
 }
 
 /* ======================================================
@@ -2066,7 +2194,7 @@ function passesFilters(n){
 const precisionByNode = new Map();
 let precisionLoaded = null;
 function loadPrecision(){
-    precisionLoaded ??= fetch('/api/v1/nodes?days_active=3&has_position=true&fields=position_precision')
+    precisionLoaded ??= fetch(`/api/v1/nodes?days_active=${loadedDays}&has_position=true&fields=position_precision`)
         .then(r => { if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
         .then(data => {
             precisionByNode.clear();
@@ -2116,7 +2244,7 @@ async function loadUtilization(){
     if(utilizationLoading) return;
     utilizationLoading = true;
     try {
-        const res = await fetch('/api/v1/nodes?days_active=3&has_position=true&fields=channel_utilization,air_util_tx');
+        const res = await fetch(`/api/v1/nodes?days_active=${loadedDays}&has_position=true&fields=channel_utilization,air_util_tx`);
         if(!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         utilizationByNode.clear();
@@ -2203,7 +2331,8 @@ let shareViewResetTimer = null;
 
 function shareCurrentView() {
     const c = map.getCenter();
-    const url = `${window.location.origin}/map?lat=${c.lat.toFixed(6)}&lng=${c.lng.toFixed(6)}&zoom=${map.getZoom()}`;
+    let url = `${window.location.origin}/map?lat=${c.lat.toFixed(6)}&lng=${c.lng.toFixed(6)}&zoom=${map.getZoom()}`;
+    if(mapMaxAge !== AGE_DEFAULT) url += `&hours=${mapMaxAge}`;
 
     navigator.clipboard.writeText(url).then(()=>{
         const btn = document.getElementById('share-button');

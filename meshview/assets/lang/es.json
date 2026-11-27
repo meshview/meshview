@@ -467,6 +467,8 @@
     "Node {id} · details unavailable": "Nodo {id} · detalles no disponibles",
     "Node {id} · no node information available": "Nodo {id} · información no disponible",
     "Nodes": "Nodos",
+    "How long ago nodes were heard": "Cuándo se oyeron los nodos",
+    "Nodes heard in the last {age}": "Nodos oídos hace menos de {age}",
     "Non-preset broadcast": "Difusión sin preset",
     "Not a Packet": "No es un paquete",
     "Only the selected node": "Solo el nodo seleccionado",

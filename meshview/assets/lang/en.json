@@ -460,6 +460,8 @@
     "Node {id} · details unavailable": "Node {id} · details unavailable",
     "Node {id} · no node information available": "Node {id} · no node information available",
     "Nodes": "Nodes",
+    "How long ago nodes were heard": "How long ago nodes were heard",
+    "Nodes heard in the last {age}": "Nodes heard in the last {age}",
     "Non-preset broadcast": "Non-preset broadcast",
     "Not a Packet": "Not a Packet",
     "Only the selected node": "Only the selected node",
