@@ -570,22 +570,18 @@ fn push_node_filter(query: &mut QueryBuilder<Sqlite>, filter: &NodeFilter) {
             );
     }
     if let Some(search) = &filter.search {
+        // Names in any case, whatever their alphabet: "παναγια" finds
+        // "Παναγια", which lower() and LIKE, ASCII's only, would not.
+        let name = format!("(?i){}", regex::escape(search));
         let term = like_literal(&search.to_lowercase());
-        query.push(" AND (");
-        for (i, column) in [
-            "lower(node.long_name)",
-            "lower(node.short_name)",
-            "lower(node.id)",
-            "CAST(node.node_id AS VARCHAR)",
-        ]
-        .iter()
-        .enumerate()
-        {
-            if i > 0 {
-                query.push(" OR ");
-            }
+        query
+            .push(" AND (node.long_name REGEXP ")
+            .push_bind(name.clone())
+            .push(" OR node.short_name REGEXP ")
+            .push_bind(name);
+        for column in ["lower(node.id)", "CAST(node.node_id AS VARCHAR)"] {
             query
-                .push(format!("{column} LIKE '%' || "))
+                .push(format!(" OR {column} LIKE '%' || "))
                 .push_bind(term.clone())
                 .push(" || '%' ESCAPE '/'");
         }

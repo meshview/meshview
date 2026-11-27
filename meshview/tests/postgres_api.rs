@@ -297,7 +297,7 @@ async fn rows(pool: &Pool, now: i64) {
         Option<i64>,
         Option<i64>,
         Option<i64>,
-    ); 9] = [
+    ); 10] = [
         (
             "!00000100",
             256,
@@ -396,6 +396,17 @@ async fn rows(pool: &Pool, now: i64) {
             None,
             None,
             None,
+        ),
+        (
+            "!00000109",
+            265,
+            Some("ΠαναγιαΤουΦαρου"),
+            Some("ΠΤΦ"),
+            Some("CLIENT"),
+            Some("LongFast"),
+            Some(now - HOUR_US),
+            Some(0),
+            Some(1),
         ),
     ];
     for (id, node_id, long, short, role, channel, seen, gateway, located) in nodes {
@@ -677,6 +688,10 @@ const URIS: &[&str] = &[
     "/api/v1/nodes?search=_",
     "/api/v1/nodes?search=100%25",
     "/api/v1/nodes?search=00000a",
+    "/api/v1/nodes?search=%CE%A0%CE%B1%CE%BD%CE%B1%CE%B3%CE%B9%CE%B1",
+    "/api/v1/nodes?search=%CF%84%CE%BF%CF%85%CF%86%CE%B1%CF%81",
+    "/api/v1/nodes?search=%CF%80%CF%84%CF%86",
+    "/api/v1/nodes?search=%C3%B1U",
     "/api/v1/nodes?role=router",
     "/api/v1/nodes?channel=LongFast",
     "/api/v1/nodes?hw_model=RAK4631",
@@ -754,6 +769,13 @@ async fn the_api_answers_the_same_on_either_database() {
         }
     }
     assert!(different.is_empty(), "{}", different.join("\n"));
+    // The same, and something: a name in another alphabet found in any case.
+    let (_, found) = get(&on_pg, "/api/v1/nodes?search=%CF%80%CF%84%CF%86").await;
+    assert!(
+        String::from_utf8(found)
+            .unwrap()
+            .contains("\"node_id\":265")
+    );
     // Most have something to answer, or the comparison proves little.
     // The contact of a node with a key, and one without.
     assert_eq!(get(&on_pg, "/api/v1/node/161/qr").await.0, 200);

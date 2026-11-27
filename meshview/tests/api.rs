@@ -904,6 +904,43 @@ async fn some_nodes(api: &Api) {
         .await;
 }
 
+#[tokio::test]
+async fn names_are_searched_in_any_case_and_alphabet() {
+    let api = api().await;
+    let now = now_us();
+    for (node_id, short, long) in [(1_i64, "ΠΤΦ", "ΠαναγιαΤουΦαρου"), (2, "a.b", "Ελλάδα (Σ)")]
+    {
+        sqlx::query(
+            "INSERT INTO node (id, node_id, short_name, long_name, last_seen_us) \
+             VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(format!("!{node_id:08x}"))
+        .bind(node_id)
+        .bind(short)
+        .bind(long)
+        .bind(now)
+        .execute(&api.pool)
+        .await
+        .unwrap();
+    }
+    let search = |text: &str| {
+        let query: String = form_urlencoded::byte_serialize(text.as_bytes()).collect();
+        format!("/api/v1/nodes?search={query}")
+    };
+
+    for text in ["ΠαναγιαΤουΦαρου", "παναγιατουφαρου", "ΤΟΥΦΑΡ", "πτφ"]
+    {
+        assert_eq!(ids(&api.get(&search(text)).await.1), [1], "{text}");
+    }
+    // Final sigma or not, a sigma.
+    assert_eq!(ids(&api.get(&search("(σ)")).await.1), [2]);
+    // Searched for literally, not as a pattern.
+    assert_eq!(ids(&api.get(&search("a.b")).await.1), [2]);
+    assert_eq!(ids(&api.get(&search("a")).await.1), [2]);
+    assert_eq!(ids(&api.get(&search(".")).await.1), [2]);
+    assert_eq!(ids(&api.get(&search("π.*")).await.1), Vec::<i64>::new());
+}
+
 fn ids(body: &Value) -> Vec<i64> {
     body["nodes"]
         .as_array()

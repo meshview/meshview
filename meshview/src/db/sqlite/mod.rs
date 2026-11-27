@@ -56,6 +56,10 @@ fn options(path: &Path) -> SqliteConnectOptions {
         // them being enforced, and the cleanup deletes in an order that assumes
         // they are not.
         .foreign_keys(false)
+        // SQLite's lower() and LIKE know the case of ASCII letters only: names
+        // are searched for with a regular expression instead, which knows it
+        // of all.
+        .with_regexp()
 }
 
 /// Opens the database for writing, creating it if it is not there, and brings
